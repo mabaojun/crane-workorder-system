@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>司机端小程序 · 吊车作业工单管理系统（界面原型）</title>
+<style>
+:root{
+  --bg:#e9edf2; --card:#ffffff; --txt:#101418; --sub:#4b5563; --line:#d6dce4;
+  --blue:#0b57d0; --blue-d:#083a8c; --red:#c62233; --green:#0a7d33; --amber:#b45309;
+  --purple:#5b21b6; --cyan-bg:#e3f0ff;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:linear-gradient(160deg,#f4f6f9,#dfe6ee);
+  font-family:"Microsoft YaHei","PingFang SC",sans-serif;overflow:hidden}
+#wrap{position:absolute;left:50%;top:50%;transform-origin:center;
+  display:flex;align-items:center;gap:56px}
+/* ---------- 左侧说明 ---------- */
+.note{width:330px;color:#1f2937}
+.note h1{font-size:26px;letter-spacing:1px;color:#0b1f3a}
+.note .tagline{margin:10px 0 22px;color:#475569;font-size:13px;line-height:1.8}
+.note .tagline b{color:var(--blue)}
+.spec{border:1px solid #cfd8e3;border-radius:14px;background:rgba(255,255,255,.75);
+  padding:16px 18px;margin-bottom:14px}
+.spec h4{font-size:14px;margin-bottom:10px;color:#0b1f3a;display:flex;align-items:center;gap:8px}
+.spec h4 i{width:8px;height:8px;border-radius:2px;background:var(--blue);flex:none}
+.spec p{font-size:12px;line-height:1.9;color:#475569}
+.demo-tip{font-size:12px;color:#64748b;border-left:3px solid var(--blue);padding-left:10px;line-height:1.8}
+/* ---------- 手机 ---------- */
+.phone{width:392px;height:820px;background:#111;border-radius:52px;padding:12px;
+  box-shadow:0 30px 80px rgba(15,30,60,.35),inset 0 0 0 3px #2a2f38;flex:none;position:relative}
+.screen{width:100%;height:100%;border-radius:40px;background:var(--bg);overflow:hidden;
+  display:flex;flex-direction:column;position:relative}
+.statusbar{height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  padding:0 26px;font-size:14px;font-weight:700;color:#101418;background:transparent}
+.statusbar .r{display:flex;gap:6px;align-items:center;font-size:12px}
+.pages{flex:1;position:relative;min-height:0}
+.page{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden}
+.page.on{display:flex}
+.scroll{flex:1;overflow-y:auto;padding:12px 14px 20px;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+/* 小程序导航 */
+.nav{flex:none;display:flex;align-items:center;height:52px;padding:0 12px;background:var(--bg)}
+.nav .bk{width:38px;height:38px;border:none;background:none;font-size:22px;color:#101418;cursor:pointer}
+.nav .tt{flex:1;text-align:center;font-size:17px;font-weight:700;color:#101418}
+.nav .cap{width:38px}
+.nav .pill{position:absolute;right:14px;top:52px;display:flex;align-items:center;gap:10px;
+  background:rgba(255,255,255,.9);border:1px solid #dfe3ea;border-radius:16px;padding:4px 12px;
+  font-size:12px;color:#101418;z-index:5}
+/* tabbar */
+.tabbar{flex:none;display:flex;background:#fff;border-top:1px solid var(--line);padding:8px 0 20px}
+.tabbar button{flex:1;border:none;background:none;cursor:pointer;font-size:11px;color:#6b7280;
+  display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0}
+.tabbar button .ic{font-size:24px;line-height:1}
+.tabbar button.on{color:var(--blue);font-weight:700}
+/* ---------- 通用组件（大热区/高对比） ---------- */
+.card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px;
+  border:1px solid var(--line)}
+.sec{font-size:14px;font-weight:800;color:#101418;margin:16px 2px 8px;display:flex;align-items:center}
+.sec small{margin-left:auto;font-weight:400;font-size:12px;color:var(--sub)}
+.chip{display:inline-block;padding:4px 12px;border-radius:8px;font-size:13px;font-weight:800}
+.chip.run{background:#dbeafe;color:var(--blue-d)}
+.chip.wait{background:#fef3c7;color:#92400e}
+.chip.done{background:#dcfce7;color:#14532d}
+.chip.bad{background:#fee2e2;color:#7f1d1d}
+.chip.out{background:#ede9fe;color:var(--purple)}
+.chip.idle{background:#e2e8f0;color:#334155}
+.btn{display:flex;align-items:center;justify-content:center;width:100%;height:60px;
+  border-radius:16px;border:none;font-size:19px;font-weight:800;cursor:pointer;gap:10px;
+  letter-spacing:2px}
+.btn:active{transform:scale(.98)}
+.btn.pri{background:var(--blue);color:#fff;box-shadow:0 4px 0 var(--blue-d)}
+.btn.sec2{background:#fff;color:var(--blue);border:3px solid var(--blue)}
+.btn.grn{background:var(--green);color:#fff;box-shadow:0 4px 0 #055e24}
+.btn.dng{background:#fff;color:var(--red);border:3px solid var(--red)}
+.btn.gry{background:#fff;color:#374151;border:3px solid #9aa4b2}
+.row{display:flex;gap:12px}
+.row>*{flex:1}
+.kv{display:flex;justify-content:space-between;font-size:15px;padding:7px 0;border-bottom:1px dashed #e5e9ef}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--sub)}
+.kv .v{font-weight:700;color:#101418;text-align:right}
+.call{display:inline-flex;align-items:center;gap:6px;background:#e7f0ff;color:var(--blue);
+  font-weight:800;border-radius:10px;padding:8px 14px;font-size:15px;cursor:pointer;border:1px solid #c5dcff}
+/* toast */
+#toast{position:absolute;left:50%;bottom:130px;transform:translateX(-50%) translateY(20px);
+  background:rgba(16,20,24,.92);color:#fff;font-size:14px;padding:12px 20px;border-radius:12px;
+  opacity:0;pointer-events:none;transition:.3s;z-index:99;max-width:300px;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* ---------- 首页 ---------- */
+.home-hd{padding:14px 16px 4px}
+.home-hd .hi{font-size:22px;font-weight:900;color:#101418}
+.home-hd .sub{font-size:13px;color:var(--sub);margin-top:2px}
+.gps{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);
+  border-radius:12px;padding:10px 14px;font-size:13px;font-weight:700;margin:10px 14px}
+.gps .dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(10,125,51,.15)}
+.wcard{background:#fff;border-radius:16px;border:1px solid var(--line);margin-bottom:14px;overflow:hidden;cursor:pointer}
+.wcard .top{display:flex;align-items:center;gap:10px;padding:14px 16px 8px}
+.wcard .top b{font-size:17px;color:#101418;flex:1}
+.wcard .no{font-size:12px;color:#6b7280;padding:0 16px 6px}
+.wcard .info{display:flex;gap:14px;padding:8px 16px;font-size:13px;color:var(--sub);flex-wrap:wrap}
+.wcard .info span b{color:#101418}
+.wcard .foot{border-top:1px dashed var(--line)}
+.day-badge{background:#fff7ed;color:#9a3412;border:1px solid #fdba74;font-size:12px;
+  font-weight:800;border-radius:8px;padding:3px 8px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stats .s{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 0;text-align:center}
+.stats .s b{display:block;font-size:24px;color:#101418}
+.stats .s span{font-size:12px;color:var(--sub)}
+/* stepper */
+.stepper{display:flex;align-items:flex-start;margin:6px 2px 2px}
+.step{flex:1;text-align:center;position:relative}
+.step .d{width:26px;height:26px;border-radius:50%;margin:0 auto 6px;display:flex;align-items:center;
+  justify-content:center;font-size:14px;font-weight:900;background:#e2e8f0;color:#94a3b8;position:relative;z-index:2}
+.step.ok .d{background:var(--blue);color:#fff}
+.step.cur .d{background:var(--blue);color:#fff;box-shadow:0 0 0 5px rgba(11,87,208,.18)}
+.step span{font-size:12px;color:var(--sub);font-weight:700}
+.step.ok span,.step.cur span{color:var(--blue)}
+.step::before{content:"";position:absolute;top:13px;left:-50%;width:100%;height:3px;background:#e2e8f0;z-index:1}
+.step:first-child::before{display:none}
+.step.ok::before,.step.cur::before{background:var(--blue)}
+/* 详情页按钮区提示 */
+.tip{font-size:12px;color:var(--sub);line-height:1.7;margin-top:8px;padding:0 4px}
+.alert-card{background:#fff;border:1px solid var(--line);border-left:6px solid var(--amber);
+  border-radius:14px;padding:12px 14px;font-size:13px;color:#374151;line-height:1.8;margin-bottom:12px}
+/* 签到 */
+.gps-big{background:#fff;border-radius:16px;border:2px solid var(--green);padding:18px;text-align:center;margin-bottom:12px}
+.gps-big .ok-ic{font-size:44px}
+.gps-big b{display:block;font-size:20px;color:var(--green);margin:8px 0 4px}
+.gps-big p{font-size:13px;color:var(--sub)}
+.shots{display:flex;gap:10px}
+.shot{width:84px;height:84px;border-radius:12px;background:#e6ebf2;border:2px dashed #b6c0cd;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;color:#64748b;cursor:pointer}
+.shot.full{background:linear-gradient(135deg,#cfe3ff,#a9c8f5);border:2px solid #9dbff2;color:#0b3a8c;
+  font-size:11px;font-weight:800;justify-content:flex-end;padding-bottom:6px}
+/* 异常 / 变更 选项 */
+.opt{display:flex;align-items:center;gap:12px;background:#fff;border:3px solid var(--line);
+  border-radius:14px;padding:16px;font-size:17px;font-weight:800;color:#101418;cursor:pointer;margin-bottom:10px}
+.opt .em{font-size:24px}
+.opt.sel{border-color:var(--red);color:var(--red);background:#fef2f2}
+.opt.selb{border-color:var(--blue);color:var(--blue);background:#eff6ff}
+textarea{width:100%;min-height:96px;border:2px solid var(--line);border-radius:14px;padding:14px;
+  font-size:15px;font-family:inherit;resize:none;background:#fff;color:#101418}
+textarea:focus{outline:none;border-color:var(--blue)}
+/* 车辆 */
+.vcard{background:#fff;border-radius:16px;border:1px solid var(--line);padding:16px;margin-bottom:14px}
+.vcard .hd{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.vcard .plate{background:#101418;color:#fff;border-radius:8px;padding:6px 12px;font-size:16px;
+  font-weight:900;letter-spacing:1px}
+.vcard .ton{font-size:14px;color:var(--sub);font-weight:700}
+.vcard .bd{font-size:13px;color:var(--sub);line-height:1.8;margin-bottom:12px}
+.mini{width:100%;height:52px;border-radius:14px;font-size:16px;font-weight:800;cursor:pointer;
+  border:none;display:flex;align-items:center;justify-content:center;gap:8px}
+.mini.pri{background:var(--purple);color:#fff}
+.mini.ok2{background:#fff;color:var(--green);border:3px solid var(--green)}
+/* 消息 */
+.msg{display:flex;gap:12px;background:#fff;border:1px solid var(--line);border-radius:14px;
+  padding:14px;margin-bottom:10px}
+.msg .ic2{width:44px;height:44px;border-radius:12px;flex:none;display:flex;align-items:center;
+  justify-content:center;font-size:20px}
+.msg b{font-size:15px;color:#101418}
+.msg p{font-size:13px;color:var(--sub);margin-top:3px;line-height:1.6}
+.msg .chn{margin-top:6px;display:flex;gap:6px}
+.tag2{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:700}
+.tag2.wx{background:#dcfce7;color:#166534}
+.tag2.dx{background:#e0e7ff;color:#3730a3}
+/* 我的 */
+.me-hd{background:linear-gradient(135deg,var(--blue),#1d4ed8);border-radius:18px;padding:20px 18px;
+  color:#fff;margin-bottom:14px}
+.me-hd .nm{font-size:22px;font-weight:900}
+.me-hd .rl{font-size:13px;opacity:.85;margin-top:4px}
+.me-hd .cert{display:inline-block;margin-top:10px;background:rgba(255,255,255,.18);
+  border:1px solid rgba(255,255,255,.35);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700}
+.menu{background:#fff;border-radius:16px;border:1px solid var(--line);overflow:hidden}
+.menu .mi{display:flex;align-items:center;gap:12px;padding:16px;font-size:15px;font-weight:700;
+  color:#101418;border-bottom:1px solid #eef1f5;cursor:pointer}
+.menu .mi:last-child{border-bottom:none}
+.menu .mi .ic2{width:36px;height:36px;border-radius:10px;background:#eef4ff;display:flex;
+  align-items:center;justify-content:center;font-size:17px}
+.menu .mi .ar{margin-left:auto;color:#9ca3af}
+.menu .mi small{margin-left:auto;color:var(--sub);font-weight:400;font-size:13px}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <!-- 左侧设计说明 -->
+  <div class="note">
+    <h1>司机端 · 小程序界面原型</h1>
+    <p class="tagline">面向<b>户外强光作业场景</b>的执行端设计。覆盖：接单通知、定位签到、双节点签退、异常上报、工单变更申请、车辆第三方派单自助标记、工时与加班记录。</p>
+    <div class="spec">
+      <h4><i></i>户外强光可用性（PRD 10.1）</h4>
+      <p>白底深字高对比 · 核心按钮高度 60px 大热区适配手套操作 · 色彩语义化（蓝=进行中 / 红=异常 / 绿=完成 / 紫=第三方派单）· 单手可达、层级扁平、弱网明确提示</p>
+    </div>
+    <div class="spec">
+      <h4><i></i>关键业务演示（可点击体验）</h4>
+      <p>① 首页进入工单 → <b>「当日签退」不结单</b>，「任务结束」自动结单释放车辆<br>② 「车辆」页可演示 <b>第三方派单状态切换</b><br>③ 异常上报：固定选项 + 自定义原因</p>
+    </div>
+    <p class="demo-tip">界面原型 · 仅供功能参考 · 非正式开发版本；数据均为演示样例。</p>
+  </div>
+
+  <!-- 手机 -->
+  <div class="phone">
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><span class="r">●●● ⌁ ▮</span></div>
+      <div class="pages">
+
+        <!-- ========== 首页 / 我的工单 ========== -->
+        <div class="page on" id="pg-home">
+          <div class="scroll">
+            <div class="home-hd">
+              <div class="hi">王建国，早上好 👷</div>
+              <div class="sub">今日 2 项任务 · 1 项进行中 · 天气 多云 14~22℃</div>
+            </div>
+            <div class="gps"><span class="dot"></span>定位已开启 · 定位功能将用于签到与加班位置校验（1km 内有效）</div>
+
+            <div class="sec">进行中 <small>跨天任务</small></div>
+            <div class="wcard" onclick="go('pg-detail')">
+              <div class="top"><b>3#换热站管道吊装</b><span class="chip run">进行中</span></div>
+              <div class="no">GD-1016-021 · 华翔供热有限公司</div>
+              <div class="info">
+                <span>车辆 <b>25t 冀B·66D12</b></span>
+                <span>预计开始 <b>08:30</b></span>
+                <span>吊装 <b>8.6t</b></span>
+              </div>
+              <div class="foot" style="padding:10px 16px;display:flex;align-items:center;gap:8px">
+                <span class="day-badge">跨天任务 · 第 2 天</span>
+                <span style="font-size:12px;color:#6b7280">昨日 08:12 签到 / 18:47 当日签退</span>
+              </div>
+            </div>
+
+            <div class="sec">待执行</div>
+            <div class="wcard">
+              <div class="top"><b>钢结构梁卸车吊装</b><span class="chip wait">待执行</span></div>
+              <div class="no">GD-1016-024 · 鑫源建材（电话代录工单）</div>
+              <div class="info">
+                <span>车辆 <b>25t 冀A·12F09</b></span>
+                <span>预计开始 <b>14:00</b></span>
+                <span>吊装 <b>4.2t</b></span>
+              </div>
+              <div class="foot" style="padding:10px 16px;font-size:12px;color:#6b7280">
+                ⏰ 到预计时间未签到将提醒你，并同步管理员
+              </div>
+            </div>
+
+            <div class="sec">本月概览</div>
+            <div class="stats">
+              <div class="s"><b>14</b><span>本月工单</span></div>
+              <div class="s"><b>142.5h</b><span>累计工时</span></div>
+              <div class="s"><b>6.5h</b><span>加班（1.5h 待审核）</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 工单详情 ========== -->
+        <div class="page" id="pg-detail">
+          <div class="nav"><button class="bk" onclick="go('pg-home')">‹</button><div class="tt">工单详情</div><div class="cap"></div></div>
+          <div class="scroll">
+            <div class="card">
+              <div style="display:flex;align-items:center;gap:10px">
+                <b style="font-size:19px">3#换热站管道吊装</b>
+                <span class="chip run" style="margin-left:auto">进行中</span>
+              </div>
+              <div style="font-size:12px;color:#6b7280;margin-top:4px">GD-1016-021 · 客户：华翔供热有限公司</div>
+              <div class="stepper">
+                <div class="step ok"><div class="d">✓</div><span>已派单</span></div>
+                <div class="step ok"><div class="d">✓</div><span>已接单</span></div>
+                <div class="step cur"><div class="d">●</div><span>进行中</span></div>
+                <div class="step"><div class="d">5</div><span>已完成</span></div>
+              </div>
+              <div class="day-badge" style="margin-top:10px">跨天任务 · 第 2 天（单任务可跨 3~4 天执行）</div>
+            </div>
+
+            <div class="card">
+              <div class="kv"><span class="k">施工地点</span><span class="v">华翔供热 3#换热站（高德点位）</span></div>
+              <div class="kv"><span class="k">预计开始</span><span class="v">今日 08:30</span></div>
+              <div class="kv"><span class="k">吊车 / 车辆</span><span class="v">25t · 冀B·66D12</span></div>
+              <div class="kv"><span class="k">吊装货物</span><span class="v">换热管道组件 · 8.6t（管理员已复核）</span></div>
+              <div class="kv"><span class="k">客户联系人</span><span class="v">张经理 138****2210</span>
+                <span class="call" onclick="toast('拨打电话（演示）')">📞 呼叫</span></div>
+            </div>
+
+            <div class="card" style="border:2px solid var(--blue)">
+              <div class="sec" style="margin:0 0 12px">签到 / 签退 <small>双节点操作</small></div>
+              <button class="btn sec2" onclick="go('pg-checkin')">📍 到场签到（今日）</button>
+              <div style="height:12px"></div>
+              <button class="btn gry" onclick="toast('当日签退：工单保持进行中，次日继续')">🌙 当日任务结束签退</button>
+              <div class="tip">「当日签退」<b>不结束工单</b>，次日到场继续签到施工；跨天记录逐日留痕。</div>
+              <div style="height:12px"></div>
+              <button class="btn grn" onclick="confirmEnd()">✅ 整项任务结束</button>
+              <div class="tip">全部完工后点击：工单<b>自动结单</b>、车辆自动释放，并统计完整工作时长（可对纸质结算单比对）。</div>
+            </div>
+
+            <div class="row">
+              <button class="btn dng" style="height:56px;font-size:16px" onclick="go('pg-exception')">⚠ 异常上报</button>
+              <button class="btn gry" style="height:56px;font-size:16px" onclick="go('pg-change')">📝 工单变更申请</button>
+            </div>
+
+            <div class="alert-card" style="border-left-color:var(--blue)">
+              <b>昨日记录（逐日留痕）</b><br>
+              08:12 到场签到 ✓ ｜ 18:47 当日签退 ✓ ｜ 加班自动记录 <b>0h47m</b>（签退位置在任务地 1km 内，待管理员审核）
+            </div>
+            <div class="alert-card" style="border-left-color:var(--green)">
+              <b>管理员批复</b>（10-15 16:20）<br>同意继续施工，注意高空风载，安全带全程佩戴。—— 刘管理员
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 签到 ========== -->
+        <div class="page" id="pg-checkin">
+          <div class="nav"><button class="bk" onclick="go('pg-detail')">‹</button><div class="tt">到场签到</div><div class="cap"></div></div>
+          <div class="scroll">
+            <div class="gps-big">
+              <div class="ok-ic">✅</div>
+              <b>已进入签到范围</b>
+              <p>距施工点约 <b style="color:#101418;font-size:16px">230 米</b> · 有效范围 1 公里（后台可配置）<br>
+              定位坐标已获取 · 微信实时定位</p>
+            </div>
+            <div class="sec">现场照片 <small>不限张数 · 签到照片对客户不可见</small></div>
+            <div class="card">
+              <div class="shots">
+                <div class="shot full">现场照 1</div>
+                <div class="shot full">现场照 2</div>
+                <div class="shot" onclick="toast('调用相机拍照（演示）')">＋</div>
+              </div>
+            </div>
+            <div class="alert-card">⏰ 预计开始 08:30，<b>超时未签到将提醒你并同步管理员 / 总监</b>（微信订阅 + 短信）</div>
+            <button class="btn pri" onclick="toast('签到成功！工单已进入「进行中」，人车状态已联动');setTimeout(()=>go('pg-detail'),900)">确认签到 · 开始任务</button>
+          </div>
+        </div>
+
+        <!-- ========== 异常上报 ========== -->
+        <div class="page" id="pg-exception">
+          <div class="nav"><button class="bk" onclick="go('pg-detail')">‹</button><div class="tt">异常上报</div><div class="cap"></div></div>
+          <div class="scroll">
+            <div class="sec" style="margin-top:2px">异常类型 <small>固定选项 / 可自定义</small></div>
+            <div class="opt" onclick="selEx(this)"><span class="em">🌧</span>下雨</div>
+            <div class="opt" onclick="selEx(this)"><span class="em">🏗</span>甲方停工</div>
+            <div class="opt" onclick="selEx(this)"><span class="em">🔧</span>车辆故障</div>
+            <div class="sec">自定义原因（可选）</div>
+            <div class="card"><textarea placeholder="手动输入异常原因说明，将随异常类型一并提交，并对客户公开…"></textarea></div>
+            <div class="sec">配图 <small>不限张数</small></div>
+            <div class="card"><div class="shots">
+              <div class="shot" onclick="toast('调用相机（演示）')">＋</div>
+            </div></div>
+            <button class="btn dng" style="border-width:0;background:var(--red);color:#fff;box-shadow:0 4px 0 #7f1d1d"
+              onclick="toast('异常已提交，等待管理员批复（已同步后台与手机端）');setTimeout(()=>go('pg-detail'),900)">提交异常</button>
+            <div class="tip" style="text-align:center">提交后后台与管理员手机端实时接收，异常原因（含自定义）对客户公开</div>
+          </div>
+        </div>
+
+        <!-- ========== 工单变更申请 ========== -->
+        <div class="page" id="pg-change">
+          <div class="nav"><button class="bk" onclick="go('pg-detail')">‹</button><div class="tt">工单变更申请</div><div class="cap"></div></div>
+          <div class="scroll">
+            <div class="alert-card" style="border-left-color:var(--blue)">
+              申请提交后由<b>管理员审批</b>；审批通过后管理员将修改工单并重新派单。取消工单将通知客户，变更 / 重派将通知客户与司机。
+            </div>
+            <div class="sec" style="margin-top:2px">申请类型</div>
+            <div class="opt" onclick="selCh(this)"><span class="em">🚫</span>取消工单（客户 / 现场原因无法执行）</div>
+            <div class="opt" onclick="selCh(this)"><span class="em">🚛</span>车辆更换</div>
+            <div class="opt" onclick="selCh(this)"><span class="em">🕐</span>延期 / 变更执行时间</div>
+            <div class="opt" onclick="selCh(this)"><span class="em">📍</span>变更施工地点 / 其他</div>
+            <div class="sec">变更原因</div>
+            <div class="card"><textarea placeholder="填写变更原因（可自定义说明）…"></textarea></div>
+            <div class="sec">佐证照片 <small>不限张数</small></div>
+            <div class="card"><div class="shots"><div class="shot" onclick="toast('调用相机（演示）')">＋</div></div></div>
+            <button class="btn pri" onclick="toast('变更申请已提交，等待管理员审批（全程留痕）');setTimeout(()=>go('pg-detail'),900)">提交申请</button>
+          </div>
+        </div>
+
+        <!-- ========== 车辆管理 ========== -->
+        <div class="page" id="pg-vehicle">
+          <div class="nav"><div class="bk" style="visibility:hidden">‹</div><div class="tt">我的车辆</div><div class="cap"></div></div>
+          <div class="scroll">
+            <div class="alert-card" style="border-left-color:var(--purple)">
+              接到<b>其他公司工单</b>时，可将车辆标记为「忙碌（第三方派单）」：<b>无需管理员审核</b>，仅改状态；
+              外部任务完成后恢复空闲。标记期间本系统不可派单、不可被客户选车；外部占用时长单独统计。
+            </div>
+
+            <div class="vcard">
+              <div class="hd"><span class="plate">冀B·66D12</span><span class="ton">50t 汽车吊</span>
+                <span class="chip run" style="margin-left:auto" id="v1chip">作业中</span></div>
+              <div class="bd">当前绑定工单 GD-1016-021（3#换热站管道吊装）· 与工单、司机三方绑定中，任务结束自动释放。</div>
+              <button class="mini ok2" disabled style="opacity:.55">任务进行中 · 状态由工单联动</button>
+            </div>
+
+            <div class="vcard">
+              <div class="hd"><span class="plate">冀A·12F09</span><span class="ton">25t 汽车吊</span>
+                <span class="chip idle" style="margin-left:auto" id="v2chip">空闲</span></div>
+              <div class="bd" id="v2desc">当前可被本系统派单，也可临时派给其他司机使用（一人多车分别独立标记）。</div>
+              <button class="mini pri" id="v2btn" onclick="toggleV2()">🚚 标记「忙碌（第三方派单）」</button>
+            </div>
+
+            <div class="sec">状态变更记录</div>
+            <div class="card">
+              <div class="kv"><span class="k">10-15 07:50</span><span class="v">冀B·66D12 空闲 → 作业中</span></div>
+              <div class="kv"><span class="k">10-12 18:20</span><span class="v">冀A·12F09 第三方派单 → 空闲</span></div>
+              <div class="kv"><span class="k">10-12 08:05</span><span class="v">冀A·12F09 空闲 → 第三方派单</span></div>
+              <div class="kv"><span class="k">本月外部占用</span><span class="v">冀A·12F09 累计 46h（计入使用率）</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 消息 ========== -->
+        <div class="page" id="pg-msg">
+          <div class="nav"><div class="bk" style="visibility:hidden">‹</div><div class="tt">消息通知</div><div class="cap"></div></div>
+          <div class="scroll">
+            <div class="msg"><div class="ic2" style="background:#eff6ff">📋</div>
+              <div><b>新工单下发：钢结构梁卸车吊装</b><p>GD-1016-024 · 今日 14:00 · 鑫源建材<br>车辆 25t 冀A·12F09 · 吊装 4.2t</p>
+              <div class="chn"><span class="tag2 wx">微信订阅</span><span class="tag2 dx">短信</span></div></div></div>
+            <div class="msg"><div class="ic2" style="background:#eff6ff">✅</div>
+              <div><b>管理员批复：同意继续施工</b><p>GD-1016-021 异常批复：注意高空风载，安全带全程佩戴。</p>
+              <div class="chn"><span class="tag2 wx">微信订阅</span><span class="tag2 dx">短信</span></div></div></div>
+            <div class="msg"><div class="ic2" style="background:#fef2f2">⏰</div>
+              <div><b>超时未签到提醒</b><p>GD-1015-016 已超预计开始时间，请尽快到场签到（已同步管理员 / 总监）。</p>
+              <div class="chn"><span class="tag2 wx">微信订阅</span><span class="tag2 dx">短信</span></div></div></div>
+            <div class="msg"><div class="ic2" style="background:#f5f3ff">🕒</div>
+              <div><b>加班记录待审核</b><p>10-15 加班 0h47m 已自动记录，待管理员审核确认后计入绩效。</p>
+              <div class="chn"><span class="tag2 wx">站内</span></div></div></div>
+          </div>
+        </div>
+
+        <!-- ========== 我的 ========== -->
+        <div class="page" id="pg-mine">
+          <div class="nav"><div class="bk" style="visibility:hidden">‹</div><div class="tt">个人中心</div><div class="cap"></div></div>
+          <div class="scroll">
+            <div class="me-hd">
+              <div class="nm">王建国</div>
+              <div class="rl">员工 / 司机 · 工号 YG-0027 · 常用车辆 冀B·66D12 + 冀A·12F09</div>
+              <span class="cert">特种设备作业证 Q2（吊车操作）· 驾驶证 B2</span>
+            </div>
+            <div class="stats" style="margin-bottom:14px">
+              <div class="s"><b>14</b><span>本月工单</span></div>
+              <div class="s"><b>12</b><span>完工</span></div>
+              <div class="s"><b>4.8★</b><span>客户评分</span></div>
+            </div>
+            <div class="menu">
+              <div class="mi" onclick="toast('打开个人档案（演示）')"><span class="ic2">👤</span>个人档案<small>由管理员维护</small><span class="ar">›</span></div>
+              <div class="mi" onclick="toast('打开工时明细（演示）')"><span class="ic2">⏱</span>工时明细<small>142.5h</small><span class="ar">›</span></div>
+              <div class="mi" onclick="toast('打开加班记录（演示）')"><span class="ic2">🌙</span>加班记录<small>6.5h · 1.5h 待审核</small><span class="ar">›</span></div>
+              <div class="mi" onclick="toast('打开历史工单（演示）')"><span class="ic2">📄</span>历史工单<small>86 单</small><span class="ar">›</span></div>
+            </div>
+            <div class="tip" style="text-align:center;margin-top:14px">工作时长与加班数据全程留痕，支持与纸质结算单比对审计</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabbar -->
+      <div class="tabbar">
+        <button class="on" data-pg="pg-home" onclick="tab(this)"><span class="ic">📋</span>工单</button>
+        <button data-pg="pg-vehicle" onclick="tab(this)"><span class="ic">🚚</span>车辆</button>
+        <button data-pg="pg-msg" onclick="tab(this)"><span class="ic">🔔</span>消息</button>
+        <button data-pg="pg-mine" onclick="tab(this)"><span class="ic">👤</span>我的</button>
+      </div>
+
+      <div id="toast"></div>
+      <!-- 小程序胶囊 -->
+      <div class="pill"><span>⋯</span><span style="width:1px;height:12px;background:#d6dce4"></span><span>◉</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 自适应
+function fit(){
+  const s=Math.min(innerWidth/1180,innerHeight/880,1);
+  document.getElementById('wrap').style.transform='translate(-50%,-50%) scale('+s+')';
+}
+addEventListener('resize',fit);fit();
+
+const pages=document.querySelectorAll('.page');
+function go(id){
+  pages.forEach(p=>p.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+}
+function tab(btn){
+  document.querySelectorAll('.tabbar button').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  go(btn.dataset.pg);
+}
+function toast(t){
+  const el=document.getElementById('toast');
+  el.textContent=t;el.classList.add('show');
+  clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),1800);
+}
+function selEx(el){
+  el.parentElement.querySelectorAll('.opt').forEach(o=>o.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function selCh(el){
+  el.parentElement.querySelectorAll('.opt').forEach(o=>o.classList.remove('selb'));
+  el.classList.add('selb');
+}
+function confirmEnd(){
+  if(confirm('确认整项任务已全部完成？\n\n· 工单将自动结单（无需管理员确认）\n· 车辆自动释放回「空闲」\n· 自动统计完整工作时长')){
+    toast('任务结束！工单已自动结单，车辆已释放，工时已统计存档');
+    setTimeout(()=>go('pg-home'),1000);
+  }
+}
+// 第三方派单切换演示
+let out=false;
+function toggleV2(){
+  out=!out;
+  const chip=document.getElementById('v2chip'),btn=document.getElementById('v2btn'),desc=document.getElementById('v2desc');
+  if(out){
+    chip.textContent='忙碌（第三方派单）';chip.className='chip out';
+    btn.className='mini ok2';btn.textContent='✅ 恢复空闲';
+    desc.innerHTML='已被标记为外部占用：<b>本系统内不可派单、不可被客户选车</b>；外部占用时长将单独统计并计入车辆使用率。';
+    toast('已标记「忙碌（第三方派单）」，无需管理员审核，已同步后台');
+  }else{
+    chip.textContent='空闲';chip.className='chip idle';
+    btn.className='mini pri';btn.textContent='🚚 标记「忙碌（第三方派单）」';
+    desc.innerHTML='当前可被本系统派单，也可临时派给其他司机使用（一人多车分别独立标记）。';
+    toast('车辆已恢复空闲，重新进入本系统运力池');
+  }
+}
+</script>
+</body>
+</html>

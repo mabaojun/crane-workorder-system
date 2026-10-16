@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>数据驾驶舱 · 吊车作业工单全流程管理系统（界面原型）</title>
+<style>
+:root{
+  --bg0:#060c1a; --bg1:#0a1428; --panel:rgba(13,28,54,.72);
+  --line:rgba(64,156,255,.18); --line2:rgba(64,156,255,.35);
+  --cyan:#38bdf8; --cyan2:#7dd3fc; --txt:#dbe7f5; --sub:#7d93b5;
+  --red:#fb4d63; --orange:#ffab40; --green:#3ddc97; --purple:#b388ff;
+  --amber:#ffd54f;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:var(--bg0);overflow:hidden;
+  font-family:"Microsoft YaHei","PingFang SC",sans-serif;color:var(--txt)}
+#stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;
+  transform-origin:center center;
+  background:
+    radial-gradient(1200px 600px at 50% -10%,rgba(56,189,248,.10),transparent 60%),
+    radial-gradient(900px 500px at 100% 110%,rgba(179,136,255,.07),transparent 60%),
+    linear-gradient(180deg,var(--bg1),var(--bg0));}
+#stage::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(64,156,255,.04) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(64,156,255,.04) 1px,transparent 1px);
+  background-size:48px 48px}
+/* ---------- Header ---------- */
+header{position:relative;height:92px;display:flex;align-items:center;
+  padding:0 36px;border-bottom:1px solid var(--line)}
+header .logo{display:flex;align-items:center;gap:14px;width:430px}
+header .logo .mark{width:44px;height:44px;border-radius:10px;
+  background:linear-gradient(135deg,var(--cyan),#2563eb);
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;color:#03101f;font-weight:900;
+  box-shadow:0 0 18px rgba(56,189,248,.55)}
+header .logo b{font-size:17px;letter-spacing:1px}
+header .logo i{display:block;font-style:normal;font-size:11px;color:var(--sub);letter-spacing:2px}
+header h1{flex:1;text-align:center;font-size:30px;letter-spacing:6px;font-weight:700;
+  background:linear-gradient(180deg,#fff,#8ec9ff);-webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 30px rgba(56,189,248,.25)}
+header .meta{width:430px;display:flex;justify-content:flex-end;align-items:center;gap:22px;
+  font-size:14px;color:var(--sub)}
+header .meta .clock{font-size:24px;font-weight:700;color:var(--cyan2);font-family:Consolas,monospace;letter-spacing:2px}
+header .meta .tag{padding:5px 12px;border:1px solid var(--line2);border-radius:20px;font-size:12px;color:var(--cyan2)}
+header::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan) 50%,transparent);opacity:.7}
+/* ---------- Layout ---------- */
+main{position:relative;height:988px;display:grid;grid-template-columns:430px 1fr 430px;
+  gap:16px;padding:16px 20px 18px}
+.col{display:flex;flex-direction:column;gap:16px;min-height:0}
+.card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:16px 18px;backdrop-filter:blur(4px);display:flex;flex-direction:column;min-height:0}
+.card::before,.card::after{content:"";position:absolute;width:14px;height:14px;pointer-events:none}
+.card::before{left:-1px;top:-1px;border-left:2px solid var(--cyan);border-top:2px solid var(--cyan)}
+.card::after{right:-1px;bottom:-1px;border-right:2px solid var(--cyan);border-bottom:2px solid var(--cyan)}
+.card h3{font-size:17px;letter-spacing:1px;display:flex;align-items:center;gap:8px;margin-bottom:12px;flex:none}
+.card h3::before{content:"";width:4px;height:16px;border-radius:2px;
+  background:linear-gradient(180deg,var(--cyan),#2563eb);box-shadow:0 0 8px rgba(56,189,248,.8)}
+.card h3 small{margin-left:auto;font-size:11px;color:var(--sub);font-weight:400;letter-spacing:0}
+/* ---------- KPI ---------- */
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:12px 14px;position:relative;overflow:hidden;
+  background:rgba(56,189,248,.04)}
+.kpi .v{font-size:42px;font-weight:800;font-family:Consolas,monospace;line-height:1.1}
+.kpi .l{font-size:13px;color:var(--sub);margin-top:2px}
+.kpi .d{position:absolute;right:10px;top:10px;font-size:11px;padding:2px 8px;border-radius:10px}
+.kpi.c1 .v{color:var(--cyan2)} .kpi.c2 .v{color:var(--amber)} .kpi.c3 .v{color:var(--red)} .kpi.c4 .v{color:var(--green)}
+.kpi.c1{box-shadow:inset 0 0 24px rgba(56,189,248,.08)}
+.kpi.c2{box-shadow:inset 0 0 24px rgba(255,213,79,.07)}
+.kpi.c3{box-shadow:inset 0 0 24px rgba(251,77,99,.08)}
+.kpi.c4{box-shadow:inset 0 0 24px rgba(61,220,151,.07)}
+/* ---------- Donut ---------- */
+.donut-wrap{display:flex;align-items:center;gap:20px;flex:1}
+.donut{position:relative;width:180px;height:180px;flex:none}
+.donut svg{transform:rotate(-90deg)}
+.donut .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.donut .c b{font-size:40px;font-family:Consolas,monospace;color:#fff}
+.donut .c span{font-size:12px;color:var(--sub)}
+.legend{flex:1;display:flex;flex-direction:column;gap:12px}
+.legend .li{display:flex;align-items:center;gap:10px;font-size:14px}
+.legend .li i{width:10px;height:10px;border-radius:3px;flex:none}
+.legend .li b{margin-left:auto;font-family:Consolas,monospace;font-size:18px}
+.legend .li span{color:var(--sub);font-size:12px;width:52px;text-align:right}
+/* ---------- demand list ---------- */
+.dlist{display:flex;flex-direction:column;gap:10px;flex:1;overflow:hidden}
+.ditem{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:8px;background:rgba(255,255,255,.02);font-size:13px}
+.ditem .nm{font-weight:700;flex:none}
+.ditem .ds{color:var(--sub);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{padding:3px 10px;border-radius:12px;font-size:11px;flex:none;border:1px solid}
+.chip.warn{color:var(--amber);border-color:rgba(255,213,79,.4);background:rgba(255,213,79,.08)}
+.chip.ok{color:var(--green);border-color:rgba(61,220,151,.4);background:rgba(61,220,151,.08)}
+.chip.no{color:var(--red);border-color:rgba(251,77,99,.4);background:rgba(251,77,99,.08)}
+.chip.blue{color:var(--cyan2);border-color:rgba(56,189,248,.4);background:rgba(56,189,248,.08)}
+.chip.grey{color:var(--sub);border-color:rgba(125,147,181,.4);background:rgba(125,147,181,.08)}
+/* ---------- alarm ---------- */
+.alarm-list{display:flex;flex-direction:column;gap:10px}
+.alarm{display:flex;gap:14px;align-items:center;border-radius:10px;padding:12px 16px;
+  border:1px solid rgba(251,77,99,.45);background:linear-gradient(90deg,rgba(251,77,99,.14),rgba(251,77,99,.03));
+  animation:breath 2.2s ease-in-out infinite}
+.alarm.mid{border-color:rgba(255,171,64,.45);background:linear-gradient(90deg,rgba(255,171,64,.13),rgba(255,171,64,.02))}
+.alarm .lv{flex:none;width:52px;text-align:center;font-weight:800;font-size:13px;border-radius:6px;padding:6px 0}
+.alarm .lv.h{background:rgba(251,77,99,.9);color:#fff;box-shadow:0 0 14px rgba(251,77,99,.6)}
+.alarm .lv.m{background:rgba(255,171,64,.85);color:#3a2200}
+.alarm .tx{flex:1;min-width:0}
+.alarm .tx b{font-size:15px}
+.alarm .tx p{font-size:12px;color:var(--sub);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.alarm .tm{flex:none;text-align:right;font-family:Consolas,monospace}
+.alarm .tm b{font-size:18px;color:var(--red)}
+.alarm.mid .tm b{color:var(--orange)}
+.alarm .tm span{display:block;font-size:11px;color:var(--sub)}
+@keyframes breath{0%,100%{box-shadow:0 0 0 rgba(251,77,99,0)}50%{box-shadow:0 0 22px rgba(251,77,99,.35)}}
+.alarm-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.alarm-head .dot{width:9px;height:9px;border-radius:50%;background:var(--red);box-shadow:0 0 10px var(--red);
+  animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.25}}
+/* ---------- map ---------- */
+.map{flex:1;position:relative;border-radius:10px;overflow:hidden;min-height:0;
+  background:linear-gradient(160deg,#0b1c38,#071226)}
+.map .road{position:absolute;background:rgba(64,156,255,.14)}
+.map .road.v{width:2px;height:100%}
+.map .road.h{height:2px;width:100%}
+.map .blk{position:absolute;border:1px solid rgba(64,156,255,.12);background:rgba(64,156,255,.05);border-radius:4px}
+.radar{position:absolute;left:50%;top:52%;width:340px;height:340px;transform:translate(-50%,-50%);
+  border-radius:50%;border:1px solid rgba(56,189,248,.25);
+  background:conic-gradient(from 0deg,rgba(56,189,248,.35),transparent 70deg);
+  animation:spin 5s linear infinite;mask:radial-gradient(circle,#000 0%,#000 100%)}
+@keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+.ring{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);border-radius:50%;
+  border:1px dashed rgba(56,189,248,.2)}
+.pin{position:absolute;width:14px;height:14px;border-radius:50%;transform:translate(-50%,-50%);cursor:default}
+.pin::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:2px solid currentColor;
+  animation:ripple 1.8s ease-out infinite}
+@keyframes ripple{from{transform:scale(.4);opacity:1}to{transform:scale(1.6);opacity:0}}
+.pin.work{background:var(--cyan);color:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+.pin.done{background:var(--green);color:var(--green)}
+.pin.warn{background:var(--orange);color:var(--orange)}
+.pin.bad{background:var(--red);color:var(--red);box-shadow:0 0 16px var(--red)}
+.pin.out{background:var(--purple);color:var(--purple)}
+.pin i{position:absolute;left:20px;top:-4px;font-style:normal;font-size:11px;color:var(--txt);
+  background:rgba(7,18,38,.85);padding:2px 8px;border-radius:4px;white-space:nowrap;border:1px solid var(--line)}
+.map .lg{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px;
+  background:rgba(7,18,38,.8);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:12px}
+.map .lg span{display:flex;align-items:center;gap:8px;color:var(--sub)}
+.map .lg i{width:8px;height:8px;border-radius:50%}
+.map .hd{position:absolute;left:12px;top:12px;font-size:12px;color:var(--sub);
+  background:rgba(7,18,38,.8);border:1px solid var(--line);padding:6px 12px;border-radius:6px}
+.map .hd b{color:var(--cyan2)}
+/* ---------- bars ---------- */
+.bars{flex:1;display:flex;align-items:flex-end;gap:26px;padding:6px 8px 0;min-height:0}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+.bar .col-b{width:34px;border-radius:6px 6px 2px 2px;position:relative;
+  background:linear-gradient(180deg,var(--cyan),rgba(37,99,235,.35));height:0;
+  transition:height 1.2s cubic-bezier(.2,.8,.2,1);box-shadow:0 0 14px rgba(56,189,248,.25)}
+.bar.hot .col-b{background:linear-gradient(180deg,#ff8a9d,rgba(251,77,99,.3));box-shadow:0 0 14px rgba(251,77,99,.3)}
+.bar b{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:13px;font-family:Consolas,monospace;color:var(--cyan2)}
+.bar.hot b{color:#ff8a9d}
+.bar span{font-size:12px;color:var(--sub)}
+.dist{display:flex;flex-direction:column;gap:12px;flex:1;justify-content:center}
+.dist .row{display:flex;align-items:center;gap:12px;font-size:13px}
+.dist .row .n{width:84px;flex:none;color:var(--txt)}
+.dist .row .track{flex:1;height:14px;border-radius:7px;background:rgba(255,255,255,.05);overflow:hidden}
+.dist .row .fill{height:100%;border-radius:7px;width:0;transition:width 1.2s cubic-bezier(.2,.8,.2,1)}
+.dist .row b{width:36px;text-align:right;font-family:Consolas,monospace;font-size:16px}
+.f-rain .fill{background:linear-gradient(90deg,#42a5f5,#1e88e5)}
+.f-stop .fill{background:linear-gradient(90deg,#ffd54f,#ffb300)}
+.f-broke .fill{background:linear-gradient(90deg,#fb4d63,#e53950)}
+/* ---------- vehicles ---------- */
+.vrow{display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px dashed rgba(64,156,255,.12);font-size:13px}
+.vrow:last-child{border-bottom:none}
+.vrow .ic{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex:none}
+.vrow .n{flex:1}
+.vrow .n i{font-style:normal;display:block;font-size:11px;color:var(--sub)}
+.vrow b{font-family:Consolas,monospace;font-size:18px}
+.ic.idle{background:rgba(61,220,151,.15);color:var(--green)}
+.ic.working{background:rgba(56,189,248,.15);color:var(--cyan2)}
+.ic.fault{background:rgba(251,77,99,.15);color:var(--red)}
+.ic.repair{background:rgba(255,213,79,.15);color:var(--amber)}
+.ic.out{background:rgba(179,136,255,.15);color:var(--purple)}
+/* ---------- staff / ai / rank ---------- */
+.staff{display:flex;gap:12px}
+.staff .s{flex:1;border:1px solid var(--line);border-radius:8px;padding:10px 0;text-align:center;background:rgba(255,255,255,.02)}
+.staff .s b{font-size:26px;font-family:Consolas,monospace;display:block}
+.staff .s span{font-size:12px;color:var(--sub)}
+.ai-box{border:1px solid rgba(179,136,255,.35);border-radius:10px;padding:12px 14px;
+  background:linear-gradient(135deg,rgba(179,136,255,.10),rgba(56,189,248,.05));font-size:13px;line-height:1.9;color:#cfd9ea}
+.ai-box .hd2{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-weight:700;color:#d7c5ff}
+.ai-box .hd2 .ai-ic{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#b388ff,#38bdf8);
+  display:flex;align-items:center;justify-content:center;font-size:12px;color:#101528;font-weight:900}
+.ai-box ul{list-style:none}
+.ai-box li::before{content:"▸ ";color:var(--purple)}
+.rank{display:flex;flex-direction:column;gap:9px;flex:1;justify-content:space-around}
+.rrow{display:flex;align-items:center;gap:12px;font-size:13px}
+.rrow .no{width:24px;height:24px;border-radius:6px;flex:none;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:12px;background:rgba(255,255,255,.08);color:var(--sub)}
+.rrow:nth-child(1) .no{background:linear-gradient(135deg,#ffd54f,#ff9800);color:#3a2200}
+.rrow:nth-child(2) .no{background:linear-gradient(135deg,#e0e6ee,#9fb0c3);color:#1b2735}
+.rrow:nth-child(3) .no{background:linear-gradient(135deg,#ffab91,#f4511e);color:#3a1200}
+.rrow .nm{width:64px}
+.rrow .track{flex:1;height:10px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden}
+.rrow .fill{height:100%;width:0;background:linear-gradient(90deg,#38bdf8,#2563eb);transition:width 1.2s .2s}
+.rrow b{width:56px;text-align:right;font-family:Consolas,monospace;font-size:15px;color:var(--cyan2)}
+.foot-note{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:11px;color:rgba(125,147,181,.5);letter-spacing:1px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header>
+    <div class="logo">
+      <div class="mark">吊</div>
+      <div><b>吊车作业工单全流程管理系统</b><i>CRANE OPERATION COMMAND CENTER</i></div>
+    </div>
+    <h1>数 据 驾 驶 舱</h1>
+    <div class="meta">
+      <span class="tag">管理员 / 总监视角</span>
+      <span>2026-10-16 星期五</span>
+      <span class="clock" id="clock">20:00:00</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- ============ 左列 ============ -->
+    <div class="col">
+      <div class="card" style="height:216px">
+        <h3>今日工单总览 <small>TODAY OVERVIEW</small></h3>
+        <div class="kpis">
+          <div class="kpi c1"><div class="v" data-n="42">0</div><div class="l">工单总数</div></div>
+          <div class="kpi c2"><div class="v" data-n="14">0</div><div class="l">进行中</div></div>
+          <div class="kpi c3"><div class="v" data-n="3">0</div><div class="l">施工受阻</div></div>
+          <div class="kpi c4"><div class="v" data-n="25">0</div><div class="l">已完成</div></div>
+        </div>
+      </div>
+
+      <div class="card" style="flex:1">
+        <h3>工单状态分布 <small>STATUS</small></h3>
+        <div class="donut-wrap">
+          <div class="donut">
+            <svg width="180" height="180" viewBox="0 0 180 180">
+              <circle cx="90" cy="90" r="70" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="20"/>
+              <!-- 周长≈439.8：进行中14 / 受阻3 / 已完成25 -->
+              <circle cx="90" cy="90" r="70" fill="none" stroke="#38bdf8" stroke-width="20" stroke-linecap="butt"
+                stroke-dasharray="146.6 293.2" stroke-dashoffset="0"/>
+              <circle cx="90" cy="90" r="70" fill="none" stroke="#fb4d63" stroke-width="20"
+                stroke-dasharray="31.4 408.4" stroke-dashoffset="-146.6"/>
+              <circle cx="90" cy="90" r="70" fill="none" stroke="#3ddc97" stroke-width="20"
+                stroke-dasharray="262.0 177.8" stroke-dashoffset="-178.0"/>
+            </svg>
+            <div class="c"><b>42</b><span>今日工单</span></div>
+          </div>
+          <div class="legend">
+            <div class="li"><i style="background:#38bdf8"></i>进行中<b>14</b><span>33.3%</span></div>
+            <div class="li"><i style="background:#fb4d63"></i>施工受阻<b>3</b><span>7.1%</span></div>
+            <div class="li"><i style="background:#3ddc97"></i>已完成<b>25</b><span>59.6%</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="height:330px">
+        <h3>需求单待处理 <small>DEMAND · 5</small></h3>
+        <div class="dlist">
+          <div class="ditem"><span class="nm">华翔供热</span><span class="ds">3#换热站管道吊装 · 50t · 货物8.6t</span><span class="chip warn">待处理</span></div>
+          <div class="ditem"><span class="nm">鑫源建材</span><span class="ds">钢结构梁吊装 · 25t · 电话代录</span><span class="chip warn">待处理</span></div>
+          <div class="ditem"><span class="nm">城建三局</span><span class="ds">塔吊基座吊运 · 80t · 货物22t</span><span class="chip blue">已编辑</span></div>
+          <div class="ditem"><span class="nm">蓝天市政</span><span class="ds">锅炉组件卸车 · 50t</span><span class="chip ok">已转工单</span></div>
+          <div class="ditem"><span class="nm">个人客户</span><span class="ds">庭院锅炉吊装 · 描述不完整</span><span class="chip no">已驳回</span></div>
+        </div>
+        <p style="font-size:11px;color:var(--sub);margin-top:10px;flex:none">需求单暂存 10 天，超期未转工单自动关闭</p>
+      </div>
+    </div>
+
+    <!-- ============ 中列 ============ -->
+    <div class="col">
+      <div class="card" style="height:262px">
+        <div class="alarm-head">
+          <span class="dot"></span>
+          <h3 style="margin:0">报警中心 <small style="margin-left:8px">ALARM CENTER</small></h3>
+          <small style="margin-left:auto;color:var(--sub);font-size:11px">高等级置顶 · AI 已附处置建议 · 仅系统内推送</small>
+        </div>
+        <div class="alarm-list">
+          <div class="alarm">
+            <div class="lv h">高</div>
+            <div class="tx"><b>车辆长时间占用</b><p>冀A·88K57 处于「忙碌（第三方派单）」已 26h ＞ 阈值 24h ｜ AI：建议联系司机核实返回时间</p></div>
+            <div class="tm"><b>26h</b><span>持续占用</span></div>
+          </div>
+          <div class="alarm mid">
+            <div class="lv m">中</div>
+            <div class="tx"><b>预定时间未到场</b><p>GD-1016-018 王建国 · 预计 09:00 · 已超时 32min ｜ AI：近3日该司机无类似记录，建议电话核实</p></div>
+            <div class="tm"><b>32min</b><span>超时时长</span></div>
+          </div>
+          <div class="alarm mid">
+            <div class="lv m">中</div>
+            <div class="tx"><b>未执行签到</b><p>GD-1016-021 李强 · 已接单且进入范围 · 超 30min 未提交签到与照片</p></div>
+            <div class="tm"><b>30min</b><span>签到超时</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="flex:1">
+        <div class="map">
+          <div class="hd">施工点位实时分布 · <b>在图 18 / 总 26</b> · 高德地图（原型示意）</div>
+          <div class="road v" style="left:22%"></div><div class="road v" style="left:46%"></div><div class="road v" style="left:71%"></div>
+          <div class="road h" style="top:28%"></div><div class="road h" style="top:56%"></div><div class="road h" style="top:80%"></div>
+          <div class="blk" style="left:24%;top:8%;width:20%;height:18%"></div>
+          <div class="blk" style="left:48%;top:32%;width:21%;height:22%"></div>
+          <div class="blk" style="left:8%;top:60%;width:12%;height:18%"></div>
+          <div class="blk" style="left:74%;top:10%;width:18%;height:16%"></div>
+          <div class="blk" style="left:74%;top:62%;width:16%;height:16%"></div>
+          <div class="radar"></div>
+          <div class="ring" style="width:120px;height:120px"></div>
+          <div class="ring" style="width:220px;height:220px"></div>
+          <div class="ring" style="width:320px;height:320px"></div>
+          <span class="pin work" style="left:31%;top:35%"><i>冀B·66D12 · 作业中</i></span>
+          <span class="pin work" style="left:57%;top:47%"><i>冀A·12F09 · 作业中</i></span>
+          <span class="pin work" style="left:44%;top:70%"><i>冀C·03H77 · 作业中</i></span>
+          <span class="pin done" style="left:20%;top:64%"><i>已完成</i></span>
+          <span class="pin done" style="left:66%;top:24%"><i>已完成</i></span>
+          <span class="pin done" style="left:80%;top:76%"><i>已完成</i></span>
+          <span class="pin out" style="left:14%;top:18%"><i>冀D·51K20 · 第三方派单</i></span>
+          <span class="pin warn" style="left:52%;top:16%"><i>GD-1016-021 · 签到超时</i></span>
+          <span class="pin bad" style="left:36%;top:84%"><i>GD-1016-018 · 未到场</i></span>
+          <div class="lg">
+            <span><i style="background:var(--cyan)"></i>作业中</span>
+            <span><i style="background:var(--green)"></i>已完成</span>
+            <span><i style="background:var(--orange)"></i>超时预警</span>
+            <span><i style="background:var(--red)"></i>报警点位</span>
+            <span><i style="background:var(--purple)"></i>第三方派单</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="height:288px;display:grid;grid-template-columns:1.15fr 1fr;gap:22px">
+        <div style="display:flex;flex-direction:column;min-height:0">
+          <h3 style="flex:none">近 7 日工单趋势 <small>7-DAYS</small></h3>
+          <div class="bars">
+            <div class="bar"><div class="col-b" data-h="46"><b>32</b></div><span>10-10</span></div>
+            <div class="bar"><div class="col-b" data-h="40"><b>28</b></div><span>10-11</span></div>
+            <div class="bar"><div class="col-b" data-h="50"><b>35</b></div><span>10-12</span></div>
+            <div class="bar"><div class="col-b" data-h="43"><b>30</b></div><span>10-13</span></div>
+            <div class="bar"><div class="col-b" data-h="55"><b>38</b></div><span>10-14</span></div>
+            <div class="bar"><div class="col-b" data-h="52"><b>36</b></div><span>10-15</span></div>
+            <div class="bar hot"><div class="col-b" data-h="60"><b>42</b></div><span>今日</span></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;min-height:0">
+          <h3 style="flex:none">异常类型分布 <small>今日 6 起</small></h3>
+          <div class="dist">
+            <div class="row f-rain"><span class="n">下雨</span><div class="track"><div class="fill" data-w="60%"></div></div><b>3</b></div>
+            <div class="row f-stop"><span class="n">甲方停工</span><div class="track"><div class="fill" data-w="40%"></div></div><b>2</b></div>
+            <div class="row f-broke"><span class="n">车辆故障</span><div class="track"><div class="fill" data-w="20%"></div></div><b>1</b></div>
+            <div class="row f-stop"><span class="n">自定义</span><div class="track"><div class="fill" data-w="20%"></div></div><b>1</b></div>
+          </div>
+          <p style="font-size:11px;color:var(--sub);margin-top:8px;flex:none">异常原因（含司机自定义）对客户公开</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 右列 ============ -->
+    <div class="col">
+      <div class="card" style="height:308px">
+        <h3>车辆状态看板 <small>共 26 台</small></h3>
+        <div class="vrow"><span class="ic idle">●</span><span class="n">空闲<i>可派单 / 可被客户选车</i></span><b style="color:var(--green)">8</b></div>
+        <div class="vrow"><span class="ic working">▲</span><span class="n">作业中<i>绑定工单 ↔ 司机</i></span><b style="color:var(--cyan2)">12</b></div>
+        <div class="vrow"><span class="ic out">◈</span><span class="n">忙碌（第三方派单）<i>外部占用 · 不参与派单 · 单独计外部时长</i></span><b style="color:var(--purple)">3</b></div>
+        <div class="vrow"><span class="ic repair">✎</span><span class="n">维修中<i>预计明日恢复 2 台</i></span><b style="color:var(--amber)">2</b></div>
+        <div class="vrow"><span class="ic fault">✖</span><span class="n">故障停用<i>待维修评估</i></span><b style="color:var(--red)">1</b></div>
+        <div style="margin-top:10px;font-size:11px;color:var(--sub);flex:none">车辆使用率 <b style="color:var(--cyan2);font-family:Consolas,monospace">73.1%</b>（含外部占用时长 46h）</div>
+      </div>
+
+      <div class="card" style="height:132px">
+        <h3>人员在岗 <small>STAFF</small></h3>
+        <div class="staff">
+          <div class="s"><b style="color:var(--green)">18</b><span>在岗</span></div>
+          <div class="s"><b style="color:var(--cyan2)">12</b><span>作业中</span></div>
+          <div class="s"><b style="color:var(--amber)">5</b><span>空闲</span></div>
+          <div class="s"><b style="color:var(--sub)">1</b><span>离岗</span></div>
+        </div>
+      </div>
+
+      <div class="card" style="height:238px">
+        <h3>AI 今日工作简报 <small>20:00 定时生成 · 留存10天</small></h3>
+        <div class="ai-box">
+          <div class="hd2"><span class="ai-ic">AI</span>火山引擎 · Coding Plan</div>
+          <ul>
+            <li>今日 42 单，完成率 59.5%，环比 +8.2%</li>
+            <li>异常 6 起：下雨 3 / 甲方停工 2 / 车辆故障 1</li>
+            <li>3 台车辆外出第三方派单，累计外部占用 46h</li>
+            <li>建议：跟进 3 台外出车辆返回计划；明日 4 张需求单待复核转工单</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card" style="flex:1">
+        <h3>本月人效排名 <small>工单数 TOP5</small></h3>
+        <div class="rank">
+          <div class="rrow"><span class="no">1</span><span class="nm">张&nbsp;伟</span><div class="track"><div class="fill" data-w="93%"></div></div><b>14 单</b></div>
+          <div class="rrow"><span class="no">2</span><span class="nm">王建国</span><div class="track"><div class="fill" data-w="80%"></div></div><b>12 单</b></div>
+          <div class="rrow"><span class="no">3</span><span class="nm">李&nbsp;强</span><div class="track"><div class="fill" data-w="73%"></div></div><b>11 单</b></div>
+          <div class="rrow"><span class="no">4</span><span class="nm">赵&nbsp;磊</span><div class="track"><div class="fill" data-w="60%"></div></div><b>9 单</b></div>
+          <div class="rrow"><span class="no">5</span><span class="nm">陈&nbsp;涛</span><div class="track"><div class="fill" data-w="53%"></div></div><b>8 单</b></div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <div class="foot-note">界面原型 · 仅供功能参考 · 非正式开发版本 —— 数据为演示样例</div>
+</div>
+
+<script>
+// 自适应缩放
+function fit(){
+  const s=Math.min(innerWidth/1920,innerHeight/1080);
+  document.getElementById('stage').style.transform=
+    'translate(-50%,-50%) scale('+s+')';
+}
+addEventListener('resize',fit);fit();
+
+// 时钟
+setInterval(()=>{
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  document.getElementById('clock').textContent=p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+},1000);
+
+// 数字滚动
+document.querySelectorAll('[data-n]').forEach(el=>{
+  const t=+el.dataset.n,st=performance.now();
+  (function f(now){const k=Math.min((now-st)/1400,1);
+    el.textContent=Math.round(t*(1-Math.pow(1-k,3)));
+    if(k<1)requestAnimationFrame(f)})(st);
+});
+// 柱状图 / 条形图入场
+setTimeout(()=>{
+  document.querySelectorAll('.col-b').forEach(b=>b.style.height=b.dataset.h+'%');
+  document.querySelectorAll('.dist .fill,.rrow .fill').forEach(f=>f.style.width=f.dataset.w);
+},300);
+</script>
+</body>
+</html>
