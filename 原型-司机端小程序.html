@@ -10,6 +10,9 @@
   --purple:#5b21b6; --cyan-bg:#e3f0ff;
 }
 *{margin:0;padding:0;box-sizing:border-box}
+/* ---------- 统一矢量图标库（全端同风格：24 网格 / 线宽 2 / 圆角端点，禁用 Emoji） ---------- */
+svg.ico{width:1em;height:1em;flex:none;display:inline-block;vertical-align:-.125em;
+  fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 html,body{width:100%;height:100%;background:linear-gradient(160deg,#f4f6f9,#dfe6ee);
   font-family:"Microsoft YaHei","PingFang SC",sans-serif;overflow:hidden}
 #wrap{position:absolute;left:50%;top:50%;transform-origin:center;
@@ -122,6 +125,20 @@ html,body{width:100%;height:100%;background:linear-gradient(160deg,#f4f6f9,#dfe6
 .tip{font-size:12px;color:var(--sub);line-height:1.7;margin-top:8px;padding:0 4px}
 .alert-card{background:#fff;border:1px solid var(--line);border-left:6px solid var(--amber);
   border-radius:14px;padding:12px 14px;font-size:13px;color:#374151;line-height:1.8;margin-bottom:12px}
+/* ---- 工单时间冲突提醒卡片（v5.4） ---- */
+.cfcard{background:linear-gradient(180deg,#fff7ed,#fff);border:2px solid var(--amber);
+  border-radius:16px;padding:14px 16px;margin-bottom:14px;box-shadow:0 4px 14px rgba(180,83,9,.12)}
+.cfcard .cf-hd{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:900;color:#7c2d12}
+.cfcard .cf-hd .chip2{margin-left:auto;background:#fee2e2;color:#7f1d1d;font-size:11px;
+  font-weight:800;border-radius:8px;padding:3px 9px}
+.cfcard p{font-size:13px;color:#4b5563;line-height:1.75;margin:8px 0 12px}
+.cfcard p b{color:#101418}
+.cf-actions{display:flex;gap:8px}
+.cf-actions button{flex:1;height:46px;border-radius:12px;font-size:13px;font-weight:800;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:5px;border:none}
+.cf-actions .a1{background:var(--amber);color:#fff;box-shadow:0 3px 0 #92400e}
+.cf-actions .a2{background:#fff;color:var(--purple);border:2px solid var(--purple)}
+.cf-actions .a3{background:#fff;color:#374151;border:2px solid #9aa4b2}
 /* 签到 */
 .gps-big{background:#fff;border-radius:16px;border:2px solid var(--green);padding:18px;text-align:center;margin-bottom:12px}
 .gps-big .ok-ic{font-size:44px}
@@ -181,18 +198,47 @@ textarea:focus{outline:none;border-color:var(--blue)}
 </style>
 </head>
 <body>
+<!-- ========== 统一矢量图标 sprite（内联，离线可用；全端共用同一套图标） ========== -->
+<svg style="display:none" aria-hidden="true" focusable="false"><defs>
+<symbol id="ic-check" viewBox="0 0 24 24"><path d="M20 6.5 9.5 17 4 11.5"/></symbol>
+<symbol id="ic-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="currentColor"/></symbol>
+<symbol id="ic-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.2"/></symbol>
+<symbol id="ic-phone" viewBox="0 0 24 24"><path d="M6.6 3.5h3l1.5 3.8-2.2 1.4a12.6 12.6 0 0 0 6.4 6.4l1.4-2.2 3.8 1.5v3a2 2 0 0 1-2.2 2A16.8 16.8 0 0 1 4.6 5.7a2 2 0 0 1 2-2.2z"/></symbol>
+<symbol id="ic-headset" viewBox="0 0 24 24"><path d="M4.5 11.5a7.5 7.5 0 0 1 15 0"/><rect x="3" y="11.5" width="4" height="6.5" rx="1.6"/><rect x="17" y="11.5" width="4" height="6.5" rx="1.6"/><path d="M19 18v1a2.5 2.5 0 0 1-2.5 2.5H13"/></symbol>
+<symbol id="ic-pin" viewBox="0 0 24 24"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></symbol>
+<symbol id="ic-moon" viewBox="0 0 24 24"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1z"/></symbol>
+<symbol id="ic-alert" viewBox="0 0 24 24"><path d="M12 3.8 2.8 20h18.4z"/><path d="M12 9.6v4.5"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/></symbol>
+<symbol id="ic-edit" viewBox="0 0 24 24"><path d="M12 20.5h8.5"/><path d="M16.6 3.6a2.1 2.1 0 0 1 3 3L7 19.2l-4.2 1.1 1.1-4.2z"/></symbol>
+<symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.2V12l3.4 2"/></symbol>
+<symbol id="ic-rain" viewBox="0 0 24 24"><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M8 14v6M16 14v6M12 16v6"/></symbol>
+<symbol id="ic-cone" viewBox="0 0 24 24"><path d="M10.4 3.5h3.2l4.4 16.5H6z"/><path d="M7.7 12.5h8.6"/><path d="M4.5 20.5h15"/></symbol>
+<symbol id="ic-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"/></symbol>
+<symbol id="ic-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6 18.4 18.4"/></symbol>
+<symbol id="ic-truck" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></symbol>
+<symbol id="ic-clipboard" viewBox="0 0 24 24"><rect x="8" y="2.5" width="8" height="4" rx="1.2"/><path d="M16 4.5h2a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-14a1 1 0 0 1 1-1h2"/><path d="M12 11.5h4.5M12 16h4.5M8 11.5h.01M8 16h.01"/></symbol>
+<symbol id="ic-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20.5a7.2 7.2 0 0 1 14.4 0"/></symbol>
+<symbol id="ic-bell" viewBox="0 0 24 24"><path d="M18 8.5a6 6 0 1 0-12 0c0 5.5-2 7-2 7h16s-2-1.5-2-7z"/><path d="M10.3 19.5a2 2 0 0 0 3.4 0"/></symbol>
+<symbol id="ic-stopwatch" viewBox="0 0 24 24"><circle cx="12" cy="13.8" r="7.3"/><path d="M12 10.6v3.4l2.5 1.5"/><path d="M9.6 2.8h4.8"/><path d="M12 2.8v3.7"/></symbol>
+<symbol id="ic-file" viewBox="0 0 24 24"><path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z"/><path d="M14 3.5V8.5h5"/><path d="M8.5 13h7M8.5 16.5h4.5"/></symbol>
+<symbol id="ic-building" viewBox="0 0 24 24"><path d="M4 20.5V5.5a2 2 0 0 1 2-2h6.5a2 2 0 0 1 2 2v15"/><path d="M14.5 9.5H18a2 2 0 0 1 2 2v9"/><path d="M2.5 20.5h19"/><path d="M7.5 8h4M7.5 11.5h4M7.5 15h4"/></symbol>
+<symbol id="ic-star" viewBox="0 0 24 24"><path d="M12 3.6l2.6 5.3 5.9.86-4.25 4.15 1 5.86L12 17l-5.25 2.77 1-5.86L3.5 9.76l5.9-.86z"/></symbol>
+<symbol id="ic-home" viewBox="0 0 24 24"><path d="M3.5 10.8 12 3.5l8.5 7.3"/><path d="M5.8 9.6V20a1 1 0 0 0 1 1h10.4a1 1 0 0 0 1-1V9.6"/><path d="M10 21v-5.5h4V21"/></symbol>
+<symbol id="ic-play" viewBox="0 0 24 24"><path d="M8.5 4.8 19.5 12l-11 7.2z"/></symbol>
+<symbol id="ic-swap" viewBox="0 0 24 24"><path d="M4.5 8.8h13"/><path d="M14.5 5.8 17.5 8.8 14.5 11.8"/><path d="M19.5 15.2h-13"/><path d="M9.5 12.2 6.5 15.2 9.5 18.2"/></symbol>
+<symbol id="ic-conflict" viewBox="0 0 24 24"><path d="M3 8.5h7"/><path d="M7.5 5.5 10.5 8.5 7.5 11.5"/><path d="M21 15.5h-7"/><path d="M16.5 12.5 13.5 15.5 16.5 18.5"/></symbol>
+</defs></svg>
 <div id="wrap">
   <!-- 左侧设计说明 -->
   <div class="note">
     <h1>司机端 · 小程序界面原型</h1>
-    <p class="tagline">面向<b>户外强光作业场景</b>的执行端设计。覆盖：接单通知、定位签到、双节点签退、异常上报、工单变更申请、车辆第三方派单自助标记、工时与加班记录。</p>
+    <p class="tagline">面向<b>户外强光作业场景</b>的执行端设计。覆盖：接单通知、定位签到、双节点签退、异常上报、工单变更申请、<b>工单互斥冲突提醒</b>、车辆第三方派单自助标记、工时与加班记录。</p>
     <div class="spec">
       <h4><i></i>户外强光可用性（PRD 10.1）</h4>
       <p>白底深字高对比 · 核心按钮高度 60px 大热区适配手套操作 · 色彩语义化（蓝=进行中 / 红=异常 / 绿=完成 / 紫=第三方派单）· 单手可达、层级扁平、弱网明确提示</p>
     </div>
     <div class="spec">
       <h4><i></i>关键业务演示（可点击体验）</h4>
-      <p>① 首页进入工单 → <b>「当日签退」不结单</b>，「任务结束」自动结单释放车辆<br>② 「车辆」页可演示 <b>第三方派单状态切换</b><br>③ 异常上报：固定选项 + 自定义原因</p>
+      <p>① 首页进入工单 → <b>「当日签退」不结单</b>，「任务结束」自动结单释放车辆<br>② <b>首页冲突提醒卡片</b>：下一单进入提前时段 → 申请延期 / 转派 / 继续执行<br>③ 「车辆」页可演示 <b>第三方派单状态切换</b><br>④ 异常上报：固定选项 + 自定义原因</p>
     </div>
     <p class="demo-tip">界面原型 · 仅供功能参考 · 非正式开发版本；数据均为演示样例。</p>
   </div>
@@ -207,10 +253,21 @@ textarea:focus{outline:none;border-color:var(--blue)}
         <div class="page on" id="pg-home">
           <div class="scroll">
             <div class="home-hd">
-              <div class="hi">王建国，早上好 👷</div>
+              <div class="hi"><svg class="ico" style="font-size:19px;color:var(--blue)"><use href="#ic-person"/></svg> 王建国，早上好</div>
               <div class="sub">今日 2 项任务 · 1 项进行中 · 天气 多云 14~22℃</div>
             </div>
             <div class="gps"><span class="dot"></span>定位已开启 · 定位功能将用于签到与加班位置校验（1km 内有效）</div>
+
+            <!-- 工单时间冲突提醒卡片（v5.4 · 4.18） -->
+            <div class="cfcard" id="cfcard">
+              <div class="cf-hd"><svg class="ico" style="font-size:18px"><use href="#ic-conflict"/></svg> 工单时间冲突提醒<span class="chip2">待处置 · 15min</span></div>
+              <p>下一工单 <b>钢结构梁卸车吊装（GD-1016-024）</b>将于 <b>13:00</b> 进入提前提醒时段（约定 14:00 · 提前 60min），而当前工单 <b>GD-1016-021</b> 仍在进行中（跨天第 2 天）。同一时间仅可执行一项未暂停任务，请选择处置方式。</p>
+              <div class="cf-actions">
+                <button class="a1" onclick="conflictAct('延期')"><svg class="ico"><use href="#ic-clock"/></svg> 申请延期</button>
+                <button class="a2" onclick="conflictAct('转派')"><svg class="ico"><use href="#ic-swap"/></svg> 申请转派</button>
+                <button class="a3" onclick="conflictAct('继续')"><svg class="ico"><use href="#ic-play"/></svg> 继续执行</button>
+              </div>
+            </div>
 
             <div class="sec">进行中 <small>跨天任务</small></div>
             <div class="wcard" onclick="go('pg-detail')">
@@ -237,7 +294,7 @@ textarea:focus{outline:none;border-color:var(--blue)}
                 <span>吊装 <b>4.2t</b></span>
               </div>
               <div class="foot" style="padding:10px 16px;font-size:12px;color:#6b7280">
-                ⏰ 到预计时间未签到将提醒你，并同步管理员
+                <svg class="ico" style="font-size:14px;color:var(--amber)"><use href="#ic-clock"/></svg> 到预计时间未签到将提醒你，并同步管理员
               </div>
             </div>
 
@@ -261,9 +318,9 @@ textarea:focus{outline:none;border-color:var(--blue)}
               </div>
               <div style="font-size:12px;color:#6b7280;margin-top:4px">GD-1016-021 · 客户：华翔供热有限公司</div>
               <div class="stepper">
-                <div class="step ok"><div class="d">✓</div><span>已派单</span></div>
-                <div class="step ok"><div class="d">✓</div><span>已接单</span></div>
-                <div class="step cur"><div class="d">●</div><span>进行中</span></div>
+                <div class="step ok"><div class="d"><svg class="ico"><use href="#ic-check"/></svg></div><span>已派单</span></div>
+                <div class="step ok"><div class="d"><svg class="ico"><use href="#ic-check"/></svg></div><span>已接单</span></div>
+                <div class="step cur"><div class="d"><svg class="ico"><use href="#ic-dot"/></svg></div><span>进行中</span></div>
                 <div class="step"><div class="d">5</div><span>已完成</span></div>
               </div>
               <div class="day-badge" style="margin-top:10px">跨天任务 · 第 2 天（单任务可跨 3~4 天执行）</div>
@@ -275,28 +332,28 @@ textarea:focus{outline:none;border-color:var(--blue)}
               <div class="kv"><span class="k">吊车 / 车辆</span><span class="v">25t · 冀B·66D12</span></div>
               <div class="kv"><span class="k">吊装货物</span><span class="v">换热管道组件 · 8.6t（管理员已复核）</span></div>
               <div class="kv"><span class="k">客户联系人</span><span class="v">张经理 138****2210</span>
-                <span class="call" onclick="toast('拨打电话（演示）')">📞 呼叫</span></div>
+                <span class="call" onclick="toast('拨打电话（演示）')"><svg class="ico"><use href="#ic-phone"/></svg> 呼叫</span></div>
             </div>
 
             <div class="card" style="border:2px solid var(--blue)">
               <div class="sec" style="margin:0 0 12px">签到 / 签退 <small>双节点操作</small></div>
-              <button class="btn sec2" onclick="go('pg-checkin')">📍 到场签到（今日）</button>
+              <button class="btn sec2" onclick="go('pg-checkin')"><svg class="ico"><use href="#ic-pin"/></svg> 到场签到（今日）</button>
               <div style="height:12px"></div>
-              <button class="btn gry" onclick="toast('当日签退：工单保持进行中，次日继续')">🌙 当日任务结束签退</button>
+              <button class="btn gry" onclick="toast('当日签退：工单保持进行中，次日继续')"><svg class="ico"><use href="#ic-moon"/></svg> 当日任务结束签退</button>
               <div class="tip">「当日签退」<b>不结束工单</b>，次日到场继续签到施工；跨天记录逐日留痕。</div>
               <div style="height:12px"></div>
-              <button class="btn grn" onclick="confirmEnd()">✅ 整项任务结束</button>
+              <button class="btn grn" onclick="confirmEnd()"><svg class="ico"><use href="#ic-check-circle"/></svg> 整项任务结束</button>
               <div class="tip">全部完工后点击：工单<b>自动结单</b>、车辆自动释放，并统计完整工作时长（可对纸质结算单比对）。</div>
             </div>
 
             <div class="row">
-              <button class="btn dng" style="height:56px;font-size:16px" onclick="go('pg-exception')">⚠ 异常上报</button>
-              <button class="btn gry" style="height:56px;font-size:16px" onclick="go('pg-change')">📝 工单变更申请</button>
+              <button class="btn dng" style="height:56px;font-size:16px" onclick="go('pg-exception')"><svg class="ico"><use href="#ic-alert"/></svg> 异常上报</button>
+              <button class="btn gry" style="height:56px;font-size:16px" onclick="go('pg-change')"><svg class="ico"><use href="#ic-edit"/></svg> 工单变更申请</button>
             </div>
 
             <div class="alert-card" style="border-left-color:var(--blue)">
               <b>昨日记录（逐日留痕）</b><br>
-              08:12 到场签到 ✓ ｜ 18:47 当日签退 ✓ ｜ 加班自动记录 <b>0h47m</b>（签退位置在任务地 1km 内，待管理员审核）
+              08:12 到场签到 <svg class="ico" style="font-size:14px;color:var(--blue)"><use href="#ic-check"/></svg> ｜ 18:47 当日签退 <svg class="ico" style="font-size:14px;color:var(--blue)"><use href="#ic-check"/></svg> ｜ 加班自动记录 <b>0h47m</b>（签退位置在任务地 1km 内，待管理员审核）
             </div>
             <div class="alert-card" style="border-left-color:var(--green)">
               <b>管理员批复</b>（10-15 16:20）<br>同意继续施工，注意高空风载，安全带全程佩戴。—— 刘管理员
@@ -309,7 +366,7 @@ textarea:focus{outline:none;border-color:var(--blue)}
           <div class="nav"><button class="bk" onclick="go('pg-detail')">‹</button><div class="tt">到场签到</div><div class="cap"></div></div>
           <div class="scroll">
             <div class="gps-big">
-              <div class="ok-ic">✅</div>
+              <div class="ok-ic" style="color:var(--green)"><svg class="ico"><use href="#ic-check-circle"/></svg></div>
               <b>已进入签到范围</b>
               <p>距施工点约 <b style="color:#101418;font-size:16px">230 米</b> · 有效范围 1 公里（后台可配置）<br>
               定位坐标已获取 · 微信实时定位</p>
@@ -322,7 +379,7 @@ textarea:focus{outline:none;border-color:var(--blue)}
                 <div class="shot" onclick="toast('调用相机拍照（演示）')">＋</div>
               </div>
             </div>
-            <div class="alert-card">⏰ 预计开始 08:30，<b>超时未签到将提醒你并同步管理员 / 总监</b>（微信订阅 + 短信）</div>
+            <div class="alert-card"><svg class="ico" style="font-size:15px;color:var(--amber)"><use href="#ic-clock"/></svg> 预计开始 08:30，<b>超时未签到将提醒你并同步管理员 / 总监</b>（微信订阅 + 短信）</div>
             <button class="btn pri" onclick="toast('签到成功！工单已进入「进行中」，人车状态已联动');setTimeout(()=>go('pg-detail'),900)">确认签到 · 开始任务</button>
           </div>
         </div>
@@ -332,9 +389,9 @@ textarea:focus{outline:none;border-color:var(--blue)}
           <div class="nav"><button class="bk" onclick="go('pg-detail')">‹</button><div class="tt">异常上报</div><div class="cap"></div></div>
           <div class="scroll">
             <div class="sec" style="margin-top:2px">异常类型 <small>固定选项 / 可自定义</small></div>
-            <div class="opt" onclick="selEx(this)"><span class="em">🌧</span>下雨</div>
-            <div class="opt" onclick="selEx(this)"><span class="em">🏗</span>甲方停工</div>
-            <div class="opt" onclick="selEx(this)"><span class="em">🔧</span>车辆故障</div>
+            <div class="opt" onclick="selEx(this)"><span class="em"><svg class="ico"><use href="#ic-rain"/></svg></span>下雨</div>
+            <div class="opt" onclick="selEx(this)"><span class="em"><svg class="ico"><use href="#ic-cone"/></svg></span>甲方停工</div>
+            <div class="opt" onclick="selEx(this)"><span class="em"><svg class="ico"><use href="#ic-wrench"/></svg></span>车辆故障</div>
             <div class="sec">自定义原因（可选）</div>
             <div class="card"><textarea placeholder="手动输入异常原因说明，将随异常类型一并提交，并对客户公开…"></textarea></div>
             <div class="sec">配图 <small>不限张数</small></div>
@@ -354,16 +411,19 @@ textarea:focus{outline:none;border-color:var(--blue)}
             <div class="alert-card" style="border-left-color:var(--blue)">
               申请提交后由<b>管理员审批</b>；审批通过后管理员将修改工单并重新派单。取消工单将通知客户，变更 / 重派将通知客户与司机。
             </div>
+            <div class="alert-card" style="border-left-color:var(--amber)">
+              <svg class="ico" style="font-size:15px;color:var(--amber)"><use href="#ic-conflict"/></svg> <b>检测到时间冲突：</b>当前工单 GD-1016-021 仍在进行中，下一工单 GD-1016-024 将于 13:00 进入提前提醒时段；提交延期申请后，系统将<b>同步提醒管理员 / 总监</b>并全程留痕。
+            </div>
             <div class="sec" style="margin-top:2px">申请类型</div>
-            <div class="opt" onclick="selCh(this)"><span class="em">🚫</span>取消工单（客户 / 现场原因无法执行）</div>
-            <div class="opt" onclick="selCh(this)"><span class="em">🚛</span>车辆更换</div>
-            <div class="opt" onclick="selCh(this)"><span class="em">🕐</span>延期 / 变更执行时间</div>
-            <div class="opt" onclick="selCh(this)"><span class="em">📍</span>变更施工地点 / 其他</div>
+            <div class="opt" onclick="selCh(this)"><span class="em"><svg class="ico"><use href="#ic-ban"/></svg></span>取消工单（客户 / 现场原因无法执行）</div>
+            <div class="opt" onclick="selCh(this)"><span class="em"><svg class="ico"><use href="#ic-truck"/></svg></span>车辆更换</div>
+            <div class="opt" onclick="selCh(this)"><span class="em"><svg class="ico"><use href="#ic-clock"/></svg></span>延期 / 变更执行时间</div>
+            <div class="opt" onclick="selCh(this)"><span class="em"><svg class="ico"><use href="#ic-pin"/></svg></span>变更施工地点 / 其他</div>
             <div class="sec">变更原因</div>
             <div class="card"><textarea placeholder="填写变更原因（可自定义说明）…"></textarea></div>
             <div class="sec">佐证照片 <small>不限张数</small></div>
             <div class="card"><div class="shots"><div class="shot" onclick="toast('调用相机（演示）')">＋</div></div></div>
-            <button class="btn pri" onclick="toast('变更申请已提交，等待管理员审批（全程留痕）');setTimeout(()=>go('pg-detail'),900)">提交申请</button>
+            <button class="btn pri" onclick="toast('变更申请已提交，冲突提醒已同步管理员 / 总监（全程留痕）');setTimeout(()=>go('pg-detail'),900)">提交申请</button>
           </div>
         </div>
 
@@ -387,7 +447,7 @@ textarea:focus{outline:none;border-color:var(--blue)}
               <div class="hd"><span class="plate">冀A·12F09</span><span class="ton">25t 汽车吊</span>
                 <span class="chip idle" style="margin-left:auto" id="v2chip">空闲</span></div>
               <div class="bd" id="v2desc">当前可被本系统派单，也可临时派给其他司机使用（一人多车分别独立标记）。</div>
-              <button class="mini pri" id="v2btn" onclick="toggleV2()">🚚 标记「忙碌（第三方派单）」</button>
+              <button class="mini pri" id="v2btn" onclick="toggleV2()"><svg class="ico"><use href="#ic-truck"/></svg> 标记「忙碌（第三方派单）」</button>
             </div>
 
             <div class="sec">状态变更记录</div>
@@ -404,16 +464,19 @@ textarea:focus{outline:none;border-color:var(--blue)}
         <div class="page" id="pg-msg">
           <div class="nav"><div class="bk" style="visibility:hidden">‹</div><div class="tt">消息通知</div><div class="cap"></div></div>
           <div class="scroll">
-            <div class="msg"><div class="ic2" style="background:#eff6ff">📋</div>
+            <div class="msg"><div class="ic2" style="background:#eff6ff;color:var(--blue)"><svg class="ico"><use href="#ic-clipboard"/></svg></div>
               <div><b>新工单下发：钢结构梁卸车吊装</b><p>GD-1016-024 · 今日 14:00 · 鑫源建材<br>车辆 25t 冀A·12F09 · 吊装 4.2t</p>
               <div class="chn"><span class="tag2 wx">微信订阅</span><span class="tag2 dx">短信</span></div></div></div>
-            <div class="msg"><div class="ic2" style="background:#eff6ff">✅</div>
+            <div class="msg"><div class="ic2" style="background:#eff6ff;color:var(--blue)"><svg class="ico"><use href="#ic-check-circle"/></svg></div>
               <div><b>管理员批复：同意继续施工</b><p>GD-1016-021 异常批复：注意高空风载，安全带全程佩戴。</p>
               <div class="chn"><span class="tag2 wx">微信订阅</span><span class="tag2 dx">短信</span></div></div></div>
-            <div class="msg"><div class="ic2" style="background:#fef2f2">⏰</div>
+            <div class="msg"><div class="ic2" style="background:#fef2f2;color:var(--red)"><svg class="ico"><use href="#ic-alert"/></svg></div>
               <div><b>超时未签到提醒</b><p>GD-1015-016 已超预计开始时间，请尽快到场签到（已同步管理员 / 总监）。</p>
               <div class="chn"><span class="tag2 wx">微信订阅</span><span class="tag2 dx">短信</span></div></div></div>
-            <div class="msg"><div class="ic2" style="background:#f5f3ff">🕒</div>
+            <div class="msg"><div class="ic2" style="background:#fef2f2;color:var(--red)"><svg class="ico"><use href="#ic-conflict"/></svg></div>
+              <div><b>工单时间冲突提醒</b><p>下一工单 GD-1016-024（14:00）已进入提前提醒时段，当前 GD-1016-021 仍在进行中；请选择申请延期 / 转派或确认继续执行（已同步管理员 / 总监）。</p>
+              <div class="chn"><span class="tag2 wx">微信订阅</span><span class="tag2 dx">短信</span></div></div></div>
+            <div class="msg"><div class="ic2" style="background:#f5f3ff;color:var(--purple)"><svg class="ico"><use href="#ic-clock"/></svg></div>
               <div><b>加班记录待审核</b><p>10-15 加班 0h47m 已自动记录，待管理员审核确认后计入绩效。</p>
               <div class="chn"><span class="tag2 wx">站内</span></div></div></div>
           </div>
@@ -431,13 +494,13 @@ textarea:focus{outline:none;border-color:var(--blue)}
             <div class="stats" style="margin-bottom:14px">
               <div class="s"><b>14</b><span>本月工单</span></div>
               <div class="s"><b>12</b><span>完工</span></div>
-              <div class="s"><b>4.8★</b><span>客户评分</span></div>
+              <div class="s"><b>4.8<svg class="ico" style="font-size:18px;color:#f59f0b"><use href="#ic-star"/></svg></b><span>客户评分</span></div>
             </div>
             <div class="menu">
-              <div class="mi" onclick="toast('打开个人档案（演示）')"><span class="ic2">👤</span>个人档案<small>由管理员维护</small><span class="ar">›</span></div>
-              <div class="mi" onclick="toast('打开工时明细（演示）')"><span class="ic2">⏱</span>工时明细<small>142.5h</small><span class="ar">›</span></div>
-              <div class="mi" onclick="toast('打开加班记录（演示）')"><span class="ic2">🌙</span>加班记录<small>6.5h · 1.5h 待审核</small><span class="ar">›</span></div>
-              <div class="mi" onclick="toast('打开历史工单（演示）')"><span class="ic2">📄</span>历史工单<small>86 单</small><span class="ar">›</span></div>
+              <div class="mi" onclick="toast('打开个人档案（演示）')"><span class="ic2" style="color:var(--blue)"><svg class="ico"><use href="#ic-person"/></svg></span>个人档案<small>由管理员维护</small><span class="ar">›</span></div>
+              <div class="mi" onclick="toast('打开工时明细（演示）')"><span class="ic2" style="color:var(--blue)"><svg class="ico"><use href="#ic-stopwatch"/></svg></span>工时明细<small>142.5h</small><span class="ar">›</span></div>
+              <div class="mi" onclick="toast('打开加班记录（演示）')"><span class="ic2" style="color:var(--purple)"><svg class="ico"><use href="#ic-moon"/></svg></span>加班记录<small>6.5h · 1.5h 待审核</small><span class="ar">›</span></div>
+              <div class="mi" onclick="toast('打开历史工单（演示）')"><span class="ic2" style="color:var(--blue)"><svg class="ico"><use href="#ic-file"/></svg></span>历史工单<small>86 单</small><span class="ar">›</span></div>
             </div>
             <div class="tip" style="text-align:center;margin-top:14px">工作时长与加班数据全程留痕，支持与纸质结算单比对审计</div>
           </div>
@@ -446,10 +509,10 @@ textarea:focus{outline:none;border-color:var(--blue)}
 
       <!-- Tabbar -->
       <div class="tabbar">
-        <button class="on" data-pg="pg-home" onclick="tab(this)"><span class="ic">📋</span>工单</button>
-        <button data-pg="pg-vehicle" onclick="tab(this)"><span class="ic">🚚</span>车辆</button>
-        <button data-pg="pg-msg" onclick="tab(this)"><span class="ic">🔔</span>消息</button>
-        <button data-pg="pg-mine" onclick="tab(this)"><span class="ic">👤</span>我的</button>
+        <button class="on" data-pg="pg-home" onclick="tab(this)"><span class="ic"><svg class="ico"><use href="#ic-clipboard"/></svg></span>工单</button>
+        <button data-pg="pg-vehicle" onclick="tab(this)"><span class="ic"><svg class="ico"><use href="#ic-truck"/></svg></span>车辆</button>
+        <button data-pg="pg-msg" onclick="tab(this)"><span class="ic"><svg class="ico"><use href="#ic-bell"/></svg></span>消息</button>
+        <button data-pg="pg-mine" onclick="tab(this)"><span class="ic"><svg class="ico"><use href="#ic-person"/></svg></span>我的</button>
       </div>
 
       <div id="toast"></div>
@@ -496,6 +559,22 @@ function confirmEnd(){
     setTimeout(()=>go('pg-home'),1000);
   }
 }
+// 工单时间冲突处置（v5.4 · 4.18）
+function conflictAct(t){
+  const c=document.getElementById('cfcard');
+  if(t==='延期'){
+    toast('已选择「申请延期」，请填写变更原因并提交（将同步提醒管理员 / 总监）');
+    setTimeout(()=>go('pg-change'),800);
+  }else if(t==='转派'){
+    toast('转派申请已提交，管理员将改派冲突工单（司机 / 管理员同步提醒，全程留痕）');
+    setTimeout(()=>{if(c) c.style.display='none';},700);
+  }else{
+    if(confirm('确认继续执行当前工单？\n\n· 视为你已阅知时间冲突风险\n· 该冲突提醒将留痕关闭\n· 管理员仍可在冲突提醒中心查阅')){
+      toast('已阅知冲突风险并继续执行，提醒已留痕关闭');
+      setTimeout(()=>{if(c) c.style.display='none';},600);
+    }
+  }
+}
 // 第三方派单切换演示
 let out=false;
 function toggleV2(){
@@ -503,12 +582,12 @@ function toggleV2(){
   const chip=document.getElementById('v2chip'),btn=document.getElementById('v2btn'),desc=document.getElementById('v2desc');
   if(out){
     chip.textContent='忙碌（第三方派单）';chip.className='chip out';
-    btn.className='mini ok2';btn.textContent='✅ 恢复空闲';
+    btn.className='mini ok2';btn.innerHTML='<svg class="ico"><use href="#ic-check-circle"/></svg> 恢复空闲';
     desc.innerHTML='已被标记为外部占用：<b>本系统内不可派单、不可被客户选车</b>；外部占用时长将单独统计并计入车辆使用率。';
     toast('已标记「忙碌（第三方派单）」，无需管理员审核，已同步后台');
   }else{
     chip.textContent='空闲';chip.className='chip idle';
-    btn.className='mini pri';btn.textContent='🚚 标记「忙碌（第三方派单）」';
+    btn.className='mini pri';btn.innerHTML='<svg class="ico"><use href="#ic-truck"/></svg> 标记「忙碌（第三方派单）」';
     desc.innerHTML='当前可被本系统派单，也可临时派给其他司机使用（一人多车分别独立标记）。';
     toast('车辆已恢复空闲，重新进入本系统运力池');
   }

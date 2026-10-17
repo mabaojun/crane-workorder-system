@@ -11,6 +11,11 @@
   --red:#c62233; --red-bg:#fdeeee; --amber:#b45309; --amber-bg:#fdf3e0;
 }
 *{margin:0;padding:0;box-sizing:border-box}
+/* ---------- 统一矢量图标库（全端同风格：24 网格 / 线宽 2 / 圆角端点，禁用 Emoji） ---------- */
+svg.ico{width:1em;height:1em;flex:none;display:inline-block;vertical-align:-.125em;
+  fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.stars svg.ico{stroke-width:1.4}
+.stars span.on svg.ico{fill:currentColor}
 html,body{width:100%;height:100%;background:linear-gradient(160deg,#faf8f5,#e9e4dc);
   font-family:"Microsoft YaHei","PingFang SC",sans-serif;overflow:hidden}
 #wrap{position:absolute;left:50%;top:50%;transform-origin:center;display:flex;align-items:center;gap:56px}
@@ -174,6 +179,34 @@ textarea.inp{min-height:88px;resize:none}
 </style>
 </head>
 <body>
+<!-- ========== 统一矢量图标 sprite（内联，离线可用；全端共用同一套图标） ========== -->
+<svg style="display:none" aria-hidden="true" focusable="false"><defs>
+<symbol id="ic-check" viewBox="0 0 24 24"><path d="M20 6.5 9.5 17 4 11.5"/></symbol>
+<symbol id="ic-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="currentColor"/></symbol>
+<symbol id="ic-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.2"/></symbol>
+<symbol id="ic-phone" viewBox="0 0 24 24"><path d="M6.6 3.5h3l1.5 3.8-2.2 1.4a12.6 12.6 0 0 0 6.4 6.4l1.4-2.2 3.8 1.5v3a2 2 0 0 1-2.2 2A16.8 16.8 0 0 1 4.6 5.7a2 2 0 0 1 2-2.2z"/></symbol>
+<symbol id="ic-headset" viewBox="0 0 24 24"><path d="M4.5 11.5a7.5 7.5 0 0 1 15 0"/><rect x="3" y="11.5" width="4" height="6.5" rx="1.6"/><rect x="17" y="11.5" width="4" height="6.5" rx="1.6"/><path d="M19 18v1a2.5 2.5 0 0 1-2.5 2.5H13"/></symbol>
+<symbol id="ic-pin" viewBox="0 0 24 24"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></symbol>
+<symbol id="ic-moon" viewBox="0 0 24 24"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1z"/></symbol>
+<symbol id="ic-alert" viewBox="0 0 24 24"><path d="M12 3.8 2.8 20h18.4z"/><path d="M12 9.6v4.5"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/></symbol>
+<symbol id="ic-edit" viewBox="0 0 24 24"><path d="M12 20.5h8.5"/><path d="M16.6 3.6a2.1 2.1 0 0 1 3 3L7 19.2l-4.2 1.1 1.1-4.2z"/></symbol>
+<symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.2V12l3.4 2"/></symbol>
+<symbol id="ic-rain" viewBox="0 0 24 24"><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M8 14v6M16 14v6M12 16v6"/></symbol>
+<symbol id="ic-cone" viewBox="0 0 24 24"><path d="M10.4 3.5h3.2l4.4 16.5H6z"/><path d="M7.7 12.5h8.6"/><path d="M4.5 20.5h15"/></symbol>
+<symbol id="ic-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"/></symbol>
+<symbol id="ic-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6 18.4 18.4"/></symbol>
+<symbol id="ic-truck" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></symbol>
+<symbol id="ic-clipboard" viewBox="0 0 24 24"><rect x="8" y="2.5" width="8" height="4" rx="1.2"/><path d="M16 4.5h2a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-14a1 1 0 0 1 1-1h2"/><path d="M12 11.5h4.5M12 16h4.5M8 11.5h.01M8 16h.01"/></symbol>
+<symbol id="ic-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20.5a7.2 7.2 0 0 1 14.4 0"/></symbol>
+<symbol id="ic-bell" viewBox="0 0 24 24"><path d="M18 8.5a6 6 0 1 0-12 0c0 5.5-2 7-2 7h16s-2-1.5-2-7z"/><path d="M10.3 19.5a2 2 0 0 0 3.4 0"/></symbol>
+<symbol id="ic-stopwatch" viewBox="0 0 24 24"><circle cx="12" cy="13.8" r="7.3"/><path d="M12 10.6v3.4l2.5 1.5"/><path d="M9.6 2.8h4.8"/><path d="M12 2.8v3.7"/></symbol>
+<symbol id="ic-file" viewBox="0 0 24 24"><path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z"/><path d="M14 3.5V8.5h5"/><path d="M8.5 13h7M8.5 16.5h4.5"/></symbol>
+<symbol id="ic-building" viewBox="0 0 24 24"><path d="M4 20.5V5.5a2 2 0 0 1 2-2h6.5a2 2 0 0 1 2 2v15"/><path d="M14.5 9.5H18a2 2 0 0 1 2 2v9"/><path d="M2.5 20.5h19"/><path d="M7.5 8h4M7.5 11.5h4M7.5 15h4"/></symbol>
+<symbol id="ic-star" viewBox="0 0 24 24"><path d="M12 3.6l2.6 5.3 5.9.86-4.25 4.15 1 5.86L12 17l-5.25 2.77 1-5.86L3.5 9.76l5.9-.86z"/></symbol>
+<symbol id="ic-home" viewBox="0 0 24 24"><path d="M3.5 10.8 12 3.5l8.5 7.3"/><path d="M5.8 9.6V20a1 1 0 0 0 1 1h10.4a1 1 0 0 0 1-1V9.6"/><path d="M10 21v-5.5h4V21"/></symbol>
+<symbol id="ic-play" viewBox="0 0 24 24"><path d="M8.5 4.8 19.5 12l-11 7.2z"/></symbol>
+<symbol id="ic-swap" viewBox="0 0 24 24"><path d="M4.5 8.8h13"/><path d="M14.5 5.8 17.5 8.8 14.5 11.8"/><path d="M19.5 15.2h-13"/><path d="M9.5 12.2 6.5 15.2 9.5 18.2"/></symbol>
+</defs></svg>
 <div id="wrap">
   <!-- 左侧说明 -->
   <div class="note">
@@ -225,11 +258,11 @@ textarea.inp{min-height:88px;resize:none}
             <div class="wcard" onclick="go('pg-order')">
               <div class="top"><b>锅炉组件卸车吊装</b><span class="chip ok">任务已完成</span></div>
               <div class="no">GD-1014-008 · 10-14 完工</div>
-              <div class="info"><span>吊装 <b>12.4t</b></span><span style="color:var(--org);font-weight:700">→ 去评价 ⭐</span></div>
+              <div class="info"><span>吊装 <b>12.4t</b></span><span style="color:var(--org);font-weight:700">→ 去评价 <svg class="ico" style="font-size:13px"><use href="#ic-star"/></svg></span></div>
             </div>
             <div class="wcard">
               <div class="top"><b>换热机组吊装就位</b><span class="chip ok">任务已完成</span></div>
-              <div class="no">GD-1010-003 · 10-10 完工 · 已评价 5★</div>
+              <div class="no">GD-1010-003 · 10-10 完工 · 已评价 5 <svg class="ico" style="font-size:12px;color:#f59f0b"><use href="#ic-star"/></svg></div>
               <div class="info"><span>吊装 <b>8.2t</b></span></div>
             </div>
 
@@ -270,8 +303,8 @@ textarea.inp{min-height:88px;resize:none}
                 </div>
               </div>
               <div style="display:flex;gap:10px;margin-top:14px">
-                <span class="call-btn" onclick="toast('呼叫司机 138****2210（演示）')">📞 一键呼叫司机</span>
-                <span class="call-btn wt" onclick="toast('拨打客服电话（演示）')">🎧 联系客服</span>
+                <span class="call-btn" onclick="toast('呼叫司机 138****2210（演示）')"><svg class="ico"><use href="#ic-phone"/></svg> 一键呼叫司机</span>
+                <span class="call-btn wt" onclick="toast('拨打客服电话（演示）')"><svg class="ico"><use href="#ic-headset"/></svg> 联系客服</span>
               </div>
               <div style="height:10px"></div>
               <div class="kv"><span class="k">执行车辆</span><span class="v">25t 汽车吊 · 冀B·66D12</span></div>
@@ -303,7 +336,7 @@ textarea.inp{min-height:88px;resize:none}
                 提交后进入「待处理」，管理员将<b style="color:var(--org)">复核吊车吨位、货物重量等全部内容</b>后转为正式工单；审核不通过将驳回并告知原因。需求单暂存 <b>10 天</b>，超期未转工单自动关闭。</p>
             </div>
             <div class="f-label">施工地址 <small>*</small></div>
-            <div class="map-pick" onclick="toast('打开地图选点（演示）')">📍 华翔供热 3#换热站（点击重新选点）</div>
+            <div class="map-pick" onclick="toast('打开地图选点（演示）')"><svg class="ico"><use href="#ic-pin"/></svg> 华翔供热 3#换热站（点击重新选点）</div>
             <div class="f-label">需求描述 <small>*</small></div>
             <div class="card" style="padding:0"><textarea class="inp" style="border:none;min-height:76px" placeholder="描述吊装作业内容、现场条件等…">3#换热站管道组件吊装就位，现场有高空作业平台。</textarea></div>
             <div class="f-label">意向吊车吨位 <small>*</small></div>
@@ -334,17 +367,17 @@ textarea.inp{min-height:88px;resize:none}
           <div class="scroll">
             <div class="sec" style="margin-top:2px">处理进度 <small>待处理 / 已转工单 / 已驳回</small></div>
             <div class="rq" onclick="go('pg-reqform')">
-              <div class="ic2">📝</div>
+              <div class="ic2" style="color:var(--org)"><svg class="ico"><use href="#ic-edit"/></svg></div>
               <div style="flex:1"><b>3#换热站管道吊装 · 50t · 8.6t</b><p>10-16 09:02 提交 · 暂存倒计时 9 天</p></div>
               <span class="chip warn">待处理</span>
             </div>
             <div class="rq">
-              <div class="ic2">✅</div>
+              <div class="ic2" style="color:var(--green)"><svg class="ico"><use href="#ic-check-circle"/></svg></div>
               <div style="flex:1"><b>锅炉组件卸车吊装 · 25t</b><p>10-14 提交 · 已复核转工单 GD-1014-008</p></div>
               <span class="chip ok">已转工单</span>
             </div>
             <div class="rq">
-              <div class="ic2">🚫</div>
+              <div class="ic2" style="color:var(--sub)"><svg class="ico"><use href="#ic-ban"/></svg></div>
               <div style="flex:1"><b>庭院锅炉吊装 · 吨位待定</b><p>10-12 提交 · 驳回原因：货物重量与现场信息不完整</p></div>
               <span class="chip no">已驳回</span>
             </div>
@@ -361,9 +394,9 @@ textarea.inp{min-height:88px;resize:none}
               <div style="font-size:17px;font-weight:800">锅炉组件卸车吊装</div>
               <div style="font-size:12px;color:#78716c;margin-top:4px">GD-1014-008 · 10-14 完工 · 司机 王建国</div>
               <div class="stars" id="stars">
-                <span onclick="setStar(1)">★</span><span onclick="setStar(2)">★</span>
-                <span onclick="setStar(3)">★</span><span onclick="setStar(4)">★</span>
-                <span onclick="setStar(5)">★</span>
+                <span onclick="setStar(1)"><svg class="ico"><use href="#ic-star"/></svg></span><span onclick="setStar(2)"><svg class="ico"><use href="#ic-star"/></svg></span>
+                <span onclick="setStar(3)"><svg class="ico"><use href="#ic-star"/></svg></span><span onclick="setStar(4)"><svg class="ico"><use href="#ic-star"/></svg></span>
+                <span onclick="setStar(5)"><svg class="ico"><use href="#ic-star"/></svg></span>
               </div>
               <div class="rate-tip" id="rate-tip">点击评分（1~5 星）</div>
             </div>
@@ -378,16 +411,16 @@ textarea.inp{min-height:88px;resize:none}
         <div class="page" id="pg-msg">
           <div class="nav"><div class="bk" style="visibility:hidden">‹</div><div class="tt">消息通知</div><div class="cap"></div></div>
           <div class="scroll">
-            <div class="rq"><div class="ic2" style="background:var(--blue-bg)">🚛</div>
+            <div class="rq"><div class="ic2" style="background:var(--blue-bg);color:var(--blue)"><svg class="ico"><use href="#ic-truck"/></svg></div>
               <div style="flex:1"><b>您的任务已派单</b><p>二网管道吊运（东区）· 司机：赵磊 137****5508</p>
               <div style="margin-top:6px"><span class="chip info" style="font-size:11px">微信订阅 + 短信</span></div></div></div>
-            <div class="rq"><div class="ic2" style="background:var(--green-bg)">👷</div>
+            <div class="rq"><div class="ic2" style="background:var(--green-bg);color:var(--green)"><svg class="ico"><use href="#ic-person"/></svg></div>
               <div style="flex:1"><b>您的任务开始执行，司机已到场</b><p>3#换热站管道吊装 · 10-16 08:41</p>
               <div style="margin-top:6px"><span class="chip info" style="font-size:11px">微信订阅 + 短信</span></div></div></div>
-            <div class="rq"><div class="ic2" style="background:var(--amber-bg)">⚠️</div>
+            <div class="rq"><div class="ic2" style="background:var(--amber-bg);color:var(--amber)"><svg class="ico"><use href="#ic-alert"/></svg></div>
               <div style="flex:1"><b>任务因「下雨」暂停</b><p>现场降雨暂停吊装，恢复时间待通知（异常原因已公开）</p>
               <div style="margin-top:6px"><span class="chip info" style="font-size:11px">微信订阅 + 短信</span></div></div></div>
-            <div class="rq"><div class="ic2" style="background:var(--green-bg)">🎉</div>
+            <div class="rq"><div class="ic2" style="background:var(--green-bg);color:var(--green)"><svg class="ico"><use href="#ic-check-circle"/></svg></div>
               <div style="flex:1"><b>您的任务已完成</b><p>锅炉组件卸车吊装 · 可进入「已完成」评价</p>
               <div style="margin-top:6px"><span class="chip info" style="font-size:11px">微信订阅 + 短信</span></div></div></div>
           </div>
@@ -405,7 +438,7 @@ textarea.inp{min-height:88px;resize:none}
             <div class="stats-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
               <div class="card" style="margin:0;text-align:center;padding:12px 0"><b style="font-size:22px">36</b><br><span style="font-size:12px;color:var(--sub)">历史需求</span></div>
               <div class="card" style="margin:0;text-align:center;padding:12px 0"><b style="font-size:22px">31</b><br><span style="font-size:12px;color:var(--sub)">成交工单</span></div>
-              <div class="card" style="margin:0;text-align:center;padding:12px 0"><b style="font-size:22px">4.9★</b><br><span style="font-size:12px;color:var(--sub)">累计评分</span></div>
+              <div class="card" style="margin:0;text-align:center;padding:12px 0"><b style="font-size:22px">4.9<svg class="ico" style="font-size:16px;color:#f59f0b"><use href="#ic-star"/></svg></b><br><span style="font-size:12px;color:var(--sub)">累计评分</span></div>
             </div>
             <div class="sec">企业联系人 <small>客户端自助维护 / 管理员后台维护</small></div>
             <div class="card">
@@ -422,9 +455,9 @@ textarea.inp{min-height:88px;resize:none}
               <button class="btn gry" style="height:46px;font-size:14px;margin-top:10px" onclick="toast('新增联系人（演示）')">＋ 新增联系人</button>
             </div>
             <div class="menu">
-              <div class="mi" onclick="toast('打开企业资料（演示）')"><span class="ic2">🏢</span>企业资料<small>统一社会信用代码已认证</small><span class="ar">›</span></div>
-              <div class="mi" onclick="go('pg-reqlist')"><span class="ic2">📝</span>我的需求单<span class="ar">›</span></div>
-              <div class="mi" onclick="toast('打开历史评价（演示）')"><span class="ic2">⭐</span>我的评价<small>31 条</small><span class="ar">›</span></div>
+              <div class="mi" onclick="toast('打开企业资料（演示）')"><span class="ic2" style="color:var(--org)"><svg class="ico"><use href="#ic-building"/></svg></span>企业资料<small>统一社会信用代码已认证</small><span class="ar">›</span></div>
+              <div class="mi" onclick="go('pg-reqlist')"><span class="ic2" style="color:var(--org)"><svg class="ico"><use href="#ic-edit"/></svg></span>我的需求单<span class="ar">›</span></div>
+              <div class="mi" onclick="toast('打开历史评价（演示）')"><span class="ic2" style="color:var(--org)"><svg class="ico"><use href="#ic-star"/></svg></span>我的评价<small>31 条</small><span class="ar">›</span></div>
             </div>
           </div>
         </div>
@@ -432,10 +465,10 @@ textarea.inp{min-height:88px;resize:none}
 
       <!-- Tabbar -->
       <div class="tabbar">
-        <button class="on" data-pg="pg-home" onclick="tab(this)"><span class="ic">🏠</span>首页</button>
-        <button data-pg="pg-reqlist" onclick="tab(this)"><span class="ic">📝</span>需求</button>
-        <button data-pg="pg-msg" onclick="tab(this)"><span class="ic">🔔</span>消息</button>
-        <button data-pg="pg-mine" onclick="tab(this)"><span class="ic">👤</span>我的</button>
+        <button class="on" data-pg="pg-home" onclick="tab(this)"><span class="ic"><svg class="ico"><use href="#ic-home"/></svg></span>首页</button>
+        <button data-pg="pg-reqlist" onclick="tab(this)"><span class="ic"><svg class="ico"><use href="#ic-edit"/></svg></span>需求</button>
+        <button data-pg="pg-msg" onclick="tab(this)"><span class="ic"><svg class="ico"><use href="#ic-bell"/></svg></span>消息</button>
+        <button data-pg="pg-mine" onclick="tab(this)"><span class="ic"><svg class="ico"><use href="#ic-person"/></svg></span>我的</button>
       </div>
 
       <div id="toast"></div>
