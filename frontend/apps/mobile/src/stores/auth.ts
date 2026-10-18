@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { uniTokenAdapter } from '../api/client'
-import { fetchMe, logout, smsLogin } from '../api/modules/auth'
+import { fetchMe, logout, passwordLogin, smsLogin } from '../api/modules/auth'
 import type { MeInfo } from '../api/types'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -12,6 +12,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(phone: string, smsCode: string) {
     const res = await smsLogin(phone, smsCode)
+    token.value = res.accessToken
+    uniTokenAdapter.set(res.accessToken)
+    await loadMe()
+  }
+
+  /** 静态密码登录：用户名即手机号，成功后与验证码登录同流程分流 */
+  async function loginByPassword(username: string, password: string) {
+    const res = await passwordLogin(username, password)
     token.value = res.accessToken
     uniTokenAdapter.set(res.accessToken)
     await loadMe()
@@ -43,5 +51,5 @@ export const useAuthStore = defineStore('auth', () => {
     uni.reLaunch({ url: '/pages/login/index' })
   }
 
-  return { token, me, role, login, loadMe, doLogout, clear, handleUnauthorized }
+  return { token, me, role, login, loginByPassword, loadMe, doLogout, clear, handleUnauthorized }
 })

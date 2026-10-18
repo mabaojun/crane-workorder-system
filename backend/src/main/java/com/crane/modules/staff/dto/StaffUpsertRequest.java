@@ -52,6 +52,10 @@ public class StaffUpsertRequest {
     /** 创建时是否顺带创建登录账号（roleId=2 司机账号，状态 PENDING_BIND） */
     private Boolean createAccount;
 
+    /** 创建登录账号时可选的初始密码，提供时不少于 6 位，经 BCrypt 编码后写入新账号 */
+    @Size(max = 64, message = "初始密码长度不能超过 64")
+    private String initialPassword;
+
     @Size(max = 255, message = "备注长度不能超过 255")
     private String remark;
 }

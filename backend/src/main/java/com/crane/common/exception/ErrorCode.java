@@ -35,6 +35,7 @@ public enum ErrorCode {
     DRIVER_MUTEX_CONFLICT(30001, "司机已有未暂停的进行中工单"),
     DRIVER_NOT_AVAILABLE(30002, "司机处于离岗或离职状态，不可派单"),
     PENDING_DISPATCH_LIMIT(30003, "同一司机未接单派单数已达上限"),
+    PASSWORD_LOGIN_DISABLED(30015, "管理员已关闭密码登录，请使用验证码登录"),
     PAST_START_TIME(30004, "预计开始时间早于当前时间，需二次确认"),
     OUT_OF_CHECKIN_RANGE(30005, "超出签到有效范围"),
     LOCATION_UNAVAILABLE(30006, "定位获取失败或未授权"),

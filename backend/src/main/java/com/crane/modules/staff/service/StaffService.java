@@ -12,6 +12,7 @@ import com.crane.modules.system.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +40,7 @@ public class StaffService {
 
     private final StaffMapper staffMapper;
     private final SysUserMapper sysUserMapper;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * 分页查询（name 模糊 / phone 精确 / status 过滤）。
@@ -76,7 +78,8 @@ public class StaffService {
         insertStaff(staff);
 
         if (Boolean.TRUE.equals(req.getCreateAccount())) {
-            bindAccount(staff, req.getName(), req.getPhone(), operatorId);
+            bindAccount(staff, req.getName(), req.getPhone(),
+                    normalizeInitialPassword(req.getInitialPassword()), operatorId);
         }
         return staff;
     }
@@ -156,15 +159,18 @@ public class StaffService {
 
     /**
      * 创建或关联登录账号：已有同手机号账号直接关联，否则新建（roleId=2 司机、PENDING_BIND），
-     * 并双向回写 staff.userId 与 sys_user.staffId。
+     * 并双向回写 staff.userId 与 sys_user.staffId。初始密码仅在新建账号时写入（BCrypt 编码）。
      */
-    private void bindAccount(Staff staff, String name, String phone, Long operatorId) {
+    private void bindAccount(Staff staff, String name, String phone, String initialPassword, Long operatorId) {
         SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getPhone, phone));
         if (user == null) {
             user = new SysUser();
             user.setPhone(phone);
             user.setNickName(name);
+            if (initialPassword != null) {
+                user.setPassword(passwordEncoder.encode(initialPassword));
+            }
             user.setRoleId(2L);
             user.setStatus("PENDING_BIND");
             user.setCreatedBy(operatorId);
@@ -178,6 +184,17 @@ public class StaffService {
         }
         staff.setUserId(user.getId());
         staffMapper.updateById(staff);
+    }
+
+    /** 初始密码校验：提供时须不少于 6 位，否则返回 20002；空值视为未设置 */
+    private String normalizeInitialPassword(String initialPassword) {
+        if (initialPassword == null || initialPassword.isBlank()) {
+            return null;
+        }
+        if (initialPassword.length() < 6) {
+            throw new BizException(ErrorCode.PARAM_INVALID, "初始密码至少6位");
+        }
+        return initialPassword;
     }
 
     private void applyUpsert(Staff staff, StaffUpsertRequest req) {

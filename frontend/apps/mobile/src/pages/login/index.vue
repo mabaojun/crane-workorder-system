@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// 登录页（T-30）：验证码直登 + 角色分流 + 微信一键登录占位（小程序通道）
+// 登录页（T-30）：验证码直登（默认）/ 静态密码登录 + 角色分流 + 微信一键登录占位（小程序通道）
+// 密码登录入口受 public-config 的 auth.password_login_enabled 控制（"false" 时隐藏并强制验证码模式）
 import { computed, onUnmounted, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { getBranding, loadBranding } from '@crane/shared/api/branding'
@@ -11,20 +12,35 @@ const auth = useAuthStore()
 
 const logoText = ref('吊装')
 const systemName = ref('吊装业务管理系统')
+const loginMode = ref<'sms' | 'password'>('sms')
+const pwdEnabled = ref(true)
 const phone = ref('')
 const smsCode = ref('')
+const password = ref('')
+const showPwd = ref(false)
 const sending = ref(false)
 const countdown = ref(0)
 let timer: ReturnType<typeof setInterval> | null = null
 
 const phoneValid = computed(() => /^1\d{10}$/.test(phone.value))
-const canSubmit = computed(() => phoneValid.value && smsCode.value.length > 0)
+const canSubmit = computed(() => {
+  if (!phoneValid.value) return false
+  return loginMode.value === 'sms' ? smsCode.value.length > 0 : password.value.length > 0
+})
 
 onShow(async () => {
   await loadBranding()
   logoText.value = getBranding()['system.logo_text'] ?? '吊装'
   systemName.value = getBranding()['system.name'] ?? '吊装业务管理系统'
+  // 开关感知：仅显式配置 "false" 才隐藏密码登录；拉取失败默认展示两种方式（后端会再校验兜底）
+  pwdEnabled.value = getBranding()['auth.password_login_enabled'] !== 'false'
+  if (!pwdEnabled.value) loginMode.value = 'sms'
 })
+
+function switchMode(mode: 'sms' | 'password') {
+  if (mode === 'password' && !pwdEnabled.value) return
+  loginMode.value = mode
+}
 
 async function getCode() {
   if (!phoneValid.value) {
@@ -58,23 +74,33 @@ async function getCode() {
   }
 }
 
+/** 登录成功后角色分流（验证码 / 密码共用） */
+async function afterLogin() {
+  const r = auth.role
+  if (r === 'DRIVER') {
+    uni.reLaunch({ url: '/pages/driver/index' })
+  } else if (r === 'CUSTOMER') {
+    uni.reLaunch({ url: '/pages/customer/index' })
+  } else {
+    toastOk('管理员请使用 PC 后台')
+  }
+}
+
 async function doLogin() {
   if (!canSubmit.value) {
-    uni.showToast({ title: '请填写手机号与验证码', icon: 'none' })
+    uni.showToast({ title: loginMode.value === 'sms' ? '请填写手机号与验证码' : '请填写手机号与密码', icon: 'none' })
     return
   }
   try {
     uni.showLoading({ title: '登录中' })
-    await auth.login(phone.value, smsCode.value)
-    uni.hideLoading()
-    const r = auth.role
-    if (r === 'DRIVER') {
-      uni.reLaunch({ url: '/pages/driver/index' })
-    } else if (r === 'CUSTOMER') {
-      uni.reLaunch({ url: '/pages/customer/index' })
+    if (loginMode.value === 'sms') {
+      await auth.login(phone.value, smsCode.value)
     } else {
-      toastOk('管理员请使用 PC 后台')
+      // 密码登录：用户名即手机号；30015（已关闭密码登录）等业务错误直接 toast 后端 message
+      await auth.loginByPassword(phone.value, password.value)
     }
+    uni.hideLoading()
+    await afterLogin()
   } catch (e) {
     uni.hideLoading()
     toastError(e)
@@ -105,6 +131,10 @@ onUnmounted(() => {
     </view>
 
     <view class="form">
+      <view class="tabs">
+        <view class="tab" :class="{ active: loginMode === 'sms' }" @tap="switchMode('sms')">验证码登录</view>
+        <view v-if="pwdEnabled" class="tab" :class="{ active: loginMode === 'password' }" @tap="switchMode('password')">密码登录</view>
+      </view>
       <view class="field">
         <text class="label">手机号</text>
         <input
@@ -116,7 +146,7 @@ onUnmounted(() => {
           placeholder-class="ph"
         />
       </view>
-      <view class="field">
+      <view v-if="loginMode === 'sms'" class="field">
         <text class="label">验证码</text>
         <input
           v-model="smsCode"
@@ -129,6 +159,18 @@ onUnmounted(() => {
         <view class="code-btn" :class="{ disabled: countdown > 0 || sending || !phoneValid }" @click="getCode">
           {{ countdown > 0 ? countdown + 's 后重发' : '获取验证码' }}
         </view>
+      </view>
+      <view v-if="loginMode === 'password'" class="field">
+        <text class="label">密码</text>
+        <input
+          v-model="password"
+          class="input"
+          :password="!showPwd"
+          maxlength="64"
+          placeholder="请输入密码"
+          placeholder-class="ph"
+        />
+        <view class="code-btn" @tap="showPwd = !showPwd">{{ showPwd ? '隐藏' : '显示' }}</view>
       </view>
       <button class="submit" :disabled="!canSubmit" @click="doLogin">登录</button>
       <!-- #ifdef MP-WEIXIN -->
@@ -180,10 +222,26 @@ onUnmounted(() => {
   color: var(--sub);
 }
 .form {
-  margin-top: 40px;
+  margin-top: 32px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+.tabs {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 4px;
+}
+.tab {
+  font-size: 16px;
+  color: var(--sub);
+  padding-bottom: 6px;
+  border-bottom: 2px solid transparent;
+}
+.tab.active {
+  color: var(--brand);
+  font-weight: 600;
+  border-bottom-color: var(--brand);
 }
 .field {
   position: relative;

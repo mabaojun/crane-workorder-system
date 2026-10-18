@@ -3,6 +3,7 @@ package com.crane.modules.auth;
 import com.crane.common.exception.BizException;
 import com.crane.common.auth.JwtUtil;
 import com.crane.common.auth.TokenUserChecker;
+import com.crane.modules.auth.dto.LoginResponse;
 import com.crane.modules.auth.dto.PasswordLoginRequest;
 import com.crane.modules.auth.dto.SmsCodeRequest;
 import com.crane.modules.auth.dto.SmsLoginRequest;
@@ -12,6 +13,7 @@ import com.crane.modules.auth.mapper.SmsCodeMapper;
 import com.crane.modules.auth.service.AuthService;
 import com.crane.modules.system.entity.SysUser;
 import com.crane.modules.system.mapper.SysUserMapper;
+import com.crane.modules.system.service.SystemConfigService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,6 +27,9 @@ import java.time.LocalDateTime;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -55,6 +60,9 @@ class AuthServiceTest {
 
     @Mock
     private TokenUserChecker tokenUserChecker;
+
+    @Mock
+    private SystemConfigService systemConfigService;
 
     @InjectMocks
     private AuthService authService;
@@ -125,6 +133,46 @@ class AuthServiceTest {
         req.setUsername(PHONE);
         req.setPassword(password);
         return req;
+    }
+
+    /** 开关关闭时小程序端密码登录返回 30015，且不触达账号查询 */
+    @Test
+    void 密码登录开关关闭时小程序端返回30015() {
+        when(systemConfigService.getOrDefault("auth.password_login_enabled", "true")).thenReturn("false");
+
+        BizException e = assertThrows(BizException.class,
+                () -> authService.passwordLogin(passwordRequest("any-password"), "mp"));
+        assertEquals(30015, e.getCode());
+        verify(sysUserMapper, never()).selectOne(any());
+    }
+
+    /** 开关关闭但管理后台豁免：不读开关配置直接放行，校验通过后正常签发令牌 */
+    @Test
+    void 密码登录开关关闭时管理后台不受影响() {
+        when(sysUserMapper.selectOne(any())).thenReturn(user("ACTIVE"));
+        when(passwordEncoder.matches("good-password", "bcrypt-hash")).thenReturn(true);
+        when(jwtUtil.createToken(any(), any())).thenReturn("token");
+
+        LoginResponse resp = authService.passwordLogin(passwordRequest("good-password"), "admin");
+
+        // admin 端在开关判定前短路，完全不触达配置中心
+        verifyNoInteractions(systemConfigService);
+        assertEquals("token", resp.getAccessToken());
+        verify(sysUserMapper).updateById(any(SysUser.class));
+    }
+
+    /** 开关开启时小程序端密码登录正常 */
+    @Test
+    void 密码登录开关开启时小程序端正常登录() {
+        when(systemConfigService.getOrDefault("auth.password_login_enabled", "true")).thenReturn("true");
+        when(sysUserMapper.selectOne(any())).thenReturn(user("ACTIVE"));
+        when(passwordEncoder.matches("good-password", "bcrypt-hash")).thenReturn(true);
+        when(jwtUtil.createToken(any(), any())).thenReturn("token");
+
+        LoginResponse resp = authService.passwordLogin(passwordRequest("good-password"), "mp");
+
+        assertEquals("token", resp.getAccessToken());
+        verify(sysUserMapper).updateById(any(SysUser.class));
     }
 
     private SmsLoginRequest smsLoginRequest() {

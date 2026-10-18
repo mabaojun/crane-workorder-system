@@ -30,14 +30,21 @@
         <div class="tip">仅展示空闲（IDLE）车辆；忙碌、维保车辆不可派</div>
       </el-form-item>
       <el-form-item label="计划开始" required>
-        <el-date-picker
-          v-model="form.planStartAt"
-          type="datetime"
-          value-format="YYYY-MM-DDTHH:mm:ss"
-          format="YYYY-MM-DD HH:mm"
-          placeholder="选择计划开始时间"
-          style="width: 100%"
-        />
+        <div class="plan-start">
+          <el-date-picker
+            v-model="form.planStartAt"
+            type="datetime"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            format="YYYY-MM-DD HH:mm"
+            placeholder="选择计划开始时间"
+            style="width: 100%"
+          />
+          <div class="quick-dates">
+            <el-button size="small" @click="setQuickDate(0)">今天</el-button>
+            <el-button size="small" @click="setQuickDate(1)">明天</el-button>
+            <el-button size="small" @click="setQuickDate(2)">后天</el-button>
+          </div>
+        </div>
       </el-form-item>
       <template v-if="mode === 'convert'">
         <el-form-item label="吊车吨位" required>
@@ -137,6 +144,12 @@ function onOpen() {
   form.confirmPast = false
 }
 
+/** 计划开始快捷日期：仅改日期部分，时间保留已选值或默认 09:00:00 */
+function setQuickDate(offsetDays: number) {
+  const time = form.planStartAt ? dayjs(form.planStartAt).format('HH:mm:ss') : '09:00:00'
+  form.planStartAt = dayjs().add(offsetDays, 'day').format(`YYYY-MM-DDT${time}`)
+}
+
 async function loadOptions() {
   form.staffId = undefined
   form.vehicleId = undefined
@@ -212,4 +225,7 @@ async function onSubmit() {
 <style scoped>
 .tip { color: var(--sub); font-size: 12px; line-height: 1.5; }
 .unit { margin-left: 8px; color: var(--sub); }
+.plan-start { width: 100%; }
+.quick-dates { margin-top: 4px; display: flex; }
+.quick-dates .el-button + .el-button { margin-left: 8px; }
 </style>

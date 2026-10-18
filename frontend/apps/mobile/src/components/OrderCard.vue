@@ -14,14 +14,18 @@ defineProps<{
     staffName?: string
     vehiclePlateNo?: string
     address?: string
+    longitude?: number
+    latitude?: number
     expectedStartAt?: string
   }
   /** 用哪套状态：司机看 status，客户看 customerVisibleStatus */
   statusKey?: 'status' | 'customerVisibleStatus'
   highlight?: boolean
+  /** 位置行显示「一键导航」按钮（有坐标时） */
+  showNav?: boolean
 }>()
 
-defineEmits<{ (e: 'tap'): void }>()
+defineEmits<{ (e: 'tap'): void; (e: 'navigate'): void }>()
 </script>
 
 <template>
@@ -37,7 +41,15 @@ defineEmits<{ (e: 'tap'): void }>()
     <view class="rows">
       <view v-if="order.customerName" class="row"><text class="k">客户</text><text>{{ order.customerName }}</text></view>
       <view v-if="order.staffName" class="row"><text class="k">司机</text><text>{{ order.staffName }}{{ order.vehiclePlateNo ? ' / ' + order.vehiclePlateNo : '' }}</text></view>
-      <view v-if="order.address" class="row"><text class="k">地点</text><text class="addr">{{ order.address }}</text></view>
+      <view class="row">
+        <text class="k">地点</text>
+        <text class="addr">{{ order.address || '-' }}</text>
+        <view
+          v-if="showNav && order.longitude != null && order.latitude != null"
+          class="nav-btn"
+          @tap.stop="$emit('navigate')"
+        >一键导航</view>
+      </view>
       <view v-if="order.expectedStartAt" class="row"><text class="k">计划</text><text>{{ fmtDateTime(order.expectedStartAt) }}</text></view>
     </view>
   </view>
@@ -92,5 +104,14 @@ defineEmits<{ (e: 'tap'): void }>()
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+}
+.nav-btn {
+  flex: none;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--brand);
+  border: 1px solid var(--brand);
+  border-radius: var(--radius);
+  padding: 2px 8px;
 }
 </style>

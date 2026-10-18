@@ -83,6 +83,19 @@
         <el-form-item v-if="!editing" label="">
           <el-checkbox v-model="form.createAccount">同时创建客户登录账号（待绑定状态）</el-checkbox>
         </el-form-item>
+        <el-form-item
+          v-if="!editing && form.createAccount"
+          label="初始密码"
+          prop="initialPassword"
+        >
+          <el-input
+            v-model="form.initialPassword"
+            type="password"
+            show-password
+            maxlength="64"
+            placeholder="选填，至少 6 位；留空则由系统默认生成"
+          />
+        </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="255" />
         </el-form-item>
@@ -196,6 +209,7 @@ const form = reactive({
   industry: '',
   address: '',
   createAccount: true,
+  initialPassword: '',
   remark: ''
 })
 
@@ -210,6 +224,15 @@ const rules: FormRules = {
     {
       validator: (_r, value: string, callback) => {
         if (form.type === 'COMPANY' && !value?.trim()) callback(new Error('公司客户必须填写统一社会信用代码'))
+        else callback()
+      },
+      trigger: 'blur'
+    }
+  ],
+  initialPassword: [
+    {
+      validator: (_r, value: string, callback) => {
+        if (value && value.length < 6) callback(new Error('初始密码至少 6 位'))
         else callback()
       },
       trigger: 'blur'
@@ -282,6 +305,7 @@ function openForm(row?: Customer) {
   form.industry = row?.industry ?? ''
   form.address = row?.address ?? ''
   form.createAccount = true
+  form.initialPassword = ''
   form.remark = row?.remark ?? ''
   formVisible.value = true
 }
@@ -298,6 +322,10 @@ async function submit() {
     industry: form.industry.trim() || undefined,
     address: form.address.trim() || undefined,
     createAccount: form.createAccount,
+    initialPassword:
+      !editing.value && form.createAccount && form.initialPassword
+        ? form.initialPassword
+        : undefined,
     remark: form.remark.trim() || undefined
   }
   try {

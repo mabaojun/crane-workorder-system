@@ -51,6 +51,8 @@ export interface CustomerUpsertRequest {
   remark?: string
   /** 创建时是否顺带创建登录账号 */
   createAccount?: boolean
+  /** 登录账号初始密码（仅创建账号时生效，选填，≥6 位） */
+  initialPassword?: string
 }
 
 export interface ContactUpsertRequest {

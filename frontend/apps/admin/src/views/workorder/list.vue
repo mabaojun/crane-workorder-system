@@ -98,6 +98,15 @@
       </div>
     </el-card>
 
+    <!-- 地图选点弹窗 -->
+    <amap-picker
+      v-model:visible="pickerVisible"
+      :lng="createForm.longitude"
+      :lat="createForm.latitude"
+      :address="createForm.address"
+      @confirm="onPicked"
+    />
+
     <!-- 派单 / 改派弹窗 -->
     <dispatch-dialog
       v-if="dispatchTarget"
@@ -151,14 +160,21 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="计划开始" required>
-              <el-date-picker
-                v-model="createForm.planStartAt"
-                type="datetime"
-                value-format="YYYY-MM-DDTHH:mm:ss"
-                format="YYYY-MM-DD HH:mm"
-                placeholder="计划开始时间"
-                style="width: 100%"
-              />
+              <div class="plan-start">
+                <el-date-picker
+                  v-model="createForm.planStartAt"
+                  type="datetime"
+                  value-format="YYYY-MM-DDTHH:mm:ss"
+                  format="YYYY-MM-DD HH:mm"
+                  placeholder="计划开始时间"
+                  style="width: 100%"
+                />
+                <div class="quick-dates">
+                  <el-button size="small" @click="setQuickDate(0)">今天</el-button>
+                  <el-button size="small" @click="setQuickDate(1)">明天</el-button>
+                  <el-button size="small" @click="setQuickDate(2)">后天</el-button>
+                </div>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -168,7 +184,11 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="施工地址" required>
-              <el-input v-model="createForm.address" maxlength="255" placeholder="施工地址" />
+              <el-input v-model="createForm.address" maxlength="255" placeholder="施工地址">
+                <template #append>
+                  <el-button @click="pickerVisible = true">地图选点</el-button>
+                </template>
+              </el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -242,9 +262,12 @@ import { pageStaffs, pageVehicles, type Staff, type Vehicle } from '@crane/share
 import { pageCustomers, type Customer } from '@crane/shared/api/customer'
 import { fmtTime } from '../../utils/format'
 import { dispatchOrder } from '@crane/shared/api/dispatch'
+import dayjs from 'dayjs'
 import DispatchDialog from '../../components/DispatchDialog.vue'
 import PrecheckList from '../../components/PrecheckList.vue'
 import StatusTag from '../../components/StatusTag.vue'
+import AMapPicker from '../../components/AMapPicker.vue'
+import type { AmapPickResult } from '@crane/shared/api/map'
 
 const route = useRoute()
 const router = useRouter()
@@ -272,6 +295,7 @@ const checks = ref<CheckItem[]>([])
 const staffs = ref<Staff[]>([])
 const vehicles = ref<Vehicle[]>([])
 const customers = ref<Customer[]>([])
+const pickerVisible = ref(false)
 const createForm = reactive({
   taskName: '',
   customerId: undefined as number | undefined,
@@ -400,6 +424,21 @@ async function onSettle(row: WorkOrder) {
 }
 
 // ==================== 直建工单 ====================
+/** 计划开始快捷日期：仅改日期部分，时间保留已选值或默认 09:00:00 */
+function setQuickDate(offsetDays: number) {
+  const time = createForm.planStartAt
+    ? dayjs(createForm.planStartAt).format('HH:mm:ss')
+    : '09:00:00'
+  createForm.planStartAt = dayjs().add(offsetDays, 'day').format(`YYYY-MM-DDT${time}`)
+}
+
+/** 地图选点确认回填经纬度与地址 */
+function onPicked(payload: AmapPickResult) {
+  createForm.longitude = payload.lng
+  createForm.latitude = payload.lat
+  if (payload.address) createForm.address = payload.address
+}
+
 function openCreate() {
   checks.value = []
   createForm.taskName = ''
@@ -502,4 +541,7 @@ async function submitCreate() {
 
 <style scoped>
 .unit { margin-left: 8px; color: var(--sub); }
+.plan-start { width: 100%; }
+.quick-dates { margin-top: 4px; display: flex; gap: 0; }
+.quick-dates .el-button + .el-button { margin-left: 8px; }
 </style>

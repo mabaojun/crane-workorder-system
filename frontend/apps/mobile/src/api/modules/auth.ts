@@ -32,6 +32,14 @@ export function smsLogin(phone: string, smsCode: string) {
   })
 }
 
+/** 静态密码登录（30015=管理员已关闭密码登录，由调用方 toast 后端 message） */
+export function passwordLogin(username: string, password: string) {
+  return request<LoginResult>('/auth/password-login', {
+    method: 'POST',
+    body: { username, password }
+  })
+}
+
 export function fetchMe() {
   return request<MeInfo>('/auth/me')
 }

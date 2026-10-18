@@ -15,6 +15,7 @@ import com.crane.modules.system.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,7 @@ public class CustomerService {
     private final CustomerMapper customerMapper;
     private final CustomerContactMapper customerContactMapper;
     private final SysUserMapper sysUserMapper;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * 分页查询（name 模糊 / phone 精确 / status 过滤），分页参数校验见 03 §1.4。
@@ -82,7 +84,7 @@ public class CustomerService {
             }
         }
         if (Boolean.TRUE.equals(req.getCreateAccount())) {
-            bindAccount(customer, operatorId);
+            bindAccount(customer, normalizeInitialPassword(req.getInitialPassword()), operatorId);
         }
         return customer;
     }
@@ -237,8 +239,9 @@ public class CustomerService {
     /**
      * 创建或关联客户登录账号：手机号取默认联系人手机号（缺省取客户主号码）；
      * 已有同手机号账号直接关联，否则新建（roleId=3、PENDING_BIND），并双向回写关联。
+     * 初始密码仅在新建账号时写入（BCrypt 编码）。
      */
-    private void bindAccount(Customer customer, Long operatorId) {
+    private void bindAccount(Customer customer, String initialPassword, Long operatorId) {
         String phone = customer.getPhone();
         CustomerContact defaultContact = customerContactMapper.selectOne(new LambdaQueryWrapper<CustomerContact>()
                 .eq(CustomerContact::getCustomerId, customer.getId())
@@ -253,6 +256,9 @@ public class CustomerService {
             user = new SysUser();
             user.setPhone(phone);
             user.setNickName(customer.getName());
+            if (initialPassword != null) {
+                user.setPassword(passwordEncoder.encode(initialPassword));
+            }
             user.setRoleId(3L);
             user.setStatus("PENDING_BIND");
             user.setCreatedBy(operatorId);
@@ -266,6 +272,17 @@ public class CustomerService {
         }
         customer.setUserId(user.getId());
         customerMapper.updateById(customer);
+    }
+
+    /** 初始密码校验：提供时须不少于 6 位，否则返回 20002；空值视为未设置 */
+    private String normalizeInitialPassword(String initialPassword) {
+        if (initialPassword == null || initialPassword.isBlank()) {
+            return null;
+        }
+        if (initialPassword.length() < 6) {
+            throw new BizException(ErrorCode.PARAM_INVALID, "初始密码至少6位");
+        }
+        return initialPassword;
     }
 
     private String generateCustomerNo() {

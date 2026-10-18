@@ -2,7 +2,7 @@
   <div>
     <el-alert type="info" :closable="false" show-icon class="notice">
       <template #title>
-        「系统名称」为本项目核心配置：修改 system.name 并保存后，全端（后台 / 客户端 / 司机端）的标题与页面展示将同步生效。
+        「系统名称」为本项目核心配置：修改 system.name 并保存后，全端（后台 / 客户端 / 司机端）的标题与页面展示将同步生效。system / map / auth 三组支持在线编辑，其余组只读。
       </template>
     </el-alert>
 
@@ -16,11 +16,19 @@
       <el-table :data="group.items" border size="small">
         <el-table-column label="配置键" prop="configKey" width="220" />
         <el-table-column label="说明" min-width="200">
-          <template #default="{ row }">{{ row.description || '-' }}</template>
+          <template #default="{ row }">{{ rowTip(row) }}</template>
         </el-table-column>
         <el-table-column label="配置值" min-width="240">
           <template #default="{ row }">
-            <template v-if="editable(row)">
+            <template v-if="isAuthSwitch(row)">
+              <el-switch
+                :model-value="row.configValue === 'true'"
+                active-text="开启"
+                inactive-text="关闭"
+                @change="(val: boolean) => onAuthSwitchChange(row, val)"
+              />
+            </template>
+            <template v-else-if="editable(row)">
               <el-input
                 v-model="row.configValue"
                 size="small"
@@ -33,13 +41,19 @@
         <el-table-column label="更新时间" width="140">
           <template #default="{ row }">{{ fmtTime(row.updatedAt) }}</template>
         </el-table-column>
-        <el-table-column v-if="group.name === 'system'" label="操作" width="140" fixed="right">
+        <el-table-column v-if="isEditableGroup(group.name)" label="操作" width="140" fixed="right">
           <template #default="{ row }">
             <template v-if="editingKey === row.configKey">
               <el-button size="small" text type="success" @click="saveRow(row)">保存</el-button>
               <el-button size="small" text @click="cancelEdit(row)">取消</el-button>
             </template>
-            <el-button v-else size="small" text type="primary" @click="beginEdit(row)">编辑</el-button>
+            <el-button
+              v-else-if="!isAuthSwitch(row)"
+              size="small"
+              text
+              type="primary"
+              @click="beginEdit(row)"
+            >编辑</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -65,11 +79,25 @@ const loading = ref(false)
 const editingKey = ref<string | null>(null)
 const backupValue = ref('')
 
+/** 允许行内编辑的配置组 */
+const EDITABLE_GROUPS = ['system', 'map', 'auth']
+/** 这些组的配置值允许清空（如清掉地图 Key） */
+const EMPTY_VALUE_OK_GROUPS = ['map', 'auth']
+/** 布尔开关类配置：true / false 字符串 */
+const AUTH_SWITCH_KEY = 'auth.password_login_enabled'
+
 const GROUP_LABEL: Record<string, string> = {
   system: '系统信息（可编辑）',
-  demand: '需求单（只读）',
-  workorder: '工单（只读）',
-  dispatch: '派单（只读）'
+  map: '地图配置（可编辑）',
+  auth: '登录配置（可编辑）'
+}
+
+/** map 组各项说明（与后端代理 / 前端渲染 / mock 联调方式对应） */
+const MAP_TIPS: Record<string, string> = {
+  'map.amap.web_key': '填高德 Web 服务 Key，供后端代理逆地理编码与 POI 关键词搜索',
+  'map.amap.jsapi_key': '填高德 JSAPI Key，供前端地图选点渲染',
+  'map.amap.security_jscode': '填高德 JSAPI 安全密钥，与 jsapi_key 配套使用',
+  'map.mock': 'true 时后端返回模拟数据，便于无 Key 联调'
 }
 
 const groups = computed<ConfigGroup[]>(() => {
@@ -79,12 +107,19 @@ const groups = computed<ConfigGroup[]>(() => {
     if (!map.has(key)) map.set(key, [])
     map.get(key)!.push(c)
   }
-  // system 分组置顶
   const ordered: ConfigGroup[] = []
   for (const [name, items] of map) {
     ordered.push({ name, label: GROUP_LABEL[name] || `${name}（只读）`, items })
   }
-  ordered.sort((a, b) => (a.name === 'system' ? -1 : b.name === 'system' ? 1 : a.name.localeCompare(b.name)))
+  // 可编辑组置顶：system → map → auth，其余按名称排序
+  ordered.sort((a, b) => {
+    const ia = EDITABLE_GROUPS.indexOf(a.name)
+    const ib = EDITABLE_GROUPS.indexOf(b.name)
+    const ra = ia === -1 ? 99 : ia
+    const rb = ib === -1 ? 99 : ib
+    if (ra !== rb) return ra - rb
+    return a.name.localeCompare(b.name)
+  })
   return ordered
 })
 
@@ -101,8 +136,21 @@ async function load() {
   }
 }
 
+function isEditableGroup(name: string) {
+  return EDITABLE_GROUPS.includes(name)
+}
+
 function editable(row: SysConfig) {
-  return row.groupName === 'system'
+  return isEditableGroup(row.groupName) && !isAuthSwitch(row)
+}
+
+function isAuthSwitch(row: SysConfig) {
+  return row.groupName === 'auth' && row.configKey === AUTH_SWITCH_KEY
+}
+
+function rowTip(row: SysConfig) {
+  if (row.groupName === 'map' && MAP_TIPS[row.configKey]) return MAP_TIPS[row.configKey]
+  return row.description || '-'
 }
 
 function beginEdit(row: SysConfig) {
@@ -116,7 +164,8 @@ function cancelEdit(row: SysConfig) {
 }
 
 async function saveRow(row: SysConfig) {
-  if (!row.configValue.trim()) {
+  // map / auth 组允许清空（如清除 Key），system 组仍要求非空
+  if (!EMPTY_VALUE_OK_GROUPS.includes(row.groupName) && !row.configValue.trim()) {
     ElMessage.warning('配置值不能为空')
     return
   }
@@ -128,6 +177,19 @@ async function saveRow(row: SysConfig) {
     // system.name 变更后刷新进程内品牌缓存，当前页面标题同步
     await loadBranding(true)
     document.title = `系统配置 - ${systemName()}`
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '保存失败')
+  }
+}
+
+/** auth.password_login_enabled 开关：true / false 字符串直存 */
+async function onAuthSwitchChange(row: SysConfig, val: boolean) {
+  const next = val ? 'true' : 'false'
+  try {
+    await updateConfig(row.configKey, next)
+    row.configValue = next
+    ElMessage.success('已保存并全端生效')
+    await load()
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : '保存失败')
   }

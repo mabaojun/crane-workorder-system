@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,10 +31,14 @@ public class AuthController {
 
     private final AuthService authService;
 
-    /** API-AUTH-004 账号密码登录（后台与大屏） */
+    /**
+     * API-AUTH-004 账号密码登录（后台与大屏）。
+     * X-Client 标识客户端（admin / screen / mp 等），密码登录开关仅豁免 admin 与 screen。
+     */
     @PostMapping("/password-login")
-    public ApiResult<LoginResponse> passwordLogin(@Valid @RequestBody PasswordLoginRequest req) {
-        return ApiResult.ok(authService.passwordLogin(req));
+    public ApiResult<LoginResponse> passwordLogin(@Valid @RequestBody PasswordLoginRequest req,
+                                                  @RequestHeader(value = "X-Client", required = false) String clientType) {
+        return ApiResult.ok(authService.passwordLogin(req, clientType));
     }
 
     /** API-AUTH-003 发送登录 / 绑定验证码 */

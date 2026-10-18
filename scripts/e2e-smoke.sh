@@ -88,6 +88,23 @@ echo "== 10. 越权用例 =="
 code=$(curl -s -X GET "$BASE/work-order/orders/$OID" -H 'X-Client: admin' | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')
 if [ "$code" = "10001" ]; then PASS=$((PASS+1)); echo "PASS  无令牌访问被拒 10001"; else FAIL=$((FAIL+1)); echo "FAIL  无令牌访问 code=$code"; fi
 
+echo "== 11. 地图选点与密码登录 =="
+req "逆地理编码(mock)" GET "/system/amap/regeo?lng=117.12&lat=36.71" "$ADMIN" ""
+addr=$(jq_get data formattedAddress)
+if [ -n "$addr" ]; then PASS=$((PASS+1)); echo "PASS  选点回填地址: $addr"; else FAIL=$((FAIL+1)); echo "FAIL  regeo 无地址"; fi
+req "关键词搜索(mock)" GET "/system/amap/place/text?keywords=%E5%81%9C%E8%BD%A6%E5%9C%BA&lng=117.12&lat=36.71" "$ADMIN" ""
+req "创建司机(初始密码)" POST /staff/staffs "$ADMIN" "{\"name\":\"E2E密码司机$TS\",\"phone\":\"137$((TS % 100000000))\",\"idCard\":\"370100199001020$((TS%1000))X\",\"position\":\"DRIVER\",\"createAccount\":true,\"initialPassword\":\"E2e@12345\"}"
+PWPHONE="137$((TS % 100000000))"
+code=$(curl -s -X POST "$BASE/auth/password-login" -H 'Content-Type: application/json' -H 'X-Client: mp' -d "{\"username\":\"$PWPHONE\",\"password\":\"E2e@12345\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')
+if [ "$code" = "0" ]; then PASS=$((PASS+1)); echo "PASS  司机密码登录(mp)"; else FAIL=$((FAIL+1)); echo "FAIL  司机密码登录 code=$code"; fi
+# 开关实时生效：关闭 → mp 被拒 30015 → 恢复
+curl -s -X PUT "$BASE/system/configs/auth.password_login_enabled" -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' -d '{"configValue":"false"}' > /dev/null
+code=$(curl -s -X POST "$BASE/auth/password-login" -H 'Content-Type: application/json' -H 'X-Client: mp' -d "{\"username\":\"$PWPHONE\",\"password\":\"E2e@12345\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')
+if [ "$code" = "30015" ]; then PASS=$((PASS+1)); echo "PASS  开关关闭后 mp 密码登录被拒 30015"; else FAIL=$((FAIL+1)); echo "FAIL  开关未生效 code=$code"; fi
+curl -s -X PUT "$BASE/system/configs/auth.password_login_enabled" -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' -d '{"configValue":"true"}' > /dev/null
+code=$(curl -s -X POST "$BASE/auth/password-login" -H 'Content-Type: application/json' -H 'X-Client: mp' -d "{\"username\":\"$PWPHONE\",\"password\":\"E2e@12345\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')
+if [ "$code" = "0" ]; then PASS=$((PASS+1)); echo "PASS  开关开启后恢复（实时生效无重启）"; else FAIL=$((FAIL+1)); echo "FAIL  恢复失败 code=$code"; fi
+
 echo "=============================="
 echo "E2E 结果：PASS=$PASS FAIL=$FAIL"
 exit $FAIL

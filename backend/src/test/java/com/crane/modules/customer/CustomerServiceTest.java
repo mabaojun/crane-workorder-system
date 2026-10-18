@@ -2,27 +2,32 @@ package com.crane.modules.customer;
 
 import com.crane.common.exception.BizException;
 import com.crane.modules.customer.dto.CustomerContactUpsertRequest;
+import com.crane.modules.customer.dto.CustomerUpsertRequest;
 import com.crane.modules.customer.entity.Customer;
 import com.crane.modules.customer.entity.CustomerContact;
 import com.crane.modules.customer.mapper.CustomerContactMapper;
 import com.crane.modules.customer.mapper.CustomerMapper;
 import com.crane.modules.customer.service.CustomerService;
+import com.crane.modules.system.entity.SysUser;
 import com.crane.modules.system.mapper.SysUserMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 客户档案服务单元测试：默认联系人唯一切换、联系人手机号全局唯一。
+ * 客户档案服务单元测试：默认联系人唯一切换、联系人手机号全局唯一、创建账号初始密码。
  */
 class CustomerServiceTest {
 
@@ -36,7 +41,8 @@ class CustomerServiceTest {
         customerMapper = mock(CustomerMapper.class);
         contactMapper = mock(CustomerContactMapper.class);
         sysUserMapper = mock(SysUserMapper.class);
-        customerService = new CustomerService(customerMapper, contactMapper, sysUserMapper);
+        customerService = new CustomerService(customerMapper, contactMapper, sysUserMapper,
+                new BCryptPasswordEncoder());
     }
 
     private CustomerContactUpsertRequest contactRequest() {
@@ -94,5 +100,51 @@ class CustomerServiceTest {
         BizException e = assertThrows(BizException.class, () -> customerService.createContact(contactRequest(), 1L));
         assertEquals(40004, e.getCode());
         assertEquals("该手机号已登记", e.getMessage());
+    }
+
+    /** 创建客户账号并携带合法初始密码时，新账号写入 BCrypt 编码密码 */
+    @Test
+    void 创建客户账号携带初始密码时应写入BCrypt编码密码() {
+        when(customerMapper.selectOne(any())).thenReturn(null);
+        when(customerMapper.insert(any(Customer.class))).thenAnswer(inv -> {
+            inv.getArgument(0, Customer.class).setId(5L);
+            return 1;
+        });
+        when(sysUserMapper.selectOne(any())).thenReturn(null);
+
+        CustomerUpsertRequest req = new CustomerUpsertRequest();
+        req.setName("测试客户");
+        req.setType("PERSON");
+        req.setPhone("13900000001");
+        req.setCreateAccount(true);
+        req.setInitialPassword("123456");
+        customerService.create(req, 1L);
+
+        ArgumentCaptor<SysUser> captor = ArgumentCaptor.forClass(SysUser.class);
+        verify(sysUserMapper).insert(captor.capture());
+        String encoded = captor.getValue().getPassword();
+        assertNotNull(encoded);
+        assertTrue(encoded.startsWith("$2"));
+    }
+
+    /** 客户初始密码不足 6 位返回 20002 */
+    @Test
+    void 客户初始密码过短应抛出20002() {
+        when(customerMapper.selectOne(any())).thenReturn(null);
+        when(customerMapper.insert(any(Customer.class))).thenAnswer(inv -> {
+            inv.getArgument(0, Customer.class).setId(5L);
+            return 1;
+        });
+
+        CustomerUpsertRequest req = new CustomerUpsertRequest();
+        req.setName("测试客户");
+        req.setType("PERSON");
+        req.setPhone("13900000001");
+        req.setCreateAccount(true);
+        req.setInitialPassword("123");
+        BizException e = assertThrows(BizException.class, () -> customerService.create(req, 1L));
+
+        assertEquals(20002, e.getCode());
+        assertEquals("初始密码至少6位", e.getMessage());
     }
 }

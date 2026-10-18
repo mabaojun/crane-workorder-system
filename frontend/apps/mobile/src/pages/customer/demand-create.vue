@@ -1,9 +1,12 @@
 <script setup lang="ts">
 // 客户端需求提报（T-33）：表单提交 → POST /demand/orders
+// 位置支持：自动定位 / 地图选点（MapPicker）；提交模式：全量（经纬度+地址，默认）或仅经纬度（野外无地址场景）
 import { ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { createDemandOrder, listDemands } from '../../api/modules/biz'
 import type { DemandOrder } from '../../api/types'
+import MapPicker from '../../components/MapPicker.vue'
+import type { MapPickResult } from '../../components/MapPicker.vue'
 import { useAuthStore } from '../../stores/auth'
 import { chooseImages, getLocation, toastError, toastOk } from '../../utils'
 
@@ -21,6 +24,10 @@ const expectDate = ref('')
 const expectTime = ref('')
 const photos = ref<string[]>([])
 const parentDemandId = ref<number | undefined>(undefined)
+
+// ---- 位置提交模式：full=全量（经纬度+地址文本）；coord=仅经纬度（地址自动生成占位文本满足必填） ----
+const showPicker = ref(false)
+const locationMode = ref<'full' | 'coord'>('full')
 
 onLoad((opts) => {
   // 「再次提报」：读取驳回单草稿（由需求列表页写入）
@@ -57,6 +64,14 @@ async function locate() {
   }
 }
 
+/** 地图选点确认：回填经纬度；无地址（regeo 失败）时生成占位文本兜底 */
+function onPicked(p: MapPickResult) {
+  coords.value = { longitude: p.lng, latitude: p.lat }
+  address.value = p.address || `自定义点位（经度${p.lng}，纬度${p.lat}）`
+  showPicker.value = false
+  toastOk('已选择点位')
+}
+
 async function takePhoto() {
   try {
     const paths = await chooseImages(1)
@@ -71,12 +86,22 @@ async function submit() {
     uni.showToast({ title: '请填写联系电话', icon: 'none' })
     return
   }
-  if (!address.value.trim()) {
-    uni.showToast({ title: '请填写施工地址', icon: 'none' })
-    return
-  }
   if (!/^1\d{10}$/.test(contactPhone.value.trim())) {
     uni.showToast({ title: '联系电话须为 11 位手机号', icon: 'none' })
+    return
+  }
+  // 位置按提交模式组装：coord 模式地址自动生成占位文本以满足后端必填
+  let submitAddress = address.value.trim()
+  const submitLng = coords.value?.longitude
+  const submitLat = coords.value?.latitude
+  if (locationMode.value === 'coord') {
+    if (submitLng == null || submitLat == null) {
+      uni.showToast({ title: '请先地图选点或自动定位获取坐标', icon: 'none' })
+      return
+    }
+    submitAddress = `自定义点位（经度${submitLng}，纬度${submitLat}）`
+  } else if (!submitAddress) {
+    uni.showToast({ title: '请填写施工地址', icon: 'none' })
     return
   }
   try {
@@ -87,9 +112,9 @@ async function submit() {
       source: 'CUSTOMER_MP',
       contactName: contactName.value.trim(),
       contactPhone: contactPhone.value.trim(),
-      address: address.value.trim(),
-      longitude: coords.value?.longitude,
-      latitude: coords.value?.latitude,
+      address: submitAddress,
+      longitude: submitLng,
+      latitude: submitLat,
       description: description.value.trim() || undefined,
       imageUrls: photos.value.length ? ['mock://local'] : undefined,
       craneTonnage: craneTonnage.value ? Number(craneTonnage.value) : undefined,
@@ -122,11 +147,29 @@ async function submit() {
       </view>
       <view class="field col">
         <text class="label">施工地址</text>
-        <input v-model="address" class="input" placeholder="请输入详细地址" placeholder-class="ph" />
+        <input
+          v-if="locationMode === 'full'"
+          v-model="address"
+          class="input"
+          placeholder="请输入详细地址或使用地图选点"
+          placeholder-class="ph"
+        />
         <view class="locate-row">
           <view class="locate" @tap="locate">{{ locating ? '定位中...' : '自动定位' }}</view>
+          <view class="locate" @tap="showPicker = true">地图选点</view>
           <text v-if="coords" class="located">已定位（{{ coords.longitude.toFixed(4) }}, {{ coords.latitude.toFixed(4) }}）</text>
         </view>
+        <text class="wild-hint">野外无地址时可直接拖动地图中心锚点选点</text>
+      </view>
+      <view class="field col">
+        <text class="label">位置信息提交模式</text>
+        <view class="mode-row">
+          <view class="mode-opt" :class="{ active: locationMode === 'full' }" @tap="locationMode = 'full'">全量（经纬度+地址）</view>
+          <view class="mode-opt" :class="{ active: locationMode === 'coord' }" @tap="locationMode = 'coord'">仅经纬度</view>
+        </view>
+        <text class="mode-tip">
+          {{ locationMode === 'full' ? '模式一：同时提交经纬度与地址文本，适用于有明确地址的现场' : '模式二：仅提交经纬度，提交时地址自动记为自定义点位，适用于野外无地址场景' }}
+        </text>
       </view>
       <view class="field col">
         <text class="label">需求描述</text>
@@ -166,6 +209,15 @@ async function submit() {
 
       <button class="submit" @tap="submit">提交需求</button>
     </view>
+
+    <!-- 地图选点弹层：带回显当前坐标 -->
+    <MapPicker
+      v-if="showPicker"
+      :initial-lng="coords?.longitude"
+      :initial-lat="coords?.latitude"
+      @confirm="onPicked"
+      @close="showPicker = false"
+    />
   </view>
 </template>
 
@@ -248,6 +300,34 @@ async function submit() {
 .located {
   font-size: 12px;
   color: var(--success);
+}
+.wild-hint {
+  font-size: 12px;
+  color: var(--sub);
+  background: var(--brand-weak);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+}
+.mode-row {
+  display: flex;
+  gap: 8px;
+}
+.mode-opt {
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 14px;
+  color: var(--txt);
+  background: var(--panel);
+}
+.mode-opt.active {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: var(--brand-weak);
+}
+.mode-tip {
+  font-size: 12px;
+  color: var(--sub);
 }
 .picker-value {
   font-size: 15px;

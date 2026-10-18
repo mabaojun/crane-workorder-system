@@ -19,6 +19,7 @@ import {
 } from '../../api/modules/biz'
 import type { WorkOrder } from '../../api/types'
 import { chooseImages, getLocation, toastError, toastOk } from '../../utils'
+import { openNavigation, navFromOrder } from '../../utils/navigation'
 
 // 状态机活跃态（终态不展示为当前工单）
 const PRIORITY = ['PENDING_ACCEPT', 'PENDING_ARRIVE', 'IN_PROGRESS', 'SUSPENDED']
@@ -79,6 +80,18 @@ onShow(load)
 function needOrder(): WorkOrder {
   if (!order.value) throw new Error('当前没有工单')
   return order.value
+}
+
+/** 一键导航：无坐标时统一 toast 提示 */
+function onNavigate() {
+  const o = order.value
+  if (!o) return
+  const target = navFromOrder(o)
+  if (!target) {
+    uni.showToast({ title: '该工单无位置坐标', icon: 'none' })
+    return
+  }
+  openNavigation(target)
 }
 
 async function onAccept() {
@@ -286,10 +299,14 @@ async function onTaskEnd() {
             taskName: order.taskName,
             customerName: order.customerName,
             address: order.address,
+            longitude: order.longitude,
+            latitude: order.latitude,
             expectedStartAt: order.expectedStartAt
           }"
           status-key="status"
           highlight
+          show-nav
+          @navigate="onNavigate"
         />
 
         <view class="info-extra">

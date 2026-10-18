@@ -99,6 +99,19 @@
         <el-form-item v-if="!editing" label="">
           <el-checkbox v-model="form.createAccount">同时创建登录账号（司机角色，待绑定状态）</el-checkbox>
         </el-form-item>
+        <el-form-item
+          v-if="!editing && form.createAccount"
+          label="初始密码"
+          prop="initialPassword"
+        >
+          <el-input
+            v-model="form.initialPassword"
+            type="password"
+            show-password
+            maxlength="64"
+            placeholder="选填，至少 6 位；留空则由系统默认生成"
+          />
+        </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="255" />
         </el-form-item>
@@ -143,6 +156,7 @@ const form = reactive({
   specialCertNo: '',
   hireDate: '',
   createAccount: true,
+  initialPassword: '',
   remark: ''
 })
 
@@ -152,7 +166,16 @@ const rules: FormRules = {
     { required: true, message: '请填写手机号', trigger: 'blur' },
     { pattern: /^1\d{10}$/, message: '手机号格式不正确', trigger: 'blur' }
   ],
-  position: [{ required: true, message: '请选择岗位', trigger: 'change' }]
+  position: [{ required: true, message: '请选择岗位', trigger: 'change' }],
+  initialPassword: [
+    {
+      validator: (_r, value: string, callback) => {
+        if (value && value.length < 6) callback(new Error('初始密码至少 6 位'))
+        else callback()
+      },
+      trigger: 'blur'
+    }
+  ]
 }
 
 onMounted(load)
@@ -197,6 +220,7 @@ function openForm(row?: Staff) {
   form.specialCertNo = row?.specialCertNo ?? ''
   form.hireDate = row?.hireDate ?? ''
   form.createAccount = true
+  form.initialPassword = ''
   form.remark = row?.remark ?? ''
   formVisible.value = true
 }
@@ -214,6 +238,10 @@ async function submit() {
     specialCertNo: form.specialCertNo.trim() || undefined,
     hireDate: form.hireDate || undefined,
     createAccount: form.createAccount,
+    initialPassword:
+      !editing.value && form.createAccount && form.initialPassword
+        ? form.initialPassword
+        : undefined,
     remark: form.remark.trim() || undefined
   }
   try {

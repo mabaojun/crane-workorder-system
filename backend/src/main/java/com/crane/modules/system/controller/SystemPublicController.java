@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -30,8 +32,21 @@ public class SystemPublicController {
         ));
     }
 
+    /**
+     * 公开配置：system 组全量 + 地图组仅下发前端 JSAPI 所需密钥（jsapi_key / security_jscode，
+     * Web 服务 key 与 mock 开关不出网）+ 密码登录开关，供各端登录页与地图页预判展示。
+     */
     @GetMapping("/public-config")
     public ApiResult<Map<String, String>> publicConfig() {
-        return ApiResult.ok(systemConfigService.getByGroup("system"));
+        Map<String, String> result = new HashMap<>(systemConfigService.getByGroup("system"));
+        for (String key : List.of("map.amap.jsapi_key", "map.amap.security_jscode")) {
+            String value = systemConfigService.get(key);
+            if (value != null) {
+                result.put(key, value);
+            }
+        }
+        result.put("auth.password_login_enabled",
+                systemConfigService.getOrDefault("auth.password_login_enabled", "true"));
+        return ApiResult.ok(result);
     }
 }

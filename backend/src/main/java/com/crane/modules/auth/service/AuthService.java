@@ -18,6 +18,7 @@ import com.crane.modules.auth.mapper.PermissionMapper;
 import com.crane.modules.auth.mapper.SmsCodeMapper;
 import com.crane.modules.system.entity.SysUser;
 import com.crane.modules.system.mapper.SysUserMapper;
+import com.crane.modules.system.service.SystemConfigService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -66,6 +68,12 @@ public class AuthService {
     private static final int SMS_EXPIRE_SECONDS = 300;
     private static final int SMS_SEND_INTERVAL_SECONDS = 60;
 
+    /** 密码登录开关豁免端：管理后台与大屏不受 auth.password_login_enabled 控制 */
+    private static final Set<String> PASSWORD_LOGIN_EXEMPT_CLIENTS = Set.of("admin", "screen");
+
+    /** 密码登录开关配置键 */
+    private static final String KEY_PASSWORD_LOGIN_ENABLED = "auth.password_login_enabled";
+
     private final SysUserMapper sysUserMapper;
     private final SmsCodeMapper smsCodeMapper;
     private final PermissionMapper permissionMapper;
@@ -73,6 +81,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final TokenUserChecker tokenUserChecker;
+    private final SystemConfigService systemConfigService;
 
     /** 是否为模拟短信通道（MVP 未接真实通道），为 true 时响应中返回 debugCode 供联调 */
     @Value("${crane.sms.mock:true}")
@@ -82,8 +91,17 @@ public class AuthService {
     @Value("${crane.jwt.expire-hours:720}")
     private long expireHours;
 
-    /** 账号密码登录（API-AUTH-004）：username 即手机号 */
+    /** 账号密码登录（API-AUTH-004）：username 即手机号，未携带客户端标识时按管理后台处理 */
     public LoginResponse passwordLogin(PasswordLoginRequest req) {
+        return passwordLogin(req, "admin");
+    }
+
+    /**
+     * 账号密码登录（含客户端标识）：管理后台（admin）与大屏（screen）不受开关控制；
+     * 其余端在 auth.password_login_enabled=false 时拒绝（30015），提示改用验证码登录。
+     */
+    public LoginResponse passwordLogin(PasswordLoginRequest req, String clientType) {
+        checkPasswordLoginEnabled(clientType);
         SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getPhone, req.getUsername()));
         if (user == null || user.getPassword() == null
@@ -96,6 +114,18 @@ public class AuthService {
         update.setLastLoginAt(LocalDateTime.now());
         sysUserMapper.updateById(update);
         return issueToken(user);
+    }
+
+    /** 密码登录开关校验：仅豁免 admin / screen 两端 */
+    private void checkPasswordLoginEnabled(String clientType) {
+        String client = clientType == null || clientType.isBlank() ? "admin" : clientType.trim().toLowerCase();
+        if (PASSWORD_LOGIN_EXEMPT_CLIENTS.contains(client)) {
+            return;
+        }
+        if ("false".equalsIgnoreCase(systemConfigService
+                .getOrDefault(KEY_PASSWORD_LOGIN_ENABLED, "true").trim())) {
+            throw new BizException(ErrorCode.PASSWORD_LOGIN_DISABLED);
+        }
     }
 
     /** 发送短信验证码（API-AUTH-003）：60 秒内同手机号同场景限发一次，MVP 记 MOCK 发送结果 */

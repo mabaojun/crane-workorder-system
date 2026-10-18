@@ -9,6 +9,7 @@ import RoleTabbar from '../../components/RoleTabbar.vue'
 import { listOrders } from '../../api/modules/biz'
 import type { WorkOrder } from '../../api/types'
 import { fmtDateTime, toastError } from '../../utils'
+import { openNavigation } from '../../utils/navigation'
 
 const list = ref<WorkOrder[]>([])
 const total = ref(0)
@@ -52,6 +53,17 @@ function openDetail(o: WorkOrder) {
 function closeDetail() {
   detail.value = null
 }
+
+/** 详情抽屉一键导航 */
+function goNavigate() {
+  const o = detail.value
+  if (!o) return
+  if (o.longitude == null || o.latitude == null) {
+    uni.showToast({ title: '该工单无位置坐标', icon: 'none' })
+    return
+  }
+  openNavigation({ lng: o.longitude, lat: o.latitude, name: o.taskName || o.orderNo, address: o.address })
+}
 </script>
 
 <template>
@@ -85,6 +97,11 @@ function closeDetail() {
           <view class="row"><text class="k">司机</text><text>{{ detail.staffName || '-' }}</text></view>
           <view class="row"><text class="k">车牌</text><text>{{ detail.vehiclePlateNo || '-' }}</text></view>
           <view class="row"><text class="k">地址</text><text>{{ detail.address || '-' }}</text></view>
+          <view class="row">
+            <text class="k">导航</text>
+            <view v-if="detail.longitude != null && detail.latitude != null" class="nav-link" @tap="goNavigate">一键导航</view>
+            <text v-else class="sub-text">无位置坐标</text>
+          </view>
           <view class="row"><text class="k">计划开始</text><text>{{ fmtDateTime(detail.expectedStartAt) }}</text></view>
           <view class="row"><text class="k">接单时间</text><text>{{ fmtDateTime(detail.acceptedAt) }}</text></view>
           <view class="row"><text class="k">开工时间</text><text>{{ fmtDateTime(detail.startedAt) }}</text></view>
@@ -175,5 +192,14 @@ function closeDetail() {
   color: var(--sub);
   flex: none;
   width: 64px;
+}
+.nav-link {
+  color: var(--brand);
+  font-size: 14px;
+  text-decoration: underline;
+}
+.sub-text {
+  color: var(--sub);
+  font-size: 13px;
 }
 </style>
