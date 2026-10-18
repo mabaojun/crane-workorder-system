@@ -75,8 +75,8 @@
               size="small"
               text
               type="success"
-              @click="changeStatus(row, 'RESUME')"
-            >恢复</el-button>
+              @click="onResume(row)"
+            >批准继续</el-button>
             <el-button
               v-if="!['COMPLETED', 'CANCELLED'].includes(row.status)"
               size="small"
@@ -143,8 +143,8 @@
       <el-form ref="createFormRef" :model="createForm" label-width="100px">
         <el-row :gutter="12">
           <el-col :span="12">
-            <el-form-item label="任务名称" required>
-              <el-input v-model="createForm.taskName" maxlength="100" placeholder="任务名称" />
+            <el-form-item label="任务名称">
+              <el-input v-model="createForm.taskName" maxlength="100" placeholder="选填，不填自动按 客户·吨位·司机 生成" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -277,8 +277,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="货物重量" required>
-              <el-input-number v-model="createForm.cargoWeightTon" :min="0.01" :precision="2" controls-position="right" style="width: 100%" />
+            <el-form-item label="货物重量">
+              <el-input-number v-model="createForm.cargoWeightTon" :min="0.01" :precision="2" controls-position="right" placeholder="选填" style="width: 100%" />
               <span class="unit">吨</span>
             </el-form-item>
           </el-col>
@@ -320,6 +320,7 @@ import {
   createWorkOrder,
   changeWorkOrderStatus,
   settleWorkOrder,
+  resumeWorkOrder,
   type WorkOrder
 } from '@crane/shared/api/workorder'
 import { precheckDispatch, type CheckItem } from '@crane/shared/api/dispatch'
@@ -563,9 +564,15 @@ async function loadCreateOptions() {
   }
 }
 
-/** 选择常用施工地点：回填地址文本（经纬度保持当前值，可后续地图选点校准） */
+/** 选择常用施工地点：回填地址文本与经纬度（无经纬度的地点保持当前值，可后续地图选点校准） */
 function onPickPlace(name: string) {
-  if (name) createForm.address = name
+  if (!name) return
+  createForm.address = name
+  const place = commonPlaces.value.find((p) => p.placeName === name)
+  if (place) {
+    if (place.longitude != null) createForm.longitude = place.longitude
+    if (place.latitude != null) createForm.latitude = place.latitude
+  }
 }
 
 async function onPrecheck() {
@@ -588,8 +595,23 @@ async function onPrecheck() {
   }
 }
 
+/** 批准继续：暂停工单恢复施工（自动关闭未批复异常并通知司机端） */
+async function onResume(row: WorkOrder) {
+  try {
+    await ElMessageBox.confirm(`确认批准工单 ${row.orderNo} 继续施工？`, '批准继续', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await resumeWorkOrder(row.id)
+    ElMessage.success('已批准继续施工')
+    load()
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '操作失败')
+  }
+}
+
 async function submitCreate() {
-  if (!createForm.taskName.trim()) return ElMessage.warning('请填写任务名称')
   if (!createForm.customerId) return ElMessage.warning('请选择客户')
   if (!createForm.staffId) return ElMessage.warning('请选择执行司机')
   if (!createForm.vehicleId) return ElMessage.warning('请选择施工车辆')
@@ -598,7 +620,6 @@ async function submitCreate() {
   if (createForm.longitude == null || createForm.latitude == null) return ElMessage.warning('请填写经纬度')
   if (!createForm.cargoName.trim()) return ElMessage.warning('请填写货物名称')
   if (!createForm.cargoQty || createForm.cargoQty < 1) return ElMessage.warning('货物数量须大于等于 1')
-  if (!createForm.cargoWeightTon) return ElMessage.warning('请填写货物重量')
   if (!createForm.craneTonnage) return ElMessage.warning('请填写吊车吨位')
   if (needConfirmPast.value && !createForm.confirmPast) {
     ElMessage.warning('计划时间早于当前时间，请勾选二次确认')
@@ -607,7 +628,8 @@ async function submitCreate() {
   creating.value = true
   try {
     await createWorkOrder({
-      taskName: createForm.taskName.trim(),
+      // 任务名称选填：不填由后端按「客户名·吊车吨位·司机姓名」自动生成
+      taskName: createForm.taskName.trim() || undefined,
       source: 'DIRECT',
       customerId: createForm.customerId,
       staffId: createForm.staffId,

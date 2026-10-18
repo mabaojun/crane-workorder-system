@@ -22,8 +22,22 @@
             v-model="newName"
             maxlength="128"
             placeholder="输入常用施工地点名称"
-            style="width: 260px"
+            style="width: 220px"
             @keyup.enter="onCreate"
+          />
+          <el-input-number
+            v-model="newLng"
+            :precision="6"
+            :controls="false"
+            placeholder="经度(选填)"
+            style="width: 130px"
+          />
+          <el-input-number
+            v-model="newLat"
+            :precision="6"
+            :controls="false"
+            placeholder="纬度(选填)"
+            style="width: 130px"
           />
           <el-button type="primary" :loading="creating" :disabled="!newName.trim()" @click="onCreate">
             新增地点
@@ -40,8 +54,14 @@
       />
 
       <el-table v-loading="loading" :data="list" border stripe>
-        <el-table-column label="地点名称" prop="placeName" min-width="240" show-overflow-tooltip />
-        <el-table-column label="排序值" prop="sortOrder" width="100" align="center" />
+        <el-table-column label="地点名称" prop="placeName" min-width="220" show-overflow-tooltip />
+        <el-table-column label="经纬度" min-width="180">
+          <template #default="{ row }">
+            <span v-if="row.longitude != null && row.latitude != null">{{ row.longitude }}, {{ row.latitude }}</span>
+            <span v-else class="no-coord">未维护</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="排序值" prop="sortOrder" width="90" align="center" />
         <el-table-column label="创建时间" width="170">
           <template #default="{ row }">{{ fmtTime(row.createdAt) }}</template>
         </el-table-column>
@@ -84,6 +104,8 @@ const total = ref(0)
 const loading = ref(false)
 const creating = ref(false)
 const newName = ref('')
+const newLng = ref<number | undefined>(undefined)
+const newLat = ref<number | undefined>(undefined)
 const query = ref({ pageNum: 1, pageSize: 20 })
 
 onMounted(load)
@@ -119,9 +141,15 @@ async function onCreate() {
   if (!placeName) return
   creating.value = true
   try {
-    await createCommonPlace({ placeName })
+    await createCommonPlace({
+      placeName,
+      longitude: newLng.value ?? undefined,
+      latitude: newLat.value ?? undefined
+    })
     ElMessage.success('已新增常用施工地点')
     newName.value = ''
+    newLng.value = undefined
+    newLat.value = undefined
     query.value.pageNum = 1
     load()
   } catch (e) {
@@ -164,5 +192,7 @@ async function onDelete(row: CommonPlace) {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
+.no-coord { color: var(--sub, #909399); }
 </style>

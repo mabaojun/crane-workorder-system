@@ -2,7 +2,7 @@
   <div>
     <el-alert type="info" :closable="false" show-icon class="notice">
       <template #title>
-        「系统名称」为本项目核心配置：修改 system.name 并保存后，全端（后台 / 客户端 / 司机端）的标题与页面展示将同步生效。system / map / auth 三组支持在线编辑，其余组只读。
+        「系统名称」为本项目核心配置：修改 system.name 并保存后，全端（后台 / 客户端 / 司机端）的标题与页面展示将同步生效。system / map / auth / ai 四组支持在线编辑（含高德 API 与 AI 接入 OpenAI 兼容接口），其余组只读。
       </template>
     </el-alert>
 
@@ -32,6 +32,7 @@
               <el-input
                 v-model="row.configValue"
                 size="small"
+                :show-password="row.configKey.endsWith('api_key')"
                 :disabled="editingKey !== null && editingKey !== row.configKey"
               />
             </template>
@@ -80,9 +81,9 @@ const editingKey = ref<string | null>(null)
 const backupValue = ref('')
 
 /** 允许行内编辑的配置组 */
-const EDITABLE_GROUPS = ['system', 'map', 'auth']
-/** 这些组的配置值允许清空（如清掉地图 Key） */
-const EMPTY_VALUE_OK_GROUPS = ['map', 'auth']
+const EDITABLE_GROUPS = ['system', 'map', 'auth', 'ai']
+/** 这些组的配置值允许清空（如清掉地图 Key / AI 接入信息） */
+const EMPTY_VALUE_OK_GROUPS = ['map', 'auth', 'ai']
 /** 布尔开关类配置：true / false 字符串 */
 const AUTH_SWITCH_KEY = 'auth.password_login_enabled'
 
@@ -90,11 +91,15 @@ const GROUP_LABEL: Record<string, string> = {
   system: '系统信息（可编辑）',
   map: '地图配置（可编辑）',
   auth: '登录配置（可编辑）',
-  ai: 'AI 服务配置（运行参数，由后端维护）'
+  ai: 'AI 服务配置（可编辑，OpenAI 兼容接口）'
 }
 
-/** ai 组各项说明（AI 简报/日报调度参数，仅展示） */
+/** ai 组各项说明（接入信息 + 简报/日报调度参数） */
 const AI_TIPS: Record<string, string> = {
+  'ai.enabled': 'AI 接入总开关，关闭时所有 AI 功能不调用外部接口',
+  'ai.api_base_url': 'OpenAI 兼容接口 Base URL，如 https://api.openai.com/v1 或中转地址',
+  'ai.api_key': 'OpenAI 兼容接口 API Key，仅后台可见，不下发前端',
+  'ai.model': '模型名称，如 gpt-4o-mini / deepseek-chat',
   'ai.daily_run_time': 'AI 日报每日执行时间（HH:mm），由后端调度任务读取',
   'ai.briefing_retention_days': 'AI 简报保留天数，超期自动清理'
 }

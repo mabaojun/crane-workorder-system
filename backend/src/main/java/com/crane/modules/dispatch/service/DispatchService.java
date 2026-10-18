@@ -11,6 +11,8 @@ import com.crane.modules.dispatch.dto.DispatchRequest;
 import com.crane.modules.dispatch.dto.RejectRequest;
 import com.crane.modules.dispatch.entity.OrderAcceptLog;
 import com.crane.modules.dispatch.mapper.OrderAcceptLogMapper;
+import com.crane.modules.customer.entity.Customer;
+import com.crane.modules.customer.mapper.CustomerMapper;
 import com.crane.modules.notify.service.NotifyService;
 import com.crane.modules.staff.entity.Vehicle;
 import com.crane.modules.staff.entity.VehicleBinding;
@@ -63,6 +65,7 @@ public class DispatchService {
     private final DispatchCheckService dispatchCheckService;
     private final WorkOrderStateMachine stateMachine;
     private final NotifyService notifyService;
+    private final CustomerMapper customerMapper;
 
     // ==================== 派单 ====================
 
@@ -350,10 +353,21 @@ public class DispatchService {
         List<Map<String, Object>> list = orders.stream()
                 .map(order -> {
                     OrderAcceptLog rejectLog = latestRejects.get(order.getId());
+                    Customer customer = order.getCustomerId() == null ? null : customerMapper.selectById(order.getCustomerId());
                     Map<String, Object> item = new LinkedHashMap<>();
                     item.put("orderId", order.getId());
                     item.put("orderNo", order.getOrderNo());
                     item.put("taskName", order.getName());
+                    // 原始工单信息：供管理员重新派单决策
+                    item.put("customerId", order.getCustomerId());
+                    item.put("customerName", customer == null ? null : customer.getName());
+                    item.put("address", order.getAddress());
+                    item.put("longitude", order.getLongitude());
+                    item.put("latitude", order.getLatitude());
+                    item.put("craneTonnage", order.getCraneTonnage());
+                    item.put("cargoName", order.getCargoName());
+                    item.put("cargoWeight", order.getCargoWeight());
+                    item.put("remark", order.getRemark());
                     item.put("rejectReason", rejectLog == null ? null : rejectLog.getReason());
                     item.put("rejectReasonType", rejectLog == null ? null : rejectLog.getReasonType());
                     item.put("rejectedAt", rejectLog == null ? null : rejectLog.getActedAt());

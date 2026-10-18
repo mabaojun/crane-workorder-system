@@ -1,6 +1,7 @@
 package com.crane.modules.place.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.crane.common.exception.BizException;
 import com.crane.common.exception.ErrorCode;
 import com.crane.modules.place.dto.CommonPlaceUpsertRequest;
@@ -12,6 +13,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -46,6 +48,8 @@ public class CommonPlaceService {
         checkNameUnique(name, null);
         CommonPlace place = new CommonPlace();
         place.setPlaceName(name);
+        place.setLongitude(req.getLongitude());
+        place.setLatitude(req.getLatitude());
         place.setSortOrder(req.getSortOrder() == null ? 0 : req.getSortOrder());
         place.setCreatedBy(operatorId);
         place.setUpdatedBy(operatorId);
@@ -67,6 +71,42 @@ public class CommonPlaceService {
             throw new BizException(ErrorCode.NOT_FOUND, "施工地点不存在或已删除");
         }
         commonPlaceMapper.deleteById(id);
+    }
+
+    /**
+     * 施工点位带入常用地点（司机签到施工记录自动沉淀，也可由管理端建单时带入）：
+     * 按名称去重 —— 命中已有地点仅回填最新经纬度；不存在则新增（并发重名时静默跳过，不阻断签到主流程）。
+     */
+    @Transactional
+    public void upsertFromSite(String rawName, BigDecimal longitude, BigDecimal latitude) {
+        if (rawName == null || rawName.isBlank()) {
+            return;
+        }
+        String name = rawName.trim();
+        CommonPlace existing = commonPlaceMapper.selectOne(new LambdaQueryWrapper<CommonPlace>()
+                .eq(CommonPlace::getPlaceName, name)
+                .last("LIMIT 1"));
+        if (existing != null) {
+            if (longitude != null || latitude != null) {
+                commonPlaceMapper.update(null, new UpdateWrapper<CommonPlace>()
+                        .eq("id", existing.getId())
+                        .set(longitude != null, "longitude", longitude)
+                        .set(latitude != null, "latitude", latitude));
+            }
+            return;
+        }
+        CommonPlace place = new CommonPlace();
+        place.setPlaceName(name);
+        place.setLongitude(longitude);
+        place.setLatitude(latitude);
+        place.setSortOrder(0);
+        try {
+            commonPlaceMapper.insert(place);
+            log.info("施工点位已带入常用地点 name={} lng={} lat={}", name, longitude, latitude);
+        } catch (DuplicateKeyException e) {
+            // 并发或历史逻辑删除行占用名称唯一键：不阻断主流程
+            log.info("常用地点已存在，跳过带入 name={}", name);
+        }
     }
 
     private void checkNameUnique(String name, Long excludeId) {

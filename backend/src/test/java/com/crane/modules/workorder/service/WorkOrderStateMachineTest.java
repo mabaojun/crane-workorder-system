@@ -111,6 +111,18 @@ class WorkOrderStateMachineTest {
     }
 
     @Test
+    void completeFromSuspendedAllowedForDriverTerminate() {
+        // 暂停态允许司机直接终止工单（结单），SUSPENDED → COMPLETED 合法
+        order.setStatus("SUSPENDED");
+
+        stateMachine.transition(order, "COMPLETED", 1L, "司机暂停态结单");
+
+        assertThat(order.getStatus()).isEqualTo("COMPLETED");
+        assertThat(order.getCustomerVisibleStatus()).isEqualTo("FINISHED");
+        assertThat(order.getCompletedAt()).isNotNull();
+    }
+
+    @Test
     void illegalTransitionThrows30007() {
         // 待接单不允许直接进入进行中
         assertThatThrownBy(() -> stateMachine.transition(order, "IN_PROGRESS", 1L, null))

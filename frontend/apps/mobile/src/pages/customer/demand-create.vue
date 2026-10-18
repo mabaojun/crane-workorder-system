@@ -40,6 +40,10 @@ const filteredPlaces = computed(() => {
 
 function pickPlace(p: CommonPlace) {
   address.value = p.placeName
+  // 常用地点已维护经纬度时直接带入，免去重复定位/选点
+  if (p.longitude != null && p.latitude != null) {
+    coords.value = { longitude: p.longitude, latitude: p.latitude }
+  }
 }
 
 onLoad((opts) => {

@@ -37,6 +37,11 @@ export function withdrawOrder(id: number | string, body: { reasonType: string; r
   return request<void>(`/dispatch/orders/${id}/withdraw`, { method: 'POST', body })
 }
 
+/** 暂停工单申请继续施工（实时通知管理端） */
+export function requestResume(id: number | string) {
+  return request<{ requested: boolean }>(`/work-order/orders/${id}/resume-request`, { method: 'POST' })
+}
+
 export function checkIn(body: {
   orderId: number | string
   // 定位/照片强制开关关闭（测试阶段）时允许为空

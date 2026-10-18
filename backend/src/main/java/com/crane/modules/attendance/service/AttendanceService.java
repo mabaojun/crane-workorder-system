@@ -18,6 +18,8 @@ import com.crane.modules.attendance.mapper.DailyCheckoutMapper;
 import com.crane.modules.attendance.mapper.OvertimeRecordMapper;
 import com.crane.modules.exception.entity.ExceptionRecord;
 import com.crane.modules.exception.mapper.ExceptionRecordMapper;
+import com.crane.modules.exception.service.ExceptionService;
+import com.crane.modules.place.service.CommonPlaceService;
 import com.crane.modules.staff.entity.Vehicle;
 import com.crane.modules.staff.entity.VehicleStatusLog;
 import com.crane.modules.staff.mapper.VehicleMapper;
@@ -62,6 +64,7 @@ public class AttendanceService {
 
     private static final String STATUS_PENDING_ARRIVE = "PENDING_ARRIVE";
     private static final String STATUS_IN_PROGRESS = "IN_PROGRESS";
+    private static final String STATUS_SUSPENDED = "SUSPENDED";
     private static final String STATUS_COMPLETED = "COMPLETED";
 
     private static final String VEHICLE_STATUS_IDLE = "IDLE";
@@ -82,6 +85,8 @@ public class AttendanceService {
     private final SystemConfigService systemConfigService;
     private final GeoService geoService;
     private final ObjectMapper objectMapper;
+    private final ExceptionService exceptionService;
+    private final CommonPlaceService commonPlaceService;
 
     /**
      * 到场签到（API-ATT-001，司机本人）。
@@ -143,6 +148,11 @@ public class AttendanceService {
         workOrderStateMachine.transition(order, STATUS_IN_PROGRESS, ctx.getStaffId(), "司机签到");
         markVehicleBusy(order.getVehicleId());
 
+        // 施工点位自动沉淀为常用地点：名称=工单地址，经纬度=签到坐标（无签到坐标时回退工单坐标），按名称去重
+        commonPlaceService.upsertFromSite(order.getAddress(),
+                req.getLongitude() != null ? req.getLongitude() : order.getLongitude(),
+                req.getLatitude() != null ? req.getLatitude() : order.getLatitude());
+
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("attendanceId", att.getId());
         data.put("workOrderStatus", STATUS_IN_PROGRESS);
@@ -163,7 +173,7 @@ public class AttendanceService {
             throw new BizException(ErrorCode.PARAM_MISSING, "工单 id 必填");
         }
         WorkOrder order = requireOrderOwnedBy(req.getOrderId(), ctx);
-        if (!STATUS_IN_PROGRESS.equals(order.getStatus())) {
+        if (!STATUS_IN_PROGRESS.equals(order.getStatus()) && !STATUS_SUSPENDED.equals(order.getStatus())) {
             throw new BizException(ErrorCode.ORDER_STATUS_NOT_ALLOWED, "工单当前状态不允许签退");
         }
         LocalDate today = LocalDate.now();
@@ -174,7 +184,12 @@ public class AttendanceService {
             throw new BizException(ErrorCode.RESOURCE_STATUS_NOT_ALLOWED, "今日已完成签退");
         }
         if (hasPendingException(order.getId())) {
-            throw new BizException(ErrorCode.PENDING_EXCEPTION_EXISTS);
+            if (STATUS_SUSPENDED.equals(order.getStatus())) {
+                // 暂停态签退：未批复异常按「继续施工」自动关闭留痕，不阻断签退
+                exceptionService.autoClosePendingForOrder(order.getId(), operatorId, "司机暂停态签退，异常自动关闭", STATUS_SUSPENDED);
+            } else {
+                throw new BizException(ErrorCode.PENDING_EXCEPTION_EXISTS);
+            }
         }
         // 定位强制开关：false（测试阶段默认）时坐标可空，弱校验本就不拦截；有坐标仍记录距离
         if (locationRequired() && (req.getLongitude() == null || req.getLatitude() == null)) {
@@ -277,11 +292,16 @@ public class AttendanceService {
             throw new BizException(ErrorCode.PARAM_MISSING, "工单 id 必填");
         }
         WorkOrder order = requireOrderOwnedBy(req.getOrderId(), ctx);
-        if (!STATUS_IN_PROGRESS.equals(order.getStatus())) {
+        if (!STATUS_IN_PROGRESS.equals(order.getStatus()) && !STATUS_SUSPENDED.equals(order.getStatus())) {
             throw new BizException(ErrorCode.ORDER_STATUS_NOT_ALLOWED, "工单当前状态不允许结单");
         }
         if (hasPendingException(order.getId())) {
-            throw new BizException(ErrorCode.PENDING_EXCEPTION_EXISTS);
+            if (STATUS_SUSPENDED.equals(order.getStatus())) {
+                // 暂停态结单：未批复异常按「继续施工」自动关闭留痕，随后工单 SUSPENDED → COMPLETED
+                exceptionService.autoClosePendingForOrder(order.getId(), operatorId, "司机暂停态结单，异常自动关闭", STATUS_COMPLETED);
+            } else {
+                throw new BizException(ErrorCode.PENDING_EXCEPTION_EXISTS);
+            }
         }
         // 定位/照片强制开关：false（测试阶段默认）时坐标与照片均可空；有坐标仍记录距离
         if (locationRequired() && (req.getLongitude() == null || req.getLatitude() == null)) {

@@ -906,6 +906,22 @@ CREATE TABLE IF NOT EXISTS ai_alarm_record (
     KEY idx_aar_occurred_at (occurred_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='AI 报警记录表';
 
+-- ------------------------------------------------------------
+-- 31. biz_common_place 常用施工地点表（下单地点快捷选择）
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS biz_common_place (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    place_name  VARCHAR(128) NOT NULL COMMENT '地点名称（展示与搜索用）',
+    sort_order  INT          NOT NULL DEFAULT 0 COMMENT '排序权重，越大越靠前',
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    created_by  BIGINT UNSIGNED NULL COMMENT '创建人',
+    updated_by  BIGINT UNSIGNED NULL COMMENT '更新人',
+    deleted     TINYINT(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_bcp_place_name (place_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='常用施工地点表';
+
 -- =============================================================
 -- 初始化数据（02 §6.3 + 01 §6.3 锁定字典）
 -- =============================================================

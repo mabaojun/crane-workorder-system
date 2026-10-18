@@ -21,6 +21,12 @@ public class CommonPlace {
     /** 地点名称（展示与模糊搜索用） */
     private String placeName;
 
+    /** 经度（GCJ-02，下单时随地点回填），可空 */
+    private java.math.BigDecimal longitude;
+
+    /** 纬度（GCJ-02，下单时随地点回填），可空 */
+    private java.math.BigDecimal latitude;
+
     /** 排序权重，越大越靠前 */
     private Integer sortOrder;
 

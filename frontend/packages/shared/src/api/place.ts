@@ -5,6 +5,10 @@ import { request } from './client'
 export interface CommonPlace {
   id: number
   placeName: string
+  /** 经度（GCJ-02），可空 */
+  longitude: number | null
+  /** 纬度（GCJ-02），可空 */
+  latitude: number | null
   sortOrder: number
   createdAt: string
   updatedAt: string
@@ -12,6 +16,8 @@ export interface CommonPlace {
 
 export interface CommonPlaceUpsertRequest {
   placeName: string
+  longitude?: number
+  latitude?: number
   sortOrder?: number
 }
 

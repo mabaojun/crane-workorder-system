@@ -20,7 +20,7 @@ import java.util.Set;
  * PENDING_ACCEPT → PENDING_ARRIVE | CANCELLED
  * PENDING_ARRIVE → IN_PROGRESS | CANCELLED
  * IN_PROGRESS → SUSPENDED | COMPLETED | CANCELLED（取消需二次确认，见 API-WO-005、PRD 4.17，异常批复终止亦走此边）
- * SUSPENDED → IN_PROGRESS | CANCELLED
+ * SUSPENDED → IN_PROGRESS | COMPLETED | CANCELLED（暂停态允许司机直接签退结单，结单即 COMPLETED）
  * COMPLETED / CANCELLED 为终态。
  * 互斥口径：司机占用 = 存在 status=IN_PROGRESS 的未删除工单（SUSPENDED 不占用）。
  * 取消亦可经 cancel() 直达：任意非终态可取消，取消后司机占用与车辆占用随之解除。
@@ -42,7 +42,7 @@ public class WorkOrderStateMachine {
             PENDING_ARRIVE, Set.of(PENDING_ACCEPT),
             IN_PROGRESS, Set.of(PENDING_ARRIVE, SUSPENDED),
             SUSPENDED, Set.of(IN_PROGRESS),
-            COMPLETED, Set.of(IN_PROGRESS),
+            COMPLETED, Set.of(IN_PROGRESS, SUSPENDED),
             CANCELLED, Set.of(PENDING_ACCEPT, PENDING_ARRIVE, IN_PROGRESS, SUSPENDED)
     );
 

@@ -141,6 +141,21 @@ public class WorkOrderController {
         ));
     }
 
+    /** 司机对暂停工单申请继续施工（实时通知管理端，管理员批准后恢复） */
+    @PostMapping("/orders/{id}/resume-request")
+    public ApiResult<Map<String, Object>> resumeRequest(@PathVariable Long id) {
+        workOrderService.resumeRequest(id, currentUserId());
+        return ApiResult.ok(Map.of("requested", true));
+    }
+
+    /** 管理员批准暂停工单继续施工（SUSPENDED → IN_PROGRESS） */
+    @PostMapping("/orders/{id}/resume")
+    public ApiResult<Map<String, Object>> resume(@PathVariable Long id) {
+        requireAdmin();
+        Long operatorId = currentUserId();
+        return ApiResult.ok(workOrderService.resume(id, operatorId));
+    }
+
     private void requireAdmin() {
         AuthContext ctx = AuthContext.get();
         if (ctx == null || !ctx.isAdmin()) {

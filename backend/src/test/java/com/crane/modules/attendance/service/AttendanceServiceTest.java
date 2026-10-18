@@ -74,6 +74,10 @@ class AttendanceServiceTest {
     private SystemConfigService systemConfigService;
     @Mock
     private GeoService geoService;
+    @Mock
+    private com.crane.modules.exception.service.ExceptionService exceptionService;
+    @Mock
+    private com.crane.modules.place.service.CommonPlaceService commonPlaceService;
 
     private AttendanceService service;
 
@@ -82,7 +86,7 @@ class AttendanceServiceTest {
         service = new AttendanceService(attendanceMapper, dailyCheckoutMapper, overtimeRecordMapper,
                 workOrderMapper, workHourStatMapper, workOrderStateMachine, vehicleMapper,
                 vehicleStatusLogMapper, exceptionRecordMapper, systemConfigService, geoService,
-                new ObjectMapper());
+                new ObjectMapper(), exceptionService, commonPlaceService);
         AuthContext.set(new AuthContext(USER_ID, "DRIVER", "SELF", STAFF_ID, null, List.of()));
         when(systemConfigService.getInt("attendance.valid_range_meters", 1000)).thenReturn(1000);
         when(systemConfigService.getInt("attendance.overtime_range_meters", 1000)).thenReturn(1000);

@@ -34,6 +34,16 @@ export interface PendingRedispatchItem {
   orderId: number
   orderNo: string
   taskName: string
+  /** 原始工单信息：供重新派单决策 */
+  customerId: number | null
+  customerName: string | null
+  address: string | null
+  longitude: number | null
+  latitude: number | null
+  craneTonnage: number | null
+  cargoName: string | null
+  cargoWeight: number | null
+  remark: string | null
   rejectReason: string | null
   rejectReasonType: string | null
   rejectedAt: string | null

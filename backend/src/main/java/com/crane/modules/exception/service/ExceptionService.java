@@ -258,6 +258,42 @@ public class ExceptionService {
 
     // ==================== 私有方法 ====================
 
+    /**
+     * 自动关闭工单全部未批复异常（司机在暂停态签退/结单、管理员批准继续时调用）：
+     * 记录按 CONTINUE 通过留痕，写审批记录，但不触发状态流转（状态由调用方自行变更）。
+     *
+     * @return 关闭的异常记录数
+     */
+    @Transactional
+    public int autoClosePendingForOrder(Long orderId, Long operatorId, String opinion, String orderStatusAfter) {
+        List<ExceptionRecord> pendings = exceptionRecordMapper.selectList(new LambdaQueryWrapper<ExceptionRecord>()
+                .eq(ExceptionRecord::getOrderId, orderId)
+                .eq(ExceptionRecord::getStatus, STATUS_PENDING));
+        if (pendings.isEmpty()) {
+            return 0;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        for (ExceptionRecord record : pendings) {
+            ApprovalRecord approval = new ApprovalRecord();
+            approval.setBizType("EXCEPTION");
+            approval.setBizId(record.getId());
+            approval.setOrderId(record.getOrderId());
+            approval.setApproverId(operatorId);
+            approval.setAction("APPROVE");
+            approval.setInstruction("CONTINUE");
+            approval.setOpinion(opinion);
+            approval.setApprovedAt(now);
+            approvalRecordMapper.insert(approval);
+            record.setStatus(STATUS_APPROVED);
+            record.setInstruction("CONTINUE");
+            record.setRepliedAt(now);
+            record.setOrderStatusAfter(orderStatusAfter);
+            exceptionRecordMapper.updateById(record);
+        }
+        log.info("未批复异常已自动关闭 orderId={} count={} opinion={}", orderId, pendings.size(), opinion);
+        return pendings.size();
+    }
+
     private AuthContext requireContext() {
         AuthContext ctx = AuthContext.get();
         if (ctx == null) {

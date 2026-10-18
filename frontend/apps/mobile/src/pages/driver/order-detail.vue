@@ -13,6 +13,7 @@ import {
   dailyCheckout,
   getOrderDetail,
   rejectOrder,
+  requestResume,
   taskEnd,
   withdrawOrder
 } from '../../api/modules/biz'
@@ -295,6 +296,22 @@ async function onCheckoutSubmit() {
   }
 }
 
+/** 暂停工单申请继续施工：实时通知管理端，批准后恢复 */
+const resuming = ref(false)
+async function onResumeRequest() {
+  const o = needOrder()
+  if (resuming.value) return
+  resuming.value = true
+  try {
+    await requestResume(o.id)
+    toastOk('已提交申请，管理员会尽快处理')
+  } catch (e) {
+    toastError(e)
+  } finally {
+    resuming.value = false
+  }
+}
+
 /** 工单终止：任务结束自动结单归档 */
 function onTaskEnd() {
   const o = needOrder()
@@ -379,9 +396,13 @@ function onTaskEnd() {
             <button class="btn danger" @tap="onTaskEnd">终止工单</button>
           </template>
 
-          <view v-else-if="order.status === 'SUSPENDED'" class="waiting">
-            工单已暂停，等待管理员批复
-          </view>
+          <template v-else-if="order.status === 'SUSPENDED'">
+            <button class="btn primary" :loading="resuming" @tap="onResumeRequest">申请继续施工</button>
+            <button class="btn warn-outline" @tap="onExceptionOpen">补充异常说明</button>
+            <button class="btn primary-outline" @tap="onCheckoutOpen">签退（今日任务完成）</button>
+            <button class="btn danger" @tap="onTaskEnd">终止工单</button>
+            <view class="tip-line">申请继续后将实时通知管理员，批准后恢复施工；也可直接签退或终止工单</view>
+          </template>
           <view v-else class="waiting">
             工单已{{ order.status === 'COMPLETED' ? '完成' : order.status === 'CANCELLED' ? '取消' : '结束' }}，无可用操作
           </view>
@@ -597,6 +618,12 @@ function onTaskEnd() {
   background: #fff;
   color: var(--warning);
   border: 1px solid var(--warning);
+  box-sizing: border-box;
+}
+.btn.primary-outline {
+  background: #fff;
+  color: var(--brand);
+  border: 1px solid var(--brand);
   box-sizing: border-box;
 }
 .waiting {

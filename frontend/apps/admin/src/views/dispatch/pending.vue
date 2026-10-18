@@ -24,7 +24,22 @@
       <el-table v-loading="loading" :data="list" border stripe>
         <el-table-column label="工单ID" prop="orderId" width="90" />
         <el-table-column label="工单号" prop="orderNo" width="170" />
-        <el-table-column label="任务名" prop="taskName" min-width="160" show-overflow-tooltip />
+        <el-table-column label="任务名" prop="taskName" min-width="150" show-overflow-tooltip />
+        <el-table-column label="客户" prop="customerName" width="130" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.customerName || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="施工地址" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.address || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="吨位" width="80">
+          <template #default="{ row }">{{ row.craneTonnage ? `${row.craneTonnage}t` : '-' }}</template>
+        </el-table-column>
+        <el-table-column label="货物" width="120" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span v-if="row.cargoName">{{ row.cargoName }}<template v-if="row.cargoWeight">（{{ row.cargoWeight }}t）</template></span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="拒单原因" min-width="180">
           <template #default="{ row }">
             <span v-if="row.rejectReasonType">{{ REJECT_REASON_LABEL[row.rejectReasonType] || row.rejectReasonType }}</span>

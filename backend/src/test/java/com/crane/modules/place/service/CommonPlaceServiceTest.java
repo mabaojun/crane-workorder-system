@@ -108,4 +108,39 @@ class CommonPlaceServiceTest {
 
         verify(commonPlaceMapper).deleteById(3L);
     }
+
+    @Test
+    void upsertFromSiteInsertsNewPlaceWithCoordinates() {
+        // 施工点位带入：名称不存在时新增并携带经纬度
+        when(commonPlaceMapper.selectOne(any())).thenReturn(null);
+
+        commonPlaceService.upsertFromSite(" 济南遥墙机场 ", new java.math.BigDecimal("117.216000"), new java.math.BigDecimal("36.721000"));
+
+        ArgumentCaptor<CommonPlace> captor = ArgumentCaptor.forClass(CommonPlace.class);
+        verify(commonPlaceMapper).insert(captor.capture());
+        assertThat(captor.getValue().getPlaceName()).isEqualTo("济南遥墙机场");
+        assertThat(captor.getValue().getLongitude()).isEqualByComparingTo("117.216000");
+        assertThat(captor.getValue().getLatitude()).isEqualByComparingTo("36.721000");
+    }
+
+    @Test
+    void upsertFromSiteExistingUpdatesCoordinatesOnly() {
+        // 命中已有地点：仅回填经纬度，不重复插入
+        CommonPlace existing = new CommonPlace();
+        existing.setId(7L);
+        existing.setPlaceName("济南西站");
+        when(commonPlaceMapper.selectOne(any())).thenReturn(existing);
+
+        commonPlaceService.upsertFromSite("济南西站", new java.math.BigDecimal("116.900000"), new java.math.BigDecimal("36.650000"));
+
+        verify(commonPlaceMapper, never()).insert(any(CommonPlace.class));
+        verify(commonPlaceMapper).update(any(), any());
+    }
+
+    @Test
+    void upsertFromSiteBlankNameSkips() {
+        commonPlaceService.upsertFromSite("   ", null, null);
+        verify(commonPlaceMapper, never()).insert(any(CommonPlace.class));
+        verify(commonPlaceMapper, never()).selectOne(any());
+    }
 }

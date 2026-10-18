@@ -8,6 +8,8 @@ import com.crane.common.exception.ErrorCode;
 import com.crane.common.result.PageResult;
 import com.crane.modules.customer.entity.Customer;
 import com.crane.modules.customer.mapper.CustomerMapper;
+import com.crane.modules.exception.service.ExceptionService;
+import com.crane.modules.notify.service.NotifyService;
 import com.crane.modules.staff.entity.Staff;
 import com.crane.modules.staff.entity.Vehicle;
 import com.crane.modules.staff.entity.VehicleBinding;
@@ -47,6 +49,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -88,6 +91,8 @@ public class WorkOrderService {
     private final CustomerMapper customerMapper;
     private final SystemConfigService systemConfigService;
     private final WorkOrderStateMachine stateMachine;
+    private final NotifyService notifyService;
+    private final ExceptionService exceptionService;
 
     // ==================== 建单 ====================
 
@@ -157,7 +162,12 @@ public class WorkOrderService {
         }
 
         WorkOrder order = new WorkOrder();
-        order.setName(command.getTaskName());
+        // 任务名称选填：不填时按「客户名·吊车吨位·司机姓名」自动生成
+        if (command.getTaskName() == null || command.getTaskName().isBlank()) {
+            order.setName(autoTaskName(customer, staff, command.getCraneTonnage()));
+        } else {
+            order.setName(command.getTaskName().trim());
+        }
         order.setSource(command.getSource());
         order.setDemandId(command.getDemandOrderId());
         order.setCustomerId(command.getCustomerId());
@@ -189,6 +199,84 @@ public class WorkOrderService {
         log.info("工单创建成功 orderId={} orderNo={} staffId={} vehicleId={}",
                 order.getId(), order.getOrderNo(), order.getStaffId(), order.getVehicleId());
         return order;
+    }
+
+    /**
+     * 任务名称自动生成：客户名 + 吊车吨位 + 司机姓名（如「济南钢铁·25吨·张三」）。
+     */
+    private String autoTaskName(Customer customer, Staff staff, java.math.BigDecimal craneTonnage) {
+        StringBuilder sb = new StringBuilder(customer.getName() == null ? "客户" : customer.getName());
+        if (craneTonnage != null) {
+            sb.append('·').append(craneTonnage.stripTrailingZeros().toPlainString()).append("吨");
+        }
+        if (staff != null && staff.getName() != null) {
+            sb.append('·').append(staff.getName());
+        }
+        String name = sb.toString();
+        return name.length() > 100 ? name.substring(0, 100) : name;
+    }
+
+    // ==================== 暂停恢复 ====================
+
+    /**
+     * 司机对暂停工单发起「申请继续」：写状态日志留痕并通过 SSE 实时通知管理端。
+     * round 按历史申请次数递增，保证同轮去重不吞掉后续申请。
+     */
+    public void resumeRequest(Long orderId, Long operatorId) {
+        AuthContext ctx = AuthContext.get();
+        if (ctx == null || !ctx.isDriver()) {
+            throw new BizException(ErrorCode.FORBIDDEN, "仅司机可申请继续施工");
+        }
+        WorkOrder order = workOrderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "工单不存在");
+        }
+        if (!WorkOrderStateMachine.SUSPENDED.equals(order.getStatus())) {
+            throw new BizException(ErrorCode.ORDER_STATUS_NOT_ALLOWED, "仅暂停中的工单可申请继续");
+        }
+        if (!Objects.equals(order.getStaffId(), ctx.getStaffId())) {
+            throw new BizException(ErrorCode.FORBIDDEN, "仅可操作本人工单");
+        }
+        long round = statusLogMapper.selectCount(new LambdaQueryWrapper<WorkOrderStatusLog>()
+                .eq(WorkOrderStatusLog::getOrderId, orderId)
+                .eq(WorkOrderStatusLog::getToStatus, WorkOrderStateMachine.SUSPENDED)
+                .like(WorkOrderStatusLog::getRemark, "司机申请继续")) + 1;
+        WorkOrderStatusLog entry = new WorkOrderStatusLog();
+        entry.setOrderId(orderId);
+        entry.setFromStatus(WorkOrderStateMachine.SUSPENDED);
+        entry.setToStatus(WorkOrderStateMachine.SUSPENDED);
+        entry.setOperatorId(ctx.getStaffId());
+        entry.setRemark("司机申请继续施工");
+        entry.setCreatedAt(LocalDateTime.now());
+        statusLogMapper.insert(entry);
+        notifyService.notifyAdminsOrderEvent(order, "RESUME_REQUEST", "司机申请继续施工",
+                "工单 " + order.getOrderNo() + " 司机申请继续施工，请及时处置", round);
+        log.info("司机申请继续施工 orderId={} staffId={}", orderId, ctx.getStaffId());
+    }
+
+    /**
+     * 管理员批准暂停工单继续施工：SUSPENDED → IN_PROGRESS，
+     * 同事务自动按「继续施工」关闭未批复异常（不触发二次流转），并实时通知管理端。
+     */
+    @Transactional
+    public Map<String, Object> resume(Long orderId, Long operatorId) {
+        WorkOrder order = workOrderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "工单不存在");
+        }
+        if (!WorkOrderStateMachine.SUSPENDED.equals(order.getStatus())) {
+            throw new BizException(ErrorCode.ORDER_STATUS_NOT_ALLOWED, "仅暂停中的工单可批准继续");
+        }
+        exceptionService.autoClosePendingForOrder(orderId, operatorId,
+                "管理员批准继续施工，异常自动关闭", WorkOrderStateMachine.IN_PROGRESS);
+        stateMachine.transition(order, WorkOrderStateMachine.IN_PROGRESS, operatorId, "管理员批准继续施工");
+        notifyService.notifyAdminsOrderEvent(order, "RESUME", "工单已恢复施工",
+                "工单 " + order.getOrderNo() + " 已批准继续施工", System.currentTimeMillis());
+        return Map.of(
+                "orderId", order.getId(),
+                "status", order.getStatus(),
+                "customerVisibleStatus", order.getCustomerVisibleStatus() == null ? "" : order.getCustomerVisibleStatus()
+        );
     }
 
     /** 来源枚举校验：DEMAND、DIRECT；来源为需求单时必须携带需求单编号 */

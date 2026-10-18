@@ -14,6 +14,12 @@ public class CommonPlaceUpsertRequest {
     @Size(max = 128, message = "地点名称不能超过128个字符")
     private String placeName;
 
+    /** 经度，可选（地图选点带入） */
+    private java.math.BigDecimal longitude;
+
+    /** 纬度，可选（地图选点带入） */
+    private java.math.BigDecimal latitude;
+
     /** 排序权重，可选，默认 0 */
     private Integer sortOrder;
 }

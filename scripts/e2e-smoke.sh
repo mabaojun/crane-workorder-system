@@ -45,7 +45,7 @@ STAFF_USER_ID=$(jq_get data userId)
 req "创建车辆" POST /staff/vehicles "$ADMIN" "{\"plateNo\":\"鲁A$((TS%10000))E2\",\"model\":\"徐工XCT25\",\"tonnage\":25,\"defaultStaffId\":$SID}"
 
 echo "== 3. 激活账号（模拟完成绑定）=="
-CUST_UID=$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM sys_user WHERE phone='$CUST_PHONE' AND deleted=0;" 2>/dev/null | tr -d ' \n')
+CUST_UID=$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM sys_user WHERE phone='$CUST_PHONE' AND deleted=0;" 2>/dev/null | tr -d ' \n')
 echo "DEBUG CUST_PHONE=$CUST_PHONE CUST_UID=[$CUST_UID]"
 req "激活客户账号" PUT /iam/users/$CUST_UID/status "$ADMIN" '{"status":"ACTIVE"}'
 req "激活司机账号" PUT /iam/users/$STAFF_USER_ID/status "$ADMIN" '{"status":"ACTIVE"}'
@@ -60,7 +60,7 @@ DID=$(jq_get data id)
 
 echo "== 5. 复核与转工单 =="
 req "管理员复核通过" POST /demand/orders/$DID/review "$ADMIN" '{"approve":true,"reviewRemark":"复核通过"}'
-req "需求单转工单" POST /demand/orders/$DID/convert "$ADMIN" "{\"staffId\":$SID,\"vehicleId\":$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_vehicle ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n'),\"planStartAt\":\"2026-12-01T09:00:00+08:00\",\"craneTonnage\":25,\"cargoWeightTon\":8,\"remark\":\"E2E转单\"}"
+req "需求单转工单" POST /demand/orders/$DID/convert "$ADMIN" "{\"staffId\":$SID,\"vehicleId\":$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_vehicle ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n'),\"planStartAt\":\"2026-12-01T09:00:00+08:00\",\"craneTonnage\":25,\"cargoWeightTon\":8,\"remark\":\"E2E转单\"}"
 OID=$(jq_get data convertedOrderId)
 
 echo "== 6. 司机接单与签到 =="
@@ -73,7 +73,7 @@ req "司机签到(定位+照片)" POST /attendance/check-in "$DRIVER" "{\"orderI
 
 echo "== 7. 异常上报与批复 =="
 req "司机异常上报" POST /exception/reports "$DRIVER" "{\"orderId\":$OID,\"type\":\"RAIN\",\"description\":\"突降大雨暂停作业\"}"
-req "管理员批复继续施工" POST /exception/reports/$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_exception_record WHERE order_id=$OID AND deleted=0 ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n')/reply "$ADMIN" '{"approve":true,"instruction":"CONTINUE","opinion":"雨停后恢复"}'
+req "管理员批复继续施工" POST /exception/reports/$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_exception_record WHERE order_id=$OID AND deleted=0 ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n')/reply "$ADMIN" '{"approve":true,"instruction":"CONTINUE","opinion":"雨停后恢复"}'
 
 echo "== 8. 任务结束与评价 =="
 req "司机任务结束" POST /attendance/task-end "$DRIVER" "{\"orderId\":$OID,\"longitude\":117.12,\"latitude\":36.71,\"photoUrls\":[\"/files/e2e/end-$TS.jpg\"]}"
@@ -90,7 +90,7 @@ if [ "$code" = "10001" ]; then PASS=$((PASS+1)); echo "PASS  无令牌访问被�
 
 echo "== 11. 地图选点与密码登录 =="
 # 无定位无照片签到（定位/照片强制开关默认关闭，测试阶段不限制）
-req "创建开关验证单" POST /work-order/orders "$ADMIN" "{\"taskName\":\"开关验证单\",\"source\":\"DIRECT\",\"customerId\":$CID,\"staffId\":$SID,\"vehicleId\":$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_vehicle WHERE status='IDLE' AND deleted=0 ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n'),\"planStartAt\":\"2026-12-08T09:00:00+08:00\",\"address\":\"开关测试点位\",\"longitude\":117.12,\"latitude\":36.71,\"cargoName\":\"测试\",\"cargoQty\":1,\"cargoWeightTon\":1,\"craneTonnage\":25}"
+req "创建开关验证单" POST /work-order/orders "$ADMIN" "{\"taskName\":\"开关验证单\",\"source\":\"DIRECT\",\"customerId\":$CID,\"staffId\":$SID,\"vehicleId\":$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_vehicle WHERE status='IDLE' AND deleted=0 ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n'),\"planStartAt\":\"2026-12-08T09:00:00+08:00\",\"address\":\"开关测试点位\",\"longitude\":117.12,\"latitude\":36.71,\"cargoName\":\"测试\",\"cargoQty\":1,\"cargoWeightTon\":1,\"craneTonnage\":25}"
 SOID=$(jq_get data orderId)
 req "开关单司机接单" POST /dispatch/orders/$SOID/accept "$DRIVER" "{}"
 req "无定位无照片签到(开关关闭)" POST /attendance/check-in "$DRIVER" "{\"orderId\":$SOID}"
@@ -120,7 +120,7 @@ req "发送退单司机验证码" POST /auth/sms-code "" "{\"phone\":\"$STAFF2_P
 WMSG=$(jq_get data debugCode)
 req "退单司机验证码登录" POST /auth/sms-login "" "{\"phone\":\"$STAFF2_PHONE\",\"smsCode\":\"$WMSG\"}"
 DRIVER2=$(jq_get data accessToken)
-req "创建退单验证单" POST /work-order/orders "$ADMIN" "{\"taskName\":\"退单验证单\",\"source\":\"DIRECT\",\"customerId\":$CID,\"staffId\":$SID2,\"vehicleId\":$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_vehicle WHERE status='IDLE' AND deleted=0 ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n'),\"planStartAt\":\"2026-12-09T09:00:00+08:00\",\"address\":\"退单测试点位\",\"longitude\":117.12,\"latitude\":36.71,\"cargoName\":\"测试\",\"cargoQty\":1,\"cargoWeightTon\":1,\"craneTonnage\":25}"
+req "创建退单验证单" POST /work-order/orders "$ADMIN" "{\"taskName\":\"退单验证单\",\"source\":\"DIRECT\",\"customerId\":$CID,\"staffId\":$SID2,\"vehicleId\":$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_vehicle WHERE status='IDLE' AND deleted=0 ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n'),\"planStartAt\":\"2026-12-09T09:00:00+08:00\",\"address\":\"退单测试点位\",\"longitude\":117.12,\"latitude\":36.71,\"cargoName\":\"测试\",\"cargoQty\":1,\"cargoWeightTon\":1,\"craneTonnage\":25}"
 WOID=$(jq_get data orderId)
 req "退单验证单司机接单" POST /dispatch/orders/$WOID/accept "$DRIVER2" "{}"
 req "司机接单后发起退单" POST /dispatch/orders/$WOID/withdraw "$DRIVER2" '{"reasonType":"ABILITY_MISMATCH"}'
@@ -129,7 +129,7 @@ WSTATUS=$(jq_get data status)
 if [ "$WSTATUS" = "PENDING_ACCEPT" ]; then PASS=$((PASS+1)); echo "PASS  退单后工单回到 PENDING_ACCEPT"; else FAIL=$((FAIL+1)); echo "FAIL  退单后工单状态=$WSTATUS"; fi
 
 echo "== 13. 常用施工地点（实时落库增删）=="
-req "管理员新增常用地点" POST /place/common-places "$ADMIN" "{\"placeName\":\"E2E测试地点$TS\"}"
+req "管理员新增常用地点" POST /place/common-places "$ADMIN" "{\"placeName\":\"E2E测试地点$TS\",\"longitude\":117.216,\"latitude\":36.721}"
 PID=$(jq_get data id)
 req "客户读取常用地点列表" GET /place/common-places "$CUST" ""
 PRESENT=$(PLACENAME="E2E测试地点$TS" python3 -c '
@@ -139,6 +139,14 @@ name=os.environ.get("PLACENAME","")
 print("YES" if any(p.get("placeName")==name for p in (d.get("data") or [])) else "NO")
 ')
 if [ "$PRESENT" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  新增地点已实时落库可查询"; else FAIL=$((FAIL+1)); echo "FAIL  列表未包含新增地点"; fi
+COORDS_OK=$(PLACENAME="E2E测试地点$TS" python3 -c '
+import json,os
+d=json.load(open("/tmp/e2e-last.json"))
+name=os.environ.get("PLACENAME","")
+ps=[p for p in (d.get("data") or []) if p.get("placeName")==name]
+print("YES" if ps and ps[0].get("longitude") is not None and ps[0].get("latitude") is not None else "NO")
+')
+if [ "$COORDS_OK" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  地点经纬度随新增实时落库"; else FAIL=$((FAIL+1)); echo "FAIL  地点经纬度缺失"; fi
 req "关键字模糊过滤查询" GET "/place/common-places?keyword=$TS" "$CUST" ""
 PRESENT=$(PLACENAME="E2E测试地点$TS" python3 -c '
 import json,os
@@ -156,6 +164,27 @@ name=os.environ.get("PLACENAME","")
 print("YES" if any(p.get("placeName")==name for p in (d.get("data") or [])) else "NO")
 ')
 if [ "$PRESENT" = "NO" ]; then PASS=$((PASS+1)); echo "PASS  删除后列表已不含该地点"; else FAIL=$((FAIL+1)); echo "FAIL  删除后地点仍存在"; fi
+
+echo "== 14. 暂停恢复链路（异常上报→申请继续→批准→暂停签退/终止）=="
+req "司机异常上报(暂停)" POST /exception/reports "$DRIVER" "{\"orderId\":$SOID,\"type\":\"RAIN\",\"description\":\"突降大雨暂停作业\"}"
+req "司机申请继续施工" POST /work-order/orders/$SOID/resume-request "$DRIVER" ""
+req "管理员批准继续" POST /work-order/orders/$SOID/resume "$ADMIN" ""
+req "查询恢复后工单" GET /work-order/orders/$SOID "$ADMIN" ""
+RSTATUS=$(jq_get data status)
+if [ "$RSTATUS" = "IN_PROGRESS" ]; then PASS=$((PASS+1)); echo "PASS  批准后工单恢复 IN_PROGRESS"; else FAIL=$((FAIL+1)); echo "FAIL  恢复后工单状态=$RSTATUS"; fi
+req "司机再次异常上报(暂停)" POST /exception/reports "$DRIVER" "{\"orderId\":$SOID,\"type\":\"CUSTOM\",\"typeLabel\":\"设备故障\",\"description\":\"设备临时故障\"}"
+req "暂停态签退" POST /attendance/daily-checkout "$DRIVER" "{\"orderId\":$SOID,\"longitude\":117.12,\"latitude\":36.71,\"isLeftSite\":false,\"isReturned\":false}"
+req "暂停态终止工单" POST /attendance/task-end "$DRIVER" "{\"orderId\":$SOID,\"longitude\":117.12,\"latitude\":36.71,\"photoUrls\":[\"/files/e2e/suspend-end-$TS.jpg\"]}"
+req "查询终止后工单" GET /work-order/orders/$SOID "$ADMIN" ""
+FSTATUS=$(jq_get data status)
+if [ "$FSTATUS" = "COMPLETED" ]; then PASS=$((PASS+1)); echo "PASS  暂停态终止后工单 COMPLETED"; else FAIL=$((FAIL+1)); echo "FAIL  终止后工单状态=$FSTATUS"; fi
+
+echo "== 15. 任务名自动生成与货物重量选填 =="
+req "创建自动命名单(无任务名/无货物重量)" POST /work-order/orders "$ADMIN" "{\"taskName\":\"\",\"source\":\"DIRECT\",\"customerId\":$CID,\"staffId\":$SID,\"vehicleId\":$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_vehicle WHERE status='IDLE' AND deleted=0 ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n'),\"planStartAt\":\"2026-12-10T09:00:00+08:00\",\"address\":\"自动命名测试点位\",\"longitude\":117.12,\"latitude\":36.71,\"cargoName\":\"测试\",\"cargoQty\":1,\"craneTonnage\":25}"
+AOID=$(jq_get data orderId)
+req "查询自动命名工单" GET /work-order/orders/$AOID "$ADMIN" ""
+TASK=$(jq_get data taskName)
+if [[ "$TASK" == *"E2E测试客户"* && "$TASK" == *"吨"* && "$TASK" == *"E2E司机"* ]]; then PASS=$((PASS+1)); echo "PASS  任务名自动生成: $TASK"; else FAIL=$((FAIL+1)); echo "FAIL  自动任务名=$TASK"; fi
 
 echo "=============================="
 echo "E2E 结果：PASS=$PASS FAIL=$FAIL"

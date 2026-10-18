@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @Data
 public class WorkOrderCreateRequest {
 
-    @NotBlank(message = "taskName 必填")
+    /** 选填：不填时按「客户名·吊车吨位·司机姓名」自动生成 */
     @Size(max = 100, message = "taskName 最长 100")
     private String taskName;
 
@@ -53,7 +53,7 @@ public class WorkOrderCreateRequest {
     @Min(value = 1, message = "cargoQty 须大于等于 1")
     private Integer cargoQty;
 
-    @NotNull(message = "cargoWeightTon 必填")
+    /** 选填：货物重量（吨） */
     @DecimalMin(value = "0.01", message = "cargoWeightTon 须大于 0")
     private BigDecimal cargoWeightTon;
 

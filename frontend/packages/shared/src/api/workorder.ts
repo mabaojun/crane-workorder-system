@@ -58,7 +58,8 @@ export interface WorkOrderStatusLog {
 }
 
 export interface WorkOrderCreateRequest {
-  taskName: string
+  /** 选填：不填时后端按「客户名·吊车吨位·司机姓名」自动生成 */
+  taskName?: string
   /** DIRECT */
   source: string
   customerId: number
@@ -71,7 +72,8 @@ export interface WorkOrderCreateRequest {
   latitude: number
   cargoName: string
   cargoQty: number
-  cargoWeightTon: number
+  /** 选填：货物重量（吨） */
+  cargoWeightTon?: number
   craneTonnage: number
   remark?: string
   requirement?: string
@@ -150,6 +152,22 @@ export function changeWorkOrderStatus(id: number | string, body: WorkOrderStatus
 export function settleWorkOrder(id: number | string) {
   return request<{ orderId: number; status: string }>(
     `/work-order/orders/${id}/settle`,
+    { method: 'POST' }
+  )
+}
+
+/** 管理员批准暂停工单继续施工（自动关闭未批复异常并实时通知） */
+export function resumeWorkOrder(id: number | string) {
+  return request<{ orderId: number; status: string; customerVisibleStatus: string }>(
+    `/work-order/orders/${id}/resume`,
+    { method: 'POST' }
+  )
+}
+
+/** 司机对暂停工单申请继续施工（SSE 实时通知管理端） */
+export function requestResumeWorkOrder(id: number | string) {
+  return request<{ requested: boolean }>(
+    `/work-order/orders/${id}/resume-request`,
     { method: 'POST' }
   )
 }

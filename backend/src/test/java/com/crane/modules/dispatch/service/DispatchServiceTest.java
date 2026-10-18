@@ -7,6 +7,7 @@ import com.crane.modules.dispatch.dto.DispatchRequest;
 import com.crane.modules.dispatch.dto.RejectRequest;
 import com.crane.modules.dispatch.entity.OrderAcceptLog;
 import com.crane.modules.dispatch.mapper.OrderAcceptLogMapper;
+import com.crane.modules.customer.mapper.CustomerMapper;
 import com.crane.modules.notify.service.NotifyService;
 import com.crane.modules.staff.entity.Vehicle;
 import com.crane.modules.staff.entity.VehicleBinding;
@@ -73,6 +74,9 @@ class DispatchServiceTest {
 
     @Mock
     private NotifyService notifyService;
+
+    @Mock
+    private CustomerMapper customerMapper;
 
     @InjectMocks
     private DispatchService dispatchService;
