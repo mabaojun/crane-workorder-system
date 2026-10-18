@@ -1021,6 +1021,8 @@ INSERT INTO sys_config (config_key, config_value, value_type, group_name, descri
     ('conflict.ahead_window_minutes',        '60',   'INT',     'conflict',   '提前提醒时段 T（分钟）'),
     ('conflict.handle_deadline_minutes',     '15',   'INT',     'conflict',   '司机冲突处置时限（分钟），超时升级'),
     ('attendance.valid_range_meters',        '1000', 'INT',     'attendance', '签到有效范围（米）'),
+    ('attendance.location_required',         'false','BOOLEAN', 'attendance', '签到/签退是否强制定位（测试阶段关闭；开启后范围外拒绝且坐标必填）'),
+    ('attendance.photo_required',            'false','BOOLEAN', 'attendance', '打卡是否强制现场照片（测试阶段关闭）'),
     ('attendance.overtime_range_meters',     '1000', 'INT',     'attendance', '加班签退有效范围（米）'),
     ('attendance.photo_max_size_mb',         '10',   'INT',     'attendance', '单张附件大小上限（MB）'),
     ('attendance.photo_max_long_edge_px',    '1920', 'INT',     'attendance', '单张长边压缩上限（px）'),

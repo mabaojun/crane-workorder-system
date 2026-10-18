@@ -101,16 +101,25 @@ public class AttendanceService {
         if (hasPendingException(order.getId())) {
             throw new BizException(ErrorCode.PENDING_EXCEPTION_EXISTS);
         }
-        if (req.getLongitude() == null || req.getLatitude() == null) {
+        // 定位强制开关：false（测试阶段默认）时坐标可空，不做范围拦截；有坐标仍记录距离供审计
+        boolean locRequired = locationRequired();
+        Integer distanceMeters = null;
+        Integer inRange = null;
+        int validRange = systemConfigService.getInt("attendance.valid_range_meters", 1000);
+        DistanceResult distance = null;
+        if (locRequired && (req.getLongitude() == null || req.getLatitude() == null)) {
             throw new BizException(ErrorCode.COORDINATE_INVALID, "签到定位经纬度必填");
         }
-        int validRange = systemConfigService.getInt("attendance.valid_range_meters", 1000);
-        DistanceResult distance = measureDistance(req.getLongitude(), req.getLatitude(), order);
-        // 签到为强制范围校验：范围外即使标注 is_in_range = 0 也必须拒绝
-        if (!distance.inRange(validRange)) {
-            throw new BizException(ErrorCode.OUT_OF_CHECKIN_RANGE);
+        if (req.getLongitude() != null && req.getLatitude() != null) {
+            distance = measureDistance(req.getLongitude(), req.getLatitude(), order);
+            distanceMeters = distance.meters();
+            inRange = distance.inRange(validRange) ? 1 : 0;
+            // 签到为强制范围校验：开关开启且范围外必须拒绝
+            if (locRequired && !distance.inRange(validRange)) {
+                throw new BizException(ErrorCode.OUT_OF_CHECKIN_RANGE);
+            }
         }
-        if (req.getPhotoUrls() == null || req.getPhotoUrls().isEmpty()) {
+        if (photoRequired() && (req.getPhotoUrls() == null || req.getPhotoUrls().isEmpty())) {
             throw new BizException(ErrorCode.PHOTO_REQUIRED, "现场照片至少 1 张");
         }
 
@@ -123,9 +132,9 @@ public class AttendanceService {
         att.setCapturedAt(req.getCapturedAt());
         att.setLongitude(req.getLongitude());
         att.setLatitude(req.getLatitude());
-        att.setDistanceMeters(distance.meters());
-        att.setIsInRange(distance.inRange(validRange) ? 1 : 0);
-        att.setIsCompliant(1);
+        att.setDistanceMeters(distanceMeters);
+        att.setIsInRange(inRange);
+        att.setIsCompliant(inRange);
         att.setPhotoUrls(toJson(req.getPhotoUrls()));
         att.setIsValid(1);
         att.setUploadMode(Boolean.TRUE.equals(req.getOfflineSync()) ? UPLOAD_MODE_OFFLINE_RETRY : UPLOAD_MODE_ONLINE);
@@ -137,7 +146,7 @@ public class AttendanceService {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("attendanceId", att.getId());
         data.put("workOrderStatus", STATUS_IN_PROGRESS);
-        data.put("distanceMeters", distance.meters());
+        data.put("distanceMeters", distanceMeters);
         data.put("vehicleStatus", VEHICLE_STATUS_BUSY);
         return data;
     }
@@ -167,13 +176,21 @@ public class AttendanceService {
         if (hasPendingException(order.getId())) {
             throw new BizException(ErrorCode.PENDING_EXCEPTION_EXISTS);
         }
-        if (req.getLongitude() == null || req.getLatitude() == null) {
+        // 定位强制开关：false（测试阶段默认）时坐标可空，弱校验本就不拦截；有坐标仍记录距离
+        if (locationRequired() && (req.getLongitude() == null || req.getLatitude() == null)) {
             throw new BizException(ErrorCode.COORDINATE_INVALID, "签退定位经纬度必填");
         }
 
         int validRange = systemConfigService.getInt("attendance.valid_range_meters", 1000);
         int overtimeRange = systemConfigService.getInt("attendance.overtime_range_meters", 1000);
-        DistanceResult distance = measureDistance(req.getLongitude(), req.getLatitude(), order);
+        Integer distanceMeters = null;
+        Integer inRange = null;
+        DistanceResult distance = null;
+        if (req.getLongitude() != null && req.getLatitude() != null) {
+            distance = measureDistance(req.getLongitude(), req.getLatitude(), order);
+            distanceMeters = distance.meters();
+            inRange = distance.inRange(validRange) ? 1 : 0;
+        }
         LocalDateTime now = LocalDateTime.now();
 
         Attendance att = new Attendance();
@@ -184,9 +201,9 @@ public class AttendanceService {
         att.setCapturedAt(req.getCapturedAt());
         att.setLongitude(req.getLongitude());
         att.setLatitude(req.getLatitude());
-        att.setDistanceMeters(distance.meters());
-        att.setIsInRange(distance.inRange(validRange) ? 1 : 0);
-        att.setIsCompliant(distance.inRange(validRange) ? 1 : 0);
+        att.setDistanceMeters(distanceMeters);
+        att.setIsInRange(inRange);
+        att.setIsCompliant(inRange);
         att.setIsValid(1);
         att.setPhotoUrls(toJson(req.getPhotoUrls()));
         att.setUploadMode(Boolean.TRUE.equals(req.getOfflineSync()) ? UPLOAD_MODE_OFFLINE_RETRY : UPLOAD_MODE_ONLINE);
@@ -201,21 +218,21 @@ public class AttendanceService {
         checkout.setDayEndAt(now);
         checkout.setLongitude(req.getLongitude());
         checkout.setLatitude(req.getLatitude());
-        checkout.setDistanceMeters(distance.meters());
-        checkout.setIsInRange(distance.inRange(validRange) ? 1 : 0);
+        checkout.setDistanceMeters(distanceMeters);
+        checkout.setIsInRange(inRange);
         checkout.setPhotoUrls(toJson(req.getPhotoUrls()));
         checkout.setIsLeftSite(Boolean.TRUE.equals(req.getIsLeftSite()) ? 1 : 0);
         checkout.setIsReturned(Boolean.TRUE.equals(req.getIsReturned()) ? 1 : 0);
         dailyCheckoutMapper.insert(checkout);
 
-        // 加班判定：实际签退晚于当日正常下班时间即生成待审核加班记录；位置不合规仅标注不阻断
+        // 加班判定：实际签退晚于当日正常下班时间即生成待审核加班记录；位置不合规或无定位仅标注不阻断
         int overtimeMinutes = 0;
-        boolean locationCompliant = true;
+        boolean locationCompliant = distance != null;
         LocalTime normalOffTime = LocalTime.parse(systemConfigService.getOrDefault("overtime.normal_off_time", "18:00"));
         if (now.toLocalTime().isAfter(normalOffTime)) {
             LocalDateTime normalOffAt = LocalDateTime.of(today, normalOffTime);
             overtimeMinutes = (int) Duration.between(normalOffAt, now).toMinutes();
-            locationCompliant = distance.meters() <= overtimeRange;
+            locationCompliant = distance != null && distance.meters() <= overtimeRange;
             OvertimeRecord overtime = new OvertimeRecord();
             overtime.setOrderId(order.getId());
             overtime.setStaffId(order.getStaffId());
@@ -266,15 +283,22 @@ public class AttendanceService {
         if (hasPendingException(order.getId())) {
             throw new BizException(ErrorCode.PENDING_EXCEPTION_EXISTS);
         }
-        if (req.getLongitude() == null || req.getLatitude() == null) {
+        // 定位/照片强制开关：false（测试阶段默认）时坐标与照片均可空；有坐标仍记录距离
+        if (locationRequired() && (req.getLongitude() == null || req.getLatitude() == null)) {
             throw new BizException(ErrorCode.COORDINATE_INVALID, "签退定位经纬度必填");
         }
-        if (req.getPhotoUrls() == null || req.getPhotoUrls().isEmpty()) {
+        if (photoRequired() && (req.getPhotoUrls() == null || req.getPhotoUrls().isEmpty())) {
             throw new BizException(ErrorCode.PHOTO_REQUIRED, "现场照片至少 1 张");
         }
 
         int validRange = systemConfigService.getInt("attendance.valid_range_meters", 1000);
-        DistanceResult distance = measureDistance(req.getLongitude(), req.getLatitude(), order);
+        Integer distanceMeters = null;
+        Integer inRange = null;
+        if (req.getLongitude() != null && req.getLatitude() != null) {
+            DistanceResult distance = measureDistance(req.getLongitude(), req.getLatitude(), order);
+            distanceMeters = distance.meters();
+            inRange = distance.inRange(validRange) ? 1 : 0;
+        }
         LocalDateTime now = LocalDateTime.now();
 
         Attendance att = new Attendance();
@@ -285,9 +309,9 @@ public class AttendanceService {
         att.setCapturedAt(req.getCapturedAt());
         att.setLongitude(req.getLongitude());
         att.setLatitude(req.getLatitude());
-        att.setDistanceMeters(distance.meters());
-        att.setIsInRange(distance.inRange(validRange) ? 1 : 0);
-        att.setIsCompliant(distance.inRange(validRange) ? 1 : 0);
+        att.setDistanceMeters(distanceMeters);
+        att.setIsInRange(inRange);
+        att.setIsCompliant(inRange);
         att.setIsValid(1);
         att.setPhotoUrls(toJson(req.getPhotoUrls()));
         att.setUploadMode(Boolean.TRUE.equals(req.getOfflineSync()) ? UPLOAD_MODE_OFFLINE_RETRY : UPLOAD_MODE_ONLINE);
@@ -451,6 +475,16 @@ public class AttendanceService {
                 .eq(ExceptionRecord::getOrderId, orderId)
                 .eq(ExceptionRecord::getStatus, "PENDING"));
         return count != null && count > 0;
+    }
+
+    /** 签到/签退是否强制定位（后台开关，测试阶段默认关闭；false 时坐标可空且不做范围拦截） */
+    private boolean locationRequired() {
+        return "true".equalsIgnoreCase(systemConfigService.getOrDefault("attendance.location_required", "false"));
+    }
+
+    /** 打卡是否强制现场照片（后台开关，测试阶段默认关闭；false 时照片可空） */
+    private boolean photoRequired() {
+        return "true".equalsIgnoreCase(systemConfigService.getOrDefault("attendance.photo_required", "false"));
     }
 
     /**

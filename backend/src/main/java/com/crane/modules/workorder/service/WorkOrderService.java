@@ -458,6 +458,15 @@ public class WorkOrderService {
         if (request.getAddress() != null) {
             order.setAddress(request.getAddress());
         }
+        if (request.getTaskName() != null && !request.getTaskName().isBlank()) {
+            order.setName(request.getTaskName());
+        }
+        if (request.getCraneTonnage() != null) {
+            order.setCraneTonnage(request.getCraneTonnage());
+        }
+        if (request.getRequirement() != null) {
+            order.setRequirement(request.getRequirement());
+        }
         if (request.getLongitude() != null) {
             order.setLongitude(request.getLongitude());
         }

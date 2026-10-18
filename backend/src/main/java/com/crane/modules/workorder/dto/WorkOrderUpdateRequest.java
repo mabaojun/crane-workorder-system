@@ -12,6 +12,9 @@ import java.time.LocalDateTime;
 @Data
 public class WorkOrderUpdateRequest {
 
+    /** 任务名称 */
+    private String taskName;
+
     /** 改派车辆 */
     private Long vehicleId;
 
@@ -32,6 +35,12 @@ public class WorkOrderUpdateRequest {
 
     /** 复核后重量（吨） */
     private BigDecimal cargoWeightTon;
+
+    /** 吊车吨位 */
+    private BigDecimal craneTonnage;
+
+    /** 施工要求 */
+    private String requirement;
 
     private String remark;
 

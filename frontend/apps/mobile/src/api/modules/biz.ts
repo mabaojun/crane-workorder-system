@@ -34,9 +34,10 @@ export function rejectOrder(id: number | string, body: { reasonType: string; rea
 
 export function checkIn(body: {
   orderId: number | string
-  longitude: number
-  latitude: number
-  photoUrls: string[]
+  // 定位/照片强制开关关闭（测试阶段）时允许为空
+  longitude: number | null
+  latitude: number | null
+  photoUrls: string[] | null
 }) {
   return request<Record<string, unknown>>('/attendance/check-in', { method: 'POST', body })
 }

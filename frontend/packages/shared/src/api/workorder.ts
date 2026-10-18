@@ -79,6 +79,25 @@ export interface WorkOrderCreateRequest {
   confirmPast?: boolean
 }
 
+/** API-WO-004 修改工单请求体（PATCH，未传字段不变） */
+export interface WorkOrderUpdateRequest {
+  taskName?: string
+  address?: string
+  /** 与 latitude 成对 */
+  longitude?: number
+  /** 与 longitude 成对 */
+  latitude?: number
+  staffId?: number
+  vehicleId?: number
+  planStartAt?: string
+  craneTonnage?: number
+  cargoWeightTon?: number
+  remark?: string
+  requirement?: string
+  /** 计划时间早于当前时的二次确认 */
+  confirmPast?: boolean
+}
+
 export interface WorkOrderStatusChangeRequest {
   /** CANCEL / SUSPEND / RESUME */
   action: string
@@ -112,6 +131,11 @@ export function createWorkOrder(body: WorkOrderCreateRequest) {
     '/work-order/orders',
     { method: 'POST', body }
   )
+}
+
+/** 修改工单（PATCH，仅传变更字段） */
+export function updateOrder(id: number | string, body: WorkOrderUpdateRequest) {
+  return request<WorkOrder>(`/work-order/orders/${id}`, { method: 'PATCH', body })
 }
 
 /** 状态变更：CANCEL / SUSPEND / RESUME */

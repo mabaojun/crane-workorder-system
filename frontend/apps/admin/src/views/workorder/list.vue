@@ -46,9 +46,16 @@
         <el-table-column label="客户可见状态" width="120">
           <template #default="{ row }">{{ row.customerVisibleStatusLabel || row.customerVisibleStatus || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="260" fixed="right">
+        <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
             <el-button size="small" text type="primary" @click="goDetail(row)">详情</el-button>
+            <el-button
+              v-if="!['COMPLETED', 'CANCELLED'].includes(row.status)"
+              size="small"
+              text
+              type="primary"
+              @click="openEdit(row)"
+            >修改</el-button>
             <el-button
               v-if="row.status === 'PENDING_ACCEPT'"
               size="small"
@@ -115,6 +122,14 @@
       title="派单"
       :prefill="dispatchPrefill"
       :submit="submitDispatch"
+    />
+
+    <!-- 修改工单弹窗 -->
+    <work-order-edit-dialog
+      v-if="editTarget"
+      v-model:visible="editVisible"
+      :order="editTarget"
+      @updated="load"
     />
 
     <!-- 直建工单弹窗 -->
@@ -264,6 +279,7 @@ import { fmtTime } from '../../utils/format'
 import { dispatchOrder } from '@crane/shared/api/dispatch'
 import dayjs from 'dayjs'
 import DispatchDialog from '../../components/DispatchDialog.vue'
+import WorkOrderEditDialog from '../../components/WorkOrderEditDialog.vue'
 import PrecheckList from '../../components/PrecheckList.vue'
 import StatusTag from '../../components/StatusTag.vue'
 import AMapPicker from '../../components/AMapPicker.vue'
@@ -286,6 +302,10 @@ const loading = ref(false)
 const dispatchVisible = ref(false)
 const dispatchTarget = ref<WorkOrder | null>(null)
 const dispatchPrefill = ref<{ planStartAt?: string }>({})
+
+// 修改工单弹窗
+const editVisible = ref(false)
+const editTarget = ref<WorkOrder | null>(null)
 
 // 直建弹窗
 const createVisible = ref(false)
@@ -352,6 +372,12 @@ function onReset() {
 
 function goDetail(row: WorkOrder) {
   router.push(`/workorder/detail/${row.id}`)
+}
+
+// ==================== 修改工单 ====================
+function openEdit(row: WorkOrder) {
+  editTarget.value = row
+  editVisible.value = true
 }
 
 // ==================== 派单 / 改派 ====================

@@ -5,6 +5,7 @@ import com.crane.common.exception.BizException;
 import com.crane.modules.attendance.dto.CheckInRequest;
 import com.crane.modules.attendance.dto.DailyCheckoutRequest;
 import com.crane.modules.attendance.dto.TaskEndRequest;
+import com.crane.modules.attendance.entity.Attendance;
 import com.crane.modules.attendance.mapper.AttendanceMapper;
 import com.crane.modules.attendance.mapper.DailyCheckoutMapper;
 import com.crane.modules.attendance.mapper.OvertimeRecordMapper;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -85,6 +87,9 @@ class AttendanceServiceTest {
         when(systemConfigService.getInt("attendance.valid_range_meters", 1000)).thenReturn(1000);
         when(systemConfigService.getInt("attendance.overtime_range_meters", 1000)).thenReturn(1000);
         when(systemConfigService.getOrDefault("overtime.normal_off_time", "18:00")).thenReturn("18:00");
+        // 默认测试阶段口径：定位与照片均不强制；需要验证强校验的用例单独开启
+        when(systemConfigService.getOrDefault("attendance.location_required", "false")).thenReturn("true");
+        when(systemConfigService.getOrDefault("attendance.photo_required", "false")).thenReturn("true");
         when(exceptionRecordMapper.selectCount(any())).thenReturn(0L);
     }
 
@@ -137,6 +142,38 @@ class AttendanceServiceTest {
 
         BizException ex = assertThrows(BizException.class, () -> service.checkIn(req, USER_ID));
         assertEquals(30012, ex.getCode());
+    }
+
+    /** 开关关闭（测试阶段默认）时：无定位、无照片也可签到成功，距离字段留空。 */
+    @Test
+    void checkInWithoutLocationAndPhotoSucceedsWhenSwitchOff() {
+        when(systemConfigService.getOrDefault("attendance.location_required", "false")).thenReturn("false");
+        when(systemConfigService.getOrDefault("attendance.photo_required", "false")).thenReturn("false");
+        WorkOrder order = pendingArriveOrder();
+        when(workOrderMapper.selectById(ORDER_ID)).thenReturn(order);
+        CheckInRequest req = checkInRequest();
+        req.setLongitude(null);
+        req.setLatitude(null);
+        req.setPhotoUrls(null);
+
+        Map<String, Object> data = service.checkIn(req, USER_ID);
+        assertEquals("IN_PROGRESS", data.get("workOrderStatus"));
+        assertNull(data.get("distanceMeters"));
+        verify(attendanceMapper).insert(any(Attendance.class));
+        verify(workOrderStateMachine).transition(order, "IN_PROGRESS", STAFF_ID, "司机签到");
+    }
+
+    /** 开关关闭时：有坐标仍记录距离但不做范围拦截（超范围不抛 30005）。 */
+    @Test
+    void checkInRangeNotEnforcedWhenLocationSwitchOff() {
+        when(systemConfigService.getOrDefault("attendance.location_required", "false")).thenReturn("false");
+        WorkOrder order = pendingArriveOrder();
+        when(workOrderMapper.selectById(ORDER_ID)).thenReturn(order);
+        when(geoService.haversine(any(), any(), any(), any())).thenReturn(50000.0);
+
+        Map<String, Object> data = service.checkIn(checkInRequest(), USER_ID);
+        assertEquals("IN_PROGRESS", data.get("workOrderStatus"));
+        assertEquals(50000, data.get("distanceMeters"));
     }
 
     /** 工单存在未批复异常时不可签到，返回 30008。 */

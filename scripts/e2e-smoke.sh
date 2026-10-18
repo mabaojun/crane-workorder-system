@@ -39,7 +39,7 @@ ADMIN=$(jq_get data accessToken)
 echo "== 2. 建档 =="
 req "创建客户(含账号)" POST /customer/customers "$ADMIN" "{\"name\":\"E2E测试客户$TS\",\"type\":\"COMPANY\",\"phone\":\"$CUST_PHONE\",\"creditCode\":\"91370100MA3E2E2E2E\",\"contacts\":[],\"createAccount\":true,\"contactName\":\"E2E联系人\",\"contactPhone\":\"$CUST_PHONE\"}"
 CID=$(jq_get data id)
-req "创建司机(含账号)" POST /staff/staffs "$ADMIN" "{\"name\":\"E2E司机$TS\",\"phone\":\""$STAFF_PHONE"\",\"idCard\":\"370100199001010$((TS%1000))X\",\"position\":\"DRIVER\",\"licenseType\":\"B2\",\"createAccount\":true}"
+req "创建司机(含账号)" POST /staff/staffs "$ADMIN" "{\"name\":\"E2E司机$TS\",\"phone\":\""$STAFF_PHONE"\",\"idCard\":\"370100199001010$((TS%1000))X\",\"position\":\"DRIVER\",\"licenseType\":\"B2\",\"createAccount\":true,\"initialPassword\":\"E2e@12345\"}"
 SID=$(jq_get data id)
 STAFF_USER_ID=$(jq_get data userId)
 req "创建车辆" POST /staff/vehicles "$ADMIN" "{\"plateNo\":\"鲁A$((TS%10000))E2\",\"model\":\"徐工XCT25\",\"tonnage\":25,\"defaultStaffId\":$SID}"
@@ -89,12 +89,16 @@ code=$(curl -s -X GET "$BASE/work-order/orders/$OID" -H 'X-Client: admin' | pyth
 if [ "$code" = "10001" ]; then PASS=$((PASS+1)); echo "PASS  无令牌访问被拒 10001"; else FAIL=$((FAIL+1)); echo "FAIL  无令牌访问 code=$code"; fi
 
 echo "== 11. 地图选点与密码登录 =="
+# 无定位无照片签到（定位/照片强制开关默认关闭，测试阶段不限制）
+req "创建开关验证单" POST /work-order/orders "$ADMIN" "{\"taskName\":\"开关验证单\",\"source\":\"DIRECT\",\"customerId\":$CID,\"staffId\":$SID,\"vehicleId\":$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_vehicle WHERE status='IDLE' AND deleted=0 ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n'),\"planStartAt\":\"2026-12-08T09:00:00+08:00\",\"address\":\"开关测试点位\",\"longitude\":117.12,\"latitude\":36.71,\"cargoName\":\"测试\",\"cargoQty\":1,\"cargoWeightTon\":1,\"craneTonnage\":25}"
+SOID=$(jq_get data orderId)
+req "开关单司机接单" POST /dispatch/orders/$SOID/accept "$DRIVER" "{}"
+req "无定位无照片签到(开关关闭)" POST /attendance/check-in "$DRIVER" "{\"orderId\":$SOID}"
 req "逆地理编码(mock)" GET "/system/amap/regeo?lng=117.12&lat=36.71" "$ADMIN" ""
 addr=$(jq_get data formattedAddress)
 if [ -n "$addr" ]; then PASS=$((PASS+1)); echo "PASS  选点回填地址: $addr"; else FAIL=$((FAIL+1)); echo "FAIL  regeo 无地址"; fi
 req "关键词搜索(mock)" GET "/system/amap/place/text?keywords=%E5%81%9C%E8%BD%A6%E5%9C%BA&lng=117.12&lat=36.71" "$ADMIN" ""
-req "创建司机(初始密码)" POST /staff/staffs "$ADMIN" "{\"name\":\"E2E密码司机$TS\",\"phone\":\"137$((TS % 100000000))\",\"idCard\":\"370100199001020$((TS%1000))X\",\"position\":\"DRIVER\",\"createAccount\":true,\"initialPassword\":\"E2e@12345\"}"
-PWPHONE="137$((TS % 100000000))"
+PWPHONE="$STAFF_PHONE"
 code=$(curl -s -X POST "$BASE/auth/password-login" -H 'Content-Type: application/json' -H 'X-Client: mp' -d "{\"username\":\"$PWPHONE\",\"password\":\"E2e@12345\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')
 if [ "$code" = "0" ]; then PASS=$((PASS+1)); echo "PASS  司机密码登录(mp)"; else FAIL=$((FAIL+1)); echo "FAIL  司机密码登录 code=$code"; fi
 # 开关实时生效：关闭 → mp 被拒 30015 → 恢复

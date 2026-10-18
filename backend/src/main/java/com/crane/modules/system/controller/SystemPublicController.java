@@ -47,6 +47,11 @@ public class SystemPublicController {
         }
         result.put("auth.password_login_enabled",
                 systemConfigService.getOrDefault("auth.password_login_enabled", "true"));
+        // 打卡定位/照片强制开关：移动端据此放宽签到 UI 拦截（后端为准）
+        result.put("attendance.location_required",
+                systemConfigService.getOrDefault("attendance.location_required", "false"));
+        result.put("attendance.photo_required",
+                systemConfigService.getOrDefault("attendance.photo_required", "false"));
         return ApiResult.ok(result);
     }
 }

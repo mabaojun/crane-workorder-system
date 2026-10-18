@@ -55,6 +55,12 @@
           plain
           @click="onSettle"
         >兜底结单</el-button>
+        <el-button
+          v-if="!['COMPLETED', 'CANCELLED'].includes(order.status)"
+          type="primary"
+          plain
+          @click="openEdit"
+        >修改工单</el-button>
         <el-button @click="router.back()">返回</el-button>
       </div>
     </el-card>
@@ -144,6 +150,14 @@
       :submit="submitDispatch"
     />
 
+    <!-- 修改工单弹窗 -->
+    <work-order-edit-dialog
+      v-if="order"
+      v-model:visible="editVisible"
+      :order="order"
+      @updated="loadAll"
+    />
+
     <!-- 异常批复弹窗 -->
     <exception-reply-dialog
       v-model="replyVisible"
@@ -175,6 +189,7 @@ import {
 import { fmtTime } from '../../utils/format'
 import { EXCEPTION_TYPE_LABEL, INSTRUCTION_LABEL, ORDER_SOURCE_LABEL } from '../../utils/tags'
 import DispatchDialog from '../../components/DispatchDialog.vue'
+import WorkOrderEditDialog from '../../components/WorkOrderEditDialog.vue'
 import ExceptionReplyDialog from '../../components/ExceptionReplyDialog.vue'
 import StatusTag from '../../components/StatusTag.vue'
 
@@ -189,6 +204,7 @@ const exceptions = ref<ExceptionRecord[]>([])
 const exceptionLoading = ref(false)
 
 const dispatchVisible = ref(false)
+const editVisible = ref(false)
 const replyVisible = ref(false)
 const replyTarget = ref<ExceptionRecord | null>(null)
 
@@ -244,6 +260,11 @@ function exceptionTypeName(row: ExceptionRecord) {
 // ==================== 派单 / 改派 ====================
 function openDispatch() {
   dispatchVisible.value = true
+}
+
+// ==================== 修改工单 ====================
+function openEdit() {
+  editVisible.value = true
 }
 
 async function submitDispatch(payload: {

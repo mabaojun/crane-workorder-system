@@ -20,6 +20,22 @@ import {
 import type { WorkOrder } from '../../api/types'
 import { chooseImages, getLocation, toastError, toastOk } from '../../utils'
 import { openNavigation, navFromOrder } from '../../utils/navigation'
+import { request } from '@crane/shared/api/client'
+
+// 打卡定位/照片强制开关（后台系统配置实时下发；测试阶段默认不强制）
+const locationRequired = ref(false)
+const photoRequired = ref(false)
+
+async function loadAttendanceSwitches() {
+  try {
+    const cfg = await request<Record<string, string>>('/system/public-config')
+    locationRequired.value = cfg['attendance.location_required'] === 'true'
+    photoRequired.value = cfg['attendance.photo_required'] === 'true'
+  } catch {
+    // 拉取失败按后端默认（不强制）处理，最终以后端校验为准
+  }
+}
+loadAttendanceSwitches()
 
 // 状态机活跃态（终态不展示为当前工单）
 const PRIORITY = ['PENDING_ACCEPT', 'PENDING_ARRIVE', 'IN_PROGRESS', 'SUSPENDED']
@@ -163,7 +179,8 @@ async function takePhoto() {
 
 async function submitCheckin() {
   const o = needOrder()
-  if (!coords.value) {
+  // 定位强制开关关闭（测试阶段）时允许无定位提交；有定位仍随单记录
+  if (!coords.value && locationRequired.value) {
     uni.showToast({ title: '尚未获取定位', icon: 'none' })
     return
   }
@@ -172,9 +189,11 @@ async function submitCheckin() {
     // TODO(二期): 对接文件上传，将本地照片（photos，base64 预览）上传后回填 photoUrls；MVP 固定占位路径
     await checkIn({
       orderId: o.id,
-      longitude: coords.value.longitude,
-      latitude: coords.value.latitude,
-      photoUrls: ['/files/mock/checkin.jpg']
+      longitude: coords.value?.longitude ?? null,
+      latitude: coords.value?.latitude ?? null,
+      photoUrls: photos.value.length > 0 || photoRequired.value
+        ? ['/files/mock/checkin.jpg']
+        : null
     })
     uni.hideLoading()
     showCheckin.value = false
