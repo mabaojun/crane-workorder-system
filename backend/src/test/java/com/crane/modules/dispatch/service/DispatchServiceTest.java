@@ -110,7 +110,7 @@ class DispatchServiceTest {
     @Test
     void dispatchVehicleNotIdleThrows40002() {
         when(workOrderMapper.selectById(100L)).thenReturn(pendingOrder());
-        when(dispatchCheckService.precheck(anyLong(), anyLong(), any()))
+        when(dispatchCheckService.precheck(any(), anyLong(), anyLong(), any()))
                 .thenReturn(List.of(CheckItem.fail("VEHICLE_IDLE", "车辆非空闲")));
 
         assertThatThrownBy(() -> dispatchService.dispatch(100L, dispatchRequest(), 99L))
@@ -120,7 +120,7 @@ class DispatchServiceTest {
     @Test
     void dispatchStaffAwayThrows30002() {
         when(workOrderMapper.selectById(100L)).thenReturn(pendingOrder());
-        when(dispatchCheckService.precheck(anyLong(), anyLong(), any()))
+        when(dispatchCheckService.precheck(any(), anyLong(), anyLong(), any()))
                 .thenReturn(List.of(CheckItem.fail("STAFF_ON_DUTY", "司机离岗")));
 
         assertThatThrownBy(() -> dispatchService.dispatch(100L, dispatchRequest(), 99L))
@@ -130,7 +130,7 @@ class DispatchServiceTest {
     @Test
     void dispatchPendingLimitThrows30003() {
         when(workOrderMapper.selectById(100L)).thenReturn(pendingOrder());
-        when(dispatchCheckService.precheck(anyLong(), anyLong(), any()))
+        when(dispatchCheckService.precheck(any(), anyLong(), anyLong(), any()))
                 .thenReturn(List.of(CheckItem.fail("PENDING_DISPATCH_LIMIT", "已达上限")));
 
         assertThatThrownBy(() -> dispatchService.dispatch(100L, dispatchRequest(), 99L))
@@ -140,7 +140,7 @@ class DispatchServiceTest {
     @Test
     void dispatchMutexConflictThrows30001() {
         when(workOrderMapper.selectById(100L)).thenReturn(pendingOrder());
-        when(dispatchCheckService.precheck(anyLong(), anyLong(), any()))
+        when(dispatchCheckService.precheck(any(), anyLong(), anyLong(), any()))
                 .thenReturn(List.of(CheckItem.fail("STAFF_NO_ACTIVE_ORDER", "司机已有进行中工单")));
 
         assertThatThrownBy(() -> dispatchService.dispatch(100L, dispatchRequest(), 99L))
@@ -150,7 +150,7 @@ class DispatchServiceTest {
     @Test
     void dispatchPastTimeWithoutConfirmThrows30004() {
         when(workOrderMapper.selectById(100L)).thenReturn(pendingOrder());
-        when(dispatchCheckService.precheck(anyLong(), anyLong(), any()))
+        when(dispatchCheckService.precheck(any(), anyLong(), anyLong(), any()))
                 .thenReturn(List.of(CheckItem.fail("TIME_VALID", "需二次确认")));
 
         assertThatThrownBy(() -> dispatchService.dispatch(100L, dispatchRequest(), 99L))
@@ -181,7 +181,7 @@ class DispatchServiceTest {
     void dispatchSuccessReassignsVehicleAndBinding() {
         WorkOrder order = pendingOrder();
         when(workOrderMapper.selectById(100L)).thenReturn(order);
-        when(dispatchCheckService.precheck(anyLong(), anyLong(), any())).thenReturn(allPass());
+        when(dispatchCheckService.precheck(any(), anyLong(), anyLong(), any())).thenReturn(allPass());
 
         Vehicle oldVehicle = new Vehicle();
         oldVehicle.setId(1L);
