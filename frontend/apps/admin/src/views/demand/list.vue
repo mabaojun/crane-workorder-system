@@ -192,6 +192,8 @@ const convertPrefill = ref<{
   address?: string
   longitude?: number
   latitude?: number
+  /** 客户需求描述，带入任务备注 */
+  remark?: string
 }>({})
 
 onMounted(load)
@@ -268,7 +270,9 @@ function openConvert(row: DemandOrder) {
     // 客户提报的位置信息：成功选点（含经纬度）时在转工单弹窗自动带出展示
     address: row.address || undefined,
     longitude: row.longitude ?? undefined,
-    latitude: row.latitude ?? undefined
+    latitude: row.latitude ?? undefined,
+    // 客户需求描述带入任务备注，管理员可在此基础上补充
+    remark: row.description || undefined
   }
   convertVisible.value = true
 }

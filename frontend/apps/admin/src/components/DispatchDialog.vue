@@ -93,6 +93,17 @@
       </template>
       <el-form-item :label="mode === 'convert' ? '任务备注' : '备注'">
         <div class="remark-block">
+          <el-alert
+            v-if="mode === 'convert' && prefill?.remark"
+            type="info"
+            :closable="false"
+            show-icon
+            class="demand-desc"
+          >
+            <template #title>
+              已带入客户需求描述，可直接补充后作为任务备注
+            </template>
+          </el-alert>
           <div class="remark-chips">
             <el-tag
               v-for="t in REMARK_PRESETS"
@@ -103,7 +114,7 @@
               @click="toggleRemarkPreset(t)"
             >{{ t }}</el-tag>
           </div>
-          <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" placeholder="任务备注（选填，可点选上方常用项快速填写）" />
+          <el-input v-model="form.remark" type="textarea" :rows="3" maxlength="500" placeholder="任务备注（选填，已带入客户需求描述，可补充；也可点选常用项）" />
         </div>
       </el-form-item>
       <el-form-item v-if="needConfirmPast" label="">
@@ -314,6 +325,7 @@ async function onSubmit() {
 }
 .tip { color: var(--sub); font-size: 12px; line-height: 1.5; }
 .demand-pos { margin-bottom: 14px; }
+.demand-desc { margin-bottom: 8px; }
 .unit { margin-left: 8px; color: var(--sub); }
 .plan-start { width: 100%; }
 .quick-dates { margin-top: 4px; display: flex; }

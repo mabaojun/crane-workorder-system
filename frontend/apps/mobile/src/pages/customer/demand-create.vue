@@ -60,6 +60,23 @@ function setQuickDate(offset: number) {
   expectDate.value = `${y}-${m}-${day}`
 }
 
+/** 需求描述常用项：点选追加、再点移除（与后台转工单备注一致） */
+const DESC_PRESETS = ['带吊笼', '带顶笼']
+
+function toggleDescPreset(text: string) {
+  if (description.value.includes(text)) {
+    description.value = description.value
+      .split(/[，,]/)
+      .map((s) => s.trim())
+      .filter((s) => s && s !== text)
+      .join('，')
+  } else {
+    description.value = description.value.trim()
+      ? `${description.value.trim().replace(/[，,]$/, '')}，${text}`
+      : text
+  }
+}
+
 onLoad((opts) => {
   // 「再次提报」：读取驳回单草稿（由需求列表页写入）
   const draftRaw = uni.getStorageSync('demand_draft')
@@ -198,6 +215,15 @@ async function submit() {
       </view>
       <view class="field col">
         <text class="label">需求描述</text>
+        <view class="desc-chips">
+          <view
+            v-for="t in DESC_PRESETS"
+            :key="t"
+            class="desc-chip"
+            :class="{ active: description.includes(t) }"
+            @tap="toggleDescPreset(t)"
+          >{{ t }}</view>
+        </view>
         <textarea v-model="description" class="textarea" placeholder="吊装任务内容、现场条件等" :maxlength="500" />
       </view>
       <view class="field">
@@ -412,6 +438,25 @@ async function submit() {
   background: var(--bg);
 }
 .tonnage-chip.active {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: var(--brand-weak);
+  font-weight: 600;
+}
+.desc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.desc-chip {
+  padding: 6px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--txt);
+  background: var(--bg);
+}
+.desc-chip.active {
   border-color: var(--brand);
   color: var(--brand);
   background: var(--brand-weak);
