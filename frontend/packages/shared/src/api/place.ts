@@ -36,9 +36,11 @@ export interface MyPlace {
   latitude: number | null
 }
 
-/** 我的常用地点（客户身份调用，仅含本客户提交过的地点） */
-export function listMyPlaces() {
-  return request<MyPlace[]>('/place/my-places')
+/** 我的常用地点：客户调用返回本客户历史工单地点；管理员可传 customerId 查指定客户的历史地点 */
+export function listMyPlaces(customerId?: number) {
+  return request<MyPlace[]>('/place/my-places', {
+    query: customerId ? { customerId } : undefined,
+  })
 }
 
 /** 新增地点（仅管理员） */

@@ -10,6 +10,7 @@ import com.crane.modules.customer.entity.Customer;
 import com.crane.modules.customer.mapper.CustomerMapper;
 import com.crane.modules.exception.service.ExceptionService;
 import com.crane.modules.notify.service.NotifyService;
+import com.crane.modules.place.service.CommonPlaceService;
 import com.crane.modules.staff.entity.Staff;
 import com.crane.modules.staff.entity.Vehicle;
 import com.crane.modules.staff.entity.VehicleBinding;
@@ -93,6 +94,7 @@ public class WorkOrderService {
     private final WorkOrderStateMachine stateMachine;
     private final NotifyService notifyService;
     private final ExceptionService exceptionService;
+    private final CommonPlaceService commonPlaceService;
 
     // ==================== 建单 ====================
 
@@ -196,6 +198,8 @@ public class WorkOrderService {
         // 建单即占用车辆：状态 BUSY + 当前工单回填 + 状态日志 + 三方绑定
         occupyVehicle(vehicle, order.getId(), command.getStaffId(), operatorId, "DISPATCH");
         createBinding(order.getId(), command.getStaffId(), command.getVehicleId());
+        // 施工地点自动沉淀为常用地点（按名称去重回填坐标）：建单/转工单用过的地址均可复用
+        commonPlaceService.upsertFromSite(order.getAddress(), order.getLongitude(), order.getLatitude());
         log.info("工单创建成功 orderId={} orderNo={} staffId={} vehicleId={}",
                 order.getId(), order.getOrderNo(), order.getStaffId(), order.getVehicleId());
         return order;

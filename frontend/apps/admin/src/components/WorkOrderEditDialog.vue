@@ -136,7 +136,7 @@
   </el-dialog>
 
   <!-- 地图选点弹窗 -->
-  <amap-picker
+  <AMapPicker
     v-model:visible="pickerVisible"
     :lng="form.longitude"
     :lat="form.latitude"

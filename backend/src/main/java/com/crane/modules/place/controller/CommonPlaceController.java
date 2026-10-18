@@ -38,16 +38,27 @@ public class CommonPlaceController {
     }
 
     /**
-     * 客户端常用地点：仅返回本客户历史工单中使用过的施工地点（含经纬度），
-     * 与管理员维护的通用地点（/common-places）口径区分。
+     * 常用地点：客户调用=本客户历史工单地点；管理员可传 customerId 查指定客户的历史地点
+     *（直建工单时按所选客户带出，地点与实际用户关联）。均含经纬度，最近使用在前。
      */
     @GetMapping("/my-places")
-    public ApiResult<List<CommonPlace>> myPlaces() {
+    public ApiResult<List<CommonPlace>> myPlaces(@RequestParam(required = false) Long customerId) {
         AuthContext ctx = AuthContext.get();
-        if (ctx == null || ctx.getCustomerId() == null) {
+        if (ctx == null) {
             return ApiResult.ok(List.of());
         }
-        return ApiResult.ok(commonPlaceService.listMyPlaces(ctx.getCustomerId()));
+        Long targetCustomerId;
+        if (ctx.isAdmin()) {
+            targetCustomerId = customerId;
+        } else if (ctx.isCustomer()) {
+            targetCustomerId = ctx.getCustomerId();
+        } else {
+            return ApiResult.ok(List.of());
+        }
+        if (targetCustomerId == null) {
+            return ApiResult.ok(List.of());
+        }
+        return ApiResult.ok(commonPlaceService.listMyPlaces(targetCustomerId));
     }
 
     @PostMapping("/common-places")

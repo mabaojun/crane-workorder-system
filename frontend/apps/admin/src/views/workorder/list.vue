@@ -106,7 +106,7 @@
     </el-card>
 
     <!-- 地图选点弹窗 -->
-    <amap-picker
+    <AMapPicker
       v-model:visible="pickerVisible"
       :lng="createForm.longitude"
       :lat="createForm.latitude"
@@ -233,19 +233,24 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="常用地点">
-              <el-select
-                v-model="selectedPlaceName"
-                filterable
-                clearable
-                placeholder="从常用施工地点快速选择（可输入关键字过滤）"
-                style="width: 100%"
-                @change="onPickPlace"
-              >
-                <el-option v-for="p in commonPlaces" :key="p.id" :value="p.placeName" :label="p.placeName" />
-                <template #empty>
-                  <p class="select-hint">暂无常用地点，可在「档案管理-常用施工地点」中维护</p>
-                </template>
-              </el-select>
+              <div class="place-row">
+                <el-select
+                  v-model="selectedPlaceName"
+                  filterable
+                  clearable
+                  :disabled="!createForm.customerId"
+                  :loading="myPlacesLoading"
+                  :placeholder="createForm.customerId ? '该客户下过单的地点，可直接选择' : '请先选择客户'"
+                  style="flex: 1"
+                  @change="onPickPlace"
+                >
+                  <el-option v-for="p in myPlaces" :key="p.placeName" :value="p.placeName" :label="p.placeName" />
+                  <template #empty>
+                    <p class="select-hint">{{ createForm.customerId ? '该客户暂无历史施工地点，可直接地图选点' : '请先选择客户，将带出其下过单的地点' }}</p>
+                  </template>
+                </el-select>
+                <el-button @click="pickerVisible = true">地图选点</el-button>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -312,7 +317,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { WORK_ORDER_STATUS_LABEL } from '@crane/shared'
@@ -327,7 +332,7 @@ import {
 import { precheckDispatch, type CheckItem } from '@crane/shared/api/dispatch'
 import { pageStaffs, pageVehicles, type Staff, type Vehicle } from '@crane/shared/api/staff'
 import { pageCustomers, type Customer } from '@crane/shared/api/customer'
-import { listCommonPlaces, type CommonPlace } from '@crane/shared/api/place'
+import { listMyPlaces, type MyPlace } from '@crane/shared/api/place'
 import { fmtTime } from '../../utils/format'
 import { dispatchOrder } from '@crane/shared/api/dispatch'
 import dayjs from 'dayjs'
@@ -368,7 +373,6 @@ const checks = ref<CheckItem[]>([])
 const staffs = ref<Staff[]>([])
 const vehicles = ref<Vehicle[]>([])
 const customers = ref<Customer[]>([])
-const commonPlaces = ref<CommonPlace[]>([])
 // 下拉选项加载态：请求期间 el-select 显示加载动画，避免"暂无数据"闪烁
 const optionsLoading = ref(false)
 const optionsError = ref(false)
@@ -547,16 +551,14 @@ async function loadCreateOptions() {
   optionsLoading.value = true
   optionsError.value = false
   try {
-    const [staffPage, vehiclePage, customerPage, places] = await Promise.all([
+    const [staffPage, vehiclePage, customerPage] = await Promise.all([
       pageStaffs({ pageSize: 100 }),
       pageVehicles({ pageSize: 100 }),
-      pageCustomers({ pageSize: 100 }),
-      listCommonPlaces().catch(() => [] as CommonPlace[])
+      pageCustomers({ pageSize: 100 })
     ])
     staffs.value = staffPage.list.filter((s) => s.position === 'DRIVER' && s.status !== 'RESIGNED')
     vehicles.value = vehiclePage.list
     customers.value = customerPage.list
-    commonPlaces.value = places
   } catch (e) {
     optionsError.value = true
     ElMessage.error(e instanceof Error ? e.message : '基础数据加载失败')
@@ -564,6 +566,33 @@ async function loadCreateOptions() {
     optionsLoading.value = false
   }
 }
+
+/** 常用地点=所选客户下过单的地点（转工单/建单用过的地址自动沉淀），客户变更即刷新 */
+const myPlaces = ref<MyPlace[]>([])
+const myPlacesLoading = ref(false)
+
+async function loadMyPlaces() {
+  if (!createForm.customerId) {
+    myPlaces.value = []
+    return
+  }
+  myPlacesLoading.value = true
+  try {
+    myPlaces.value = await listMyPlaces(createForm.customerId)
+  } catch {
+    myPlaces.value = []
+  } finally {
+    myPlacesLoading.value = false
+  }
+}
+
+watch(
+  () => createForm.customerId,
+  () => {
+    selectedPlaceName.value = ''
+    loadMyPlaces()
+  }
+)
 
 /** 选择车辆自动带出吊车吨位（车辆档案吨位，可手动覆盖） */
 function onVehicleChange(id: number) {
@@ -575,7 +604,7 @@ function onVehicleChange(id: number) {
 function onPickPlace(name: string) {
   if (!name) return
   createForm.address = name
-  const place = commonPlaces.value.find((p) => p.placeName === name)
+  const place = myPlaces.value.find((p) => p.placeName === name)
   if (place) {
     if (place.longitude != null) createForm.longitude = place.longitude
     if (place.latitude != null) createForm.latitude = place.latitude
@@ -669,4 +698,5 @@ async function submitCreate() {
 .quick-dates { margin-top: 4px; display: flex; gap: 0; }
 .quick-dates .el-button + .el-button { margin-left: 8px; }
 .select-hint { text-align: center; color: var(--sub, #909399); font-size: 13px; padding: 14px 0; margin: 0; }
+.place-row { display: flex; gap: 8px; width: 100%; }
 </style>
