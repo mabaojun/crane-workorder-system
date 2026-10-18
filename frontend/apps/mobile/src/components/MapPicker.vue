@@ -33,6 +33,8 @@ const selLat = ref(centerLat.value)
 
 const showAmap = ref(false)
 const amapFailed = ref(false)
+/** 失败原因：给出可自查的诊断提示（Key 白名单 / 网络） */
+const failReason = ref('')
 /** 卫星图层默认开启，可切换标准图 */
 const satelliteOn = ref(true)
 
@@ -139,6 +141,7 @@ async function initAmap(jsapiKey: string, securityJscode: string) {
     const el = document.getElementById('amap-container')
     if (!el) {
       amapFailed.value = true
+      failReason.value = '地图容器未就绪，请关闭弹窗后重试'
       return
     }
     amapInstance = new AMap.Map(el, {
@@ -147,6 +150,7 @@ async function initAmap(jsapiKey: string, securityJscode: string) {
     })
   } catch (e) {
     amapFailed.value = true
+    failReason.value = diagnoseAmapError(e)
     toastError(e)
     return
   }
@@ -194,6 +198,27 @@ async function onConfirm() {
     })
   } finally {
     confirming.value = false
+  }
+}
+
+/** 高德失败诊断：2.0 域名校验失败是最常见原因（白名单未含当前访问域名） */
+function diagnoseAmapError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e)
+  if (/INVALID_USER_SCODE|USERKEY_PLAT_NOMATCH|USERKEY_ERROR|SCODE/i.test(msg)) {
+    return `高德 Key 校验未通过：请到高德控制台将当前访问域名（${location.host}）加入该 JSAPI Key 的安全域名白名单，或核对安全密钥 securityJsCode 是否填写正确`
+  }
+  return msg || '地图加载失败，请检查网络后重试'
+}
+
+/** 重试加载地图：清失败态重新初始化 */
+async function retryAmap() {
+  amapFailed.value = false
+  failReason.value = ''
+  try {
+    const keys = await getAmapPublicKeys()
+    if (keys.jsapiKey) await initAmap(keys.jsapiKey, keys.securityJscode)
+  } catch {
+    amapFailed.value = true
   }
 }
 
@@ -285,7 +310,8 @@ onMounted(async () => {
         <view class="crosshair"><view class="ch-v" /><view class="ch-h" /></view>
       </view>
       <view v-else class="map-area no-map">
-        <text class="map-tip">{{ amapFailed ? '地图加载失败，可通过关键词搜索选择地点，或返回使用自动定位' : '地图加载中...' }}</text>
+        <text class="map-tip">{{ failReason || '地图加载中...' }}</text>
+        <view v-if="amapFailed" class="retry-btn" @tap="retryAmap">重新加载地图</view>
       </view>
       <!-- #endif -->
 
@@ -424,6 +450,15 @@ onMounted(async () => {
   color: var(--sub);
   padding: 0 24px;
   text-align: center;
+  line-height: 1.6;
+}
+.retry-btn {
+  margin-top: 14px;
+  padding: 8px 22px;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius);
+  color: var(--brand);
+  font-size: 14px;
 }
 .crosshair {
   position: absolute;
