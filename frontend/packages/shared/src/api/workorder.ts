@@ -70,8 +70,10 @@ export interface WorkOrderCreateRequest {
   address: string
   longitude: number
   latitude: number
-  cargoName: string
-  cargoQty: number
+  /** 选填：货物名称 */
+  cargoName?: string
+  /** 选填：货物数量 */
+  cargoQty?: number
   /** 选填：货物重量（吨） */
   cargoWeightTon?: number
   craneTonnage: number

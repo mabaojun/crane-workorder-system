@@ -98,6 +98,8 @@ export function createDemandOrder(body: {
   description?: string
   imageUrls?: string[]
   cargoWeight?: number
+  /** 设备吨位（点选常用档位或直接输入），选填 */
+  craneTonnage?: number
   expectedStartAt?: string
   parentDemandId?: number
 }) {

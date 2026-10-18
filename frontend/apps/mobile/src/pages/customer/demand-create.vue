@@ -22,6 +22,9 @@ const coords = ref<{ longitude: number; latitude: number } | null>(null)
 const locating = ref(false)
 const description = ref('')
 const cargoWeight = ref('')
+const craneTonnage = ref('')
+/** 设备吨位常用档位：点选快捷，也可直接输入其他吨位 */
+const TONNAGE_PRESETS = [8, 16, 25, 50, 70, 80, 100, 110, 130, 150, 200, 300]
 const expectDate = ref('')
 const expectTime = ref('')
 const photos = ref<string[]>([])
@@ -145,6 +148,8 @@ async function submit() {
       description: description.value.trim() || undefined,
       imageUrls: photos.value.length ? ['mock://local'] : undefined,
       cargoWeight: cargoWeight.value ? Number(cargoWeight.value) : undefined,
+      // 设备吨位：点选常用档位或直接输入
+      craneTonnage: craneTonnage.value ? Number(craneTonnage.value) : undefined,
       expectedStartAt,
       parentDemandId: parentDemandId.value
     })
@@ -199,6 +204,19 @@ async function submit() {
         <text class="label">货物重量(吨)</text>
         <input v-model="cargoWeight" class="input" type="digit" placeholder="选填，如 8" placeholder-class="ph" />
       </view>
+      <view class="field">
+        <text class="label">设备吨位(吨)</text>
+        <input v-model="craneTonnage" class="input" type="digit" placeholder="点选下方常用吨位，或直接输入" placeholder-class="ph" />
+        <view class="tonnage-chips">
+          <view
+            v-for="t in TONNAGE_PRESETS"
+            :key="t"
+            class="tonnage-chip"
+            :class="{ active: craneTonnage === String(t) }"
+            @tap="craneTonnage = craneTonnage === String(t) ? '' : String(t)"
+          >{{ t }}</view>
+        </view>
+      </view>
       <view class="field half-wrap">
         <view class="half">
           <text class="label">期望开始日期</text>
@@ -210,6 +228,7 @@ async function submit() {
             <view class="quick" @tap="setQuickDate(1)">明天</view>
             <view class="quick" @tap="setQuickDate(2)">后天</view>
           </view>
+          <text class="field-hint">点击日期框可自选任意日期</text>
         </view>
         <view class="half">
           <text class="label">期望开始时间</text>
@@ -220,6 +239,7 @@ async function submit() {
             <view class="quick" @tap="expectTime = '07:00'">上午 7:00</view>
             <view class="quick" @tap="expectTime = '13:00'">下午 1:00</view>
           </view>
+          <text class="field-hint">点击时间框可自选任意时间</text>
         </view>
       </view>
       <view class="field col">
@@ -368,6 +388,34 @@ async function submit() {
   border-color: var(--brand);
   color: var(--brand);
   background: var(--brand-weak);
+}
+.field-hint {
+  font-size: 11px;
+  color: var(--sub);
+}
+.tonnage-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.tonnage-chip {
+  min-width: 52px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--txt);
+  background: var(--bg);
+}
+.tonnage-chip.active {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: var(--brand-weak);
+  font-weight: 600;
 }
 .picker-value {
   font-size: 15px;

@@ -249,7 +249,7 @@
                     <p class="select-hint">{{ createForm.customerId ? '该客户暂无历史施工地点，可直接地图选点' : '请先选择客户，将带出其下过单的地点' }}</p>
                   </template>
                 </el-select>
-                <el-button @click="pickerVisible = true">地图选点</el-button>
+                <el-button type="primary" plain @click="pickerVisible = true">地图选点</el-button>
               </div>
             </el-form-item>
           </el-col>
@@ -273,13 +273,13 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="货物名称" required>
-              <el-input v-model="createForm.cargoName" maxlength="128" placeholder="货物名称" />
+            <el-form-item label="货物名称">
+              <el-input v-model="createForm.cargoName" maxlength="128" placeholder="选填" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="货物数量" required>
-              <el-input-number v-model="createForm.cargoQty" :min="1" :precision="0" controls-position="right" style="width: 100%" />
+            <el-form-item label="货物数量">
+              <el-input-number v-model="createForm.cargoQty" :min="1" :precision="0" controls-position="right" placeholder="选填" style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -683,8 +683,6 @@ async function submitCreate() {
   if (!createForm.planStartAt) return ElMessage.warning('请选择计划开始时间')
   if (!createForm.address.trim()) return ElMessage.warning('请填写施工地址')
   if (createForm.longitude == null || createForm.latitude == null) return ElMessage.warning('请填写经纬度')
-  if (!createForm.cargoName.trim()) return ElMessage.warning('请填写货物名称')
-  if (!createForm.cargoQty || createForm.cargoQty < 1) return ElMessage.warning('货物数量须大于等于 1')
   if (!createForm.craneTonnage) return ElMessage.warning('请填写吊车吨位')
   if (needConfirmPast.value && !createForm.confirmPast) {
     ElMessage.warning('计划时间早于当前时间，请勾选二次确认')
@@ -703,8 +701,8 @@ async function submitCreate() {
       address: createForm.address.trim(),
       longitude: createForm.longitude,
       latitude: createForm.latitude,
-      cargoName: createForm.cargoName.trim(),
-      cargoQty: createForm.cargoQty,
+      // 货物名称/数量选填：仅在有值时提交
+      ...(createForm.cargoName.trim() ? { cargoName: createForm.cargoName.trim() } : {}),
       cargoWeightTon: createForm.cargoWeightTon,
       craneTonnage: createForm.craneTonnage,
       remark: createForm.remark.trim() || undefined,

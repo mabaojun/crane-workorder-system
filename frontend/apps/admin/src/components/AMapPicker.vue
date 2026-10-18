@@ -170,6 +170,8 @@ async function onOpen() {
     const keys = await getAmapPublicKeys()
     if (keys.jsapiKey) {
       mode.value = 'map'
+      // 先置 ready 渲染地图容器（v-else-if="ready && mode==='map'"），再初始化，否则 mapRef 为 null 静默失败
+      ready.value = true
       await nextTick()
       try {
         await initMap(keys.jsapiKey, keys.securityJscode)
@@ -213,7 +215,9 @@ function loadAmapScript(jsapiKey: string, securityJscode: string): Promise<any> 
 
 async function initMap(jsapiKey: string, securityJscode: string) {
   const AMap = await loadAmapScript(jsapiKey, securityJscode)
-  if (!mapRef.value) return
+  if (!mapRef.value) {
+    throw new Error('地图容器未就绪')
+  }
   map = new AMap.Map(mapRef.value, {
     zoom: 15,
     center: [

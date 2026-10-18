@@ -45,11 +45,11 @@ public class WorkOrderCreateRequest {
     @NotNull(message = "latitude 必填")
     private BigDecimal latitude;
 
-    @NotBlank(message = "cargoName 必填")
+    /** 选填：货物名称 */
     @Size(max = 128, message = "cargoName 最长 128")
     private String cargoName;
 
-    @NotNull(message = "cargoQty 必填")
+    /** 选填：货物数量 */
     @Min(value = 1, message = "cargoQty 须大于等于 1")
     private Integer cargoQty;
 

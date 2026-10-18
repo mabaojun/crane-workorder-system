@@ -145,26 +145,31 @@ async function initAmap(jsapiKey: string, securityJscode: string) {
       zoom: Number(props.initialLng) ? 16 : 12,
       center: [centerLng.value, centerLat.value]
     })
-    // 卫星图层：默认叠加显示，可一键切换标准图
-    satelliteOn.value = true
-    satelliteLayer = new AMap.TileLayer.Satellite({ zIndex: 1 })
-    amapInstance.add(satelliteLayer)
-    amapInstance.on('moveend', () => {
-      const c = amapInstance.getCenter()
-      if (!c) return
-      selLng.value = c.getLng()
-      selLat.value = c.getLat()
-    })
-    amapInstance.on('click', (e: { lnglat?: { getLng(): number; getLat(): number } }) => {
-      if (!e.lnglat) return
-      selLng.value = e.lnglat.getLng()
-      selLat.value = e.lnglat.getLat()
-      amapInstance.setCenter([selLng.value, selLat.value])
-    })
   } catch (e) {
     amapFailed.value = true
     toastError(e)
+    return
   }
+  // 卫星图层独立降级：叠加失败不影响地图本体可用
+  try {
+    satelliteOn.value = true
+    satelliteLayer = new (window as any).AMap.TileLayer.Satellite({ zIndex: 1 })
+    amapInstance.add(satelliteLayer)
+  } catch {
+    satelliteLayer = null
+  }
+  amapInstance.on('moveend', () => {
+    const c = amapInstance.getCenter()
+    if (!c) return
+    selLng.value = c.getLng()
+    selLat.value = c.getLat()
+  })
+  amapInstance.on('click', (e: { lnglat?: { getLng(): number; getLat(): number } }) => {
+    if (!e.lnglat) return
+    selLng.value = e.lnglat.getLng()
+    selLat.value = e.lnglat.getLat()
+    amapInstance.setCenter([selLng.value, selLat.value])
+  })
 }
 
 // ---- 确认选点：统一 regeo 反查 ----

@@ -8,6 +8,19 @@
     @open="onOpen"
   >
     <el-form ref="formRef" :model="form" label-width="100px">
+      <el-alert
+        v-if="mode === 'convert' && prefill?.address"
+        type="success"
+        :closable="false"
+        show-icon
+        class="demand-pos"
+      >
+        <template #title>
+          客户已选点：<b>{{ prefill.address }}</b>
+          <span v-if="prefill.longitude != null">（{{ prefill.longitude }}, {{ prefill.latitude }}）</span>
+          ，转工单自动沿用该位置，如需校准可在建单后修改
+        </template>
+      </el-alert>
       <el-form-item label="执行司机" required>
         <el-select
           v-model="form.staffId"
@@ -130,7 +143,16 @@ const props = defineProps<{
   modelValue: boolean
   mode: 'convert' | 'dispatch'
   title: string
-  prefill?: { planStartAt?: string; craneTonnage?: number; cargoWeightTon?: number; remark?: string }
+  prefill?: {
+    planStartAt?: string
+    craneTonnage?: number
+    cargoWeightTon?: number
+    remark?: string
+    /** 客户提报的位置信息（转工单时带出展示） */
+    address?: string
+    longitude?: number
+    latitude?: number
+  }
   submit: (payload: {
     staffId: number
     vehicleId: number
@@ -291,6 +313,7 @@ async function onSubmit() {
   cursor: pointer;
 }
 .tip { color: var(--sub); font-size: 12px; line-height: 1.5; }
+.demand-pos { margin-bottom: 14px; }
 .unit { margin-left: 8px; color: var(--sub); }
 .plan-start { width: 100%; }
 .quick-dates { margin-top: 4px; display: flex; }

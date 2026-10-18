@@ -185,7 +185,14 @@ const rejectForm = reactive({ reviewRemark: '' })
 // 转工单弹窗
 const convertVisible = ref(false)
 const convertTarget = ref<DemandOrder | null>(null)
-const convertPrefill = ref<{ planStartAt?: string; craneTonnage?: number; cargoWeightTon?: number }>({})
+const convertPrefill = ref<{
+  planStartAt?: string
+  craneTonnage?: number
+  cargoWeightTon?: number
+  address?: string
+  longitude?: number
+  latitude?: number
+}>({})
 
 onMounted(load)
 
@@ -257,7 +264,11 @@ function openConvert(row: DemandOrder) {
   convertPrefill.value = {
     planStartAt: row.expectedStartAt || undefined,
     craneTonnage: row.craneTonnage ?? undefined,
-    cargoWeightTon: row.cargoWeight ?? undefined
+    cargoWeightTon: row.cargoWeight ?? undefined,
+    // 客户提报的位置信息：成功选点（含经纬度）时在转工单弹窗自动带出展示
+    address: row.address || undefined,
+    longitude: row.longitude ?? undefined,
+    latitude: row.latitude ?? undefined
   }
   convertVisible.value = true
 }
