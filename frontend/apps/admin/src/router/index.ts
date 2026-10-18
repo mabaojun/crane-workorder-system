@@ -70,6 +70,12 @@ const router = createRouter({
           component: () => import('../views/customer/list.vue')
         },
         {
+          path: 'system/place-list',
+          name: 'place-list',
+          meta: { title: '常用施工地点', menu: 'place', adminOnly: true },
+          component: () => import('../views/system/place-list.vue')
+        },
+        {
           path: 'system/user-list',
           name: 'user-list',
           meta: { title: '账号与权限', menu: 'user', adminOnly: true },

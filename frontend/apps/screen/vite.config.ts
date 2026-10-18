@@ -6,6 +6,8 @@ export default defineConfig({
   base: process.env.SCREEN_BASE || '/',
   plugins: [vue()],
   server: {
+    host: true, // 局域网测试：放开 0.0.0.0
+    allowedHosts: true,
     port: 7776,
     proxy: {
       '/api': {

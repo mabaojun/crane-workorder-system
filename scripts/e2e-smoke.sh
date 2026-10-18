@@ -1,5 +1,5 @@
 #!/bin/bash
-# 端到端 API 冒烟：管理员建档 → 客户提报 → 复核转工单 → 司机接单签到 → 异常上报批复 → 任务结束 → 客户评价
+# 端到端 API 冒烟：管理员建档 → 客户提报 → 复核转工单 → 司机接单签到 → 异常上报批复 → 任务结束 → 客户评价 → 司机退单 → 常用施工地点
 # 用法：bash scripts/e2e-smoke.sh（需后端 7777 已启动、MySQL 已初始化）
 set -e
 cd "$(dirname "$0")"
@@ -108,6 +108,54 @@ if [ "$code" = "30015" ]; then PASS=$((PASS+1)); echo "PASS  开关关闭后 mp 
 curl -s -X PUT "$BASE/system/configs/auth.password_login_enabled" -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' -d '{"configValue":"true"}' > /dev/null
 code=$(curl -s -X POST "$BASE/auth/password-login" -H 'Content-Type: application/json' -H 'X-Client: mp' -d "{\"username\":\"$PWPHONE\",\"password\":\"E2e@12345\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')
 if [ "$code" = "0" ]; then PASS=$((PASS+1)); echo "PASS  开关开启后恢复（实时生效无重启）"; else FAIL=$((FAIL+1)); echo "FAIL  恢复失败 code=$code"; fi
+
+echo "== 12. 司机退单（接单后状态回退并通知管理端）=="
+# 独立退单司机：避免与前面链路的司机占用状态（30001）互相干扰
+STAFF2_PHONE="137$((TS % 100000000))"
+req "创建退单司机(含账号)" POST /staff/staffs "$ADMIN" "{\"name\":\"E2E退单司机$TS\",\"phone\":\"$STAFF2_PHONE\",\"idCard\":\"370100199001012$((TS%1000))X\",\"position\":\"DRIVER\",\"licenseType\":\"B2\",\"createAccount\":true,\"initialPassword\":\"E2e@12345\"}"
+SID2=$(jq_get data id)
+STAFF2_USER_ID=$(jq_get data userId)
+req "激活退单司机账号" PUT /iam/users/$STAFF2_USER_ID/status "$ADMIN" '{"status":"ACTIVE"}'
+req "发送退单司机验证码" POST /auth/sms-code "" "{\"phone\":\"$STAFF2_PHONE\",\"scene\":\"LOGIN\"}"
+WMSG=$(jq_get data debugCode)
+req "退单司机验证码登录" POST /auth/sms-login "" "{\"phone\":\"$STAFF2_PHONE\",\"smsCode\":\"$WMSG\"}"
+DRIVER2=$(jq_get data accessToken)
+req "创建退单验证单" POST /work-order/orders "$ADMIN" "{\"taskName\":\"退单验证单\",\"source\":\"DIRECT\",\"customerId\":$CID,\"staffId\":$SID2,\"vehicleId\":$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_vehicle WHERE status='IDLE' AND deleted=0 ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n'),\"planStartAt\":\"2026-12-09T09:00:00+08:00\",\"address\":\"退单测试点位\",\"longitude\":117.12,\"latitude\":36.71,\"cargoName\":\"测试\",\"cargoQty\":1,\"cargoWeightTon\":1,\"craneTonnage\":25}"
+WOID=$(jq_get data orderId)
+req "退单验证单司机接单" POST /dispatch/orders/$WOID/accept "$DRIVER2" "{}"
+req "司机接单后发起退单" POST /dispatch/orders/$WOID/withdraw "$DRIVER2" '{"reasonType":"ABILITY_MISMATCH"}'
+req "管理员查询退单后工单" GET /work-order/orders/$WOID "$ADMIN" ""
+WSTATUS=$(jq_get data status)
+if [ "$WSTATUS" = "PENDING_ACCEPT" ]; then PASS=$((PASS+1)); echo "PASS  退单后工单回到 PENDING_ACCEPT"; else FAIL=$((FAIL+1)); echo "FAIL  退单后工单状态=$WSTATUS"; fi
+
+echo "== 13. 常用施工地点（实时落库增删）=="
+req "管理员新增常用地点" POST /place/common-places "$ADMIN" "{\"placeName\":\"E2E测试地点$TS\"}"
+PID=$(jq_get data id)
+req "客户读取常用地点列表" GET /place/common-places "$CUST" ""
+PRESENT=$(PLACENAME="E2E测试地点$TS" python3 -c '
+import json,os
+d=json.load(open("/tmp/e2e-last.json"))
+name=os.environ.get("PLACENAME","")
+print("YES" if any(p.get("placeName")==name for p in (d.get("data") or [])) else "NO")
+')
+if [ "$PRESENT" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  新增地点已实时落库可查询"; else FAIL=$((FAIL+1)); echo "FAIL  列表未包含新增地点"; fi
+req "关键字模糊过滤查询" GET "/place/common-places?keyword=$TS" "$CUST" ""
+PRESENT=$(PLACENAME="E2E测试地点$TS" python3 -c '
+import json,os
+d=json.load(open("/tmp/e2e-last.json"))
+name=os.environ.get("PLACENAME","")
+print("YES" if any(p.get("placeName")==name for p in (d.get("data") or [])) else "NO")
+')
+if [ "$PRESENT" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  关键字过滤命中新增地点"; else FAIL=$((FAIL+1)); echo "FAIL  关键字过滤未命中"; fi
+req "管理员删除常用地点" DELETE /place/common-places/$PID "$ADMIN" ""
+req "删除后再次读取列表" GET /place/common-places "$CUST" ""
+PRESENT=$(PLACENAME="E2E测试地点$TS" python3 -c '
+import json,os
+d=json.load(open("/tmp/e2e-last.json"))
+name=os.environ.get("PLACENAME","")
+print("YES" if any(p.get("placeName")==name for p in (d.get("data") or [])) else "NO")
+')
+if [ "$PRESENT" = "NO" ]; then PASS=$((PASS+1)); echo "PASS  删除后列表已不含该地点"; else FAIL=$((FAIL+1)); echo "FAIL  删除后地点仍存在"; fi
 
 echo "=============================="
 echo "E2E 结果：PASS=$PASS FAIL=$FAIL"

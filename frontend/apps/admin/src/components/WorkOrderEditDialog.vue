@@ -35,28 +35,50 @@
         </el-col>
         <el-col :span="12">
           <el-form-item label="执行司机">
-            <el-select v-model="form.staffId" filterable placeholder="保持不变" style="width: 100%">
+            <el-select
+              v-model="form.staffId"
+              filterable
+              :loading="optionsLoading"
+              placeholder="保持不变"
+              style="width: 100%"
+            >
               <el-option
                 v-for="s in staffOptions"
                 :key="s.id"
                 :value="s.id"
                 :label="`${s.name}（${s.phone}）｜${STAFF_STATUS_LABEL[s.status] || s.status}`"
               />
+              <template #empty>
+                <p v-if="optionsLoading" class="select-hint">数据加载中…</p>
+                <p v-else-if="optionsError" class="select-hint">加载失败，请关闭弹窗重试</p>
+                <p v-else class="select-hint">暂无可用司机</p>
+              </template>
             </el-select>
-            <div class="tip">仅可改派为无进行中工单的司机</div>
+            <div class="tip">改派由管理员自行判断；司机状态已标注供参考</div>
           </el-form-item>
         </el-col>
         <el-col :span="12">
           <el-form-item label="施工车辆">
-            <el-select v-model="form.vehicleId" filterable placeholder="保持不变" style="width: 100%">
+            <el-select
+              v-model="form.vehicleId"
+              filterable
+              :loading="optionsLoading"
+              placeholder="保持不变"
+              style="width: 100%"
+            >
               <el-option
                 v-for="v in selectableVehicles"
                 :key="v.id"
                 :value="v.id"
                 :label="`${v.plateNo}｜${v.tonnage}吨｜${vehicleLabel(v)}`"
               />
+              <template #empty>
+                <p v-if="optionsLoading" class="select-hint">数据加载中…</p>
+                <p v-else-if="optionsError" class="select-hint">加载失败，请关闭弹窗重试</p>
+                <p v-else class="select-hint">暂无可选车辆</p>
+              </template>
             </el-select>
-            <div class="tip">仅可改派为空闲（IDLE）车辆；本单当前车辆始终可选</div>
+            <div class="tip">默认优先展示空闲车辆与当前车辆，改派由管理员自行判断</div>
           </el-form-item>
         </el-col>
         <el-col :span="12">
@@ -183,6 +205,9 @@ const staffOptions = ref<Staff[]>([])
 const vehicleOptions = ref<Vehicle[]>([])
 const pickerVisible = ref(false)
 const submitting = ref(false)
+// 下拉选项加载态：请求期间显示加载动画，避免"暂无数据"闪烁
+const optionsLoading = ref(false)
+const optionsError = ref(false)
 /** 后端 30004（计划时间早于当前）报错后强制展示二次确认勾选 */
 const confirmPastNeeded = ref(false)
 
@@ -228,6 +253,8 @@ function onOpen() {
 }
 
 async function loadOptions() {
+  optionsLoading.value = true
+  optionsError.value = false
   try {
     const [staffPage, vehiclePage] = await Promise.all([
       pageStaffs({ pageSize: 100 }),
@@ -236,7 +263,10 @@ async function loadOptions() {
     staffOptions.value = staffPage.list.filter((s) => s.position === 'DRIVER' && s.status !== 'RESIGNED')
     vehicleOptions.value = vehiclePage.list
   } catch (e) {
+    optionsError.value = true
     ElMessage.error(e instanceof Error ? e.message : '基础数据加载失败')
+  } finally {
+    optionsLoading.value = false
   }
 }
 
@@ -319,4 +349,5 @@ async function onSubmit() {
 .plan-start { width: 100%; }
 .quick-dates { margin-top: 4px; display: flex; gap: 0; }
 .quick-dates .el-button + .el-button { margin-left: 8px; }
+.select-hint { text-align: center; color: var(--sub, #909399); font-size: 13px; padding: 14px 0; margin: 0; }
 </style>

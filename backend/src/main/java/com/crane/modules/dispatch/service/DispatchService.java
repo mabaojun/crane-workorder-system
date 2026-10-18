@@ -11,6 +11,7 @@ import com.crane.modules.dispatch.dto.DispatchRequest;
 import com.crane.modules.dispatch.dto.RejectRequest;
 import com.crane.modules.dispatch.entity.OrderAcceptLog;
 import com.crane.modules.dispatch.mapper.OrderAcceptLogMapper;
+import com.crane.modules.notify.service.NotifyService;
 import com.crane.modules.staff.entity.Vehicle;
 import com.crane.modules.staff.entity.VehicleBinding;
 import com.crane.modules.staff.entity.VehicleStatusLog;
@@ -18,7 +19,9 @@ import com.crane.modules.staff.mapper.VehicleBindingMapper;
 import com.crane.modules.staff.mapper.VehicleMapper;
 import com.crane.modules.staff.mapper.VehicleStatusLogMapper;
 import com.crane.modules.workorder.entity.WorkOrder;
+import com.crane.modules.workorder.entity.WorkOrderStatusLog;
 import com.crane.modules.workorder.mapper.WorkOrderMapper;
+import com.crane.modules.workorder.mapper.WorkOrderStatusLogMapper;
 import com.crane.modules.workorder.service.WorkOrderStateMachine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,17 +49,20 @@ import java.util.stream.Collectors;
 public class DispatchService {
 
     private static final String STATUS_PENDING_ACCEPT = "PENDING_ACCEPT";
+    private static final String STATUS_PENDING_ARRIVE = "PENDING_ARRIVE";
     private static final String STATUS_CANCELLED = "CANCELLED";
     private static final String ACTION_ACCEPT = "ACCEPT";
     private static final String ACTION_REJECT = "REJECT";
 
     private final WorkOrderMapper workOrderMapper;
+    private final WorkOrderStatusLogMapper workOrderStatusLogMapper;
     private final OrderAcceptLogMapper orderAcceptLogMapper;
     private final VehicleMapper vehicleMapper;
     private final VehicleBindingMapper vehicleBindingMapper;
     private final VehicleStatusLogMapper vehicleStatusLogMapper;
     private final DispatchCheckService dispatchCheckService;
     private final WorkOrderStateMachine stateMachine;
+    private final NotifyService notifyService;
 
     // ==================== 派单 ====================
 
@@ -186,17 +192,44 @@ public class DispatchService {
     @Transactional
     public WorkOrder reject(Long orderId, RejectRequest request, Long operatorId) {
         WorkOrder order = mustGetOwnPendingOrder(orderId);
-        String reasonType = request.getReasonType();
-        if (!"VEHICLE_FAULT".equals(reasonType) && !"TIME_CONFLICT".equals(reasonType)
-                && !"ABILITY_MISMATCH".equals(reasonType) && !"OTHER".equals(reasonType)) {
-            throw new BizException(ErrorCode.ENUM_INVALID, "拒单原因类型取值非法: " + reasonType);
-        }
-        if ("OTHER".equals(reasonType) && (request.getReason() == null || request.getReason().isBlank())) {
-            throw new BizException(ErrorCode.PARAM_MISSING, "拒单原因为其他时必须填写明细");
-        }
+        String reasonType = validateRejectReason(request);
         // 拒单不改工单状态与派单归属，进入待重新派单队列
         orderAcceptLogMapper.insert(buildAcceptLog(order, ACTION_REJECT, reasonType, request.getReason()));
         log.info("拒单成功 orderId={} staffId={} reasonType={}", orderId, order.getStaffId(), reasonType);
+        return order;
+    }
+
+    /**
+     * 退单（API-DISP-008）：仅"待到场"（已接单 PENDING_ARRIVE）司机本人可发起；
+     * 工单回退到 PENDING_ACCEPT 并清空接单时间，写状态日志与拒单日志进入待重新派单队列，
+     * 并通过 SSE 实时通知全部管理端（毫秒级，满足 ≤500ms）。
+     */
+    @Transactional
+    public WorkOrder withdraw(Long orderId, RejectRequest request, Long operatorId) {
+        WorkOrder order = mustGetOwnArrivedOrder(orderId);
+        String reasonType = validateRejectReason(request);
+        // 状态机无 PENDING_ARRIVE→PENDING_ACCEPT 回退边，直接置状态并手写状态日志；
+        // 接单时间需显式置 null，updateById 忽略 null 字段，必须用 UpdateWrapper
+        workOrderMapper.update(null, new UpdateWrapper<WorkOrder>()
+                .eq("id", orderId)
+                .set("status", STATUS_PENDING_ACCEPT)
+                .set("customer_visible_status", "DISPATCHED")
+                .set("accepted_at", null)
+                .set("updated_by", operatorId));
+        workOrderStatusLogMapper.insert(buildStatusLog(orderId, STATUS_PENDING_ARRIVE, STATUS_PENDING_ACCEPT,
+                operatorId, "司机退单：" + rejectReasonText(reasonType, request.getReason())));
+        // 写拒单日志，进入待重新派单队列，轮次与既有规则一致
+        OrderAcceptLog rejectLog = buildAcceptLog(order, ACTION_REJECT, reasonType, request.getReason());
+        orderAcceptLogMapper.insert(rejectLog);
+        order.setStatus(STATUS_PENDING_ACCEPT);
+        order.setCustomerVisibleStatus("DISPATCHED");
+        order.setAcceptedAt(null);
+        // 实时通知全部管理端
+        notifyService.notifyAdminsOrderEvent(order, "WITHDRAW", "司机退单",
+                "司机已退单：" + order.getOrderNo() + " " + order.getName()
+                        + "（" + rejectReasonText(reasonType, request.getReason()) + "），请尽快重新派单",
+                rejectLog.getDeliverRound());
+        log.info("退单成功 orderId={} staffId={} reasonType={}", orderId, order.getStaffId(), reasonType);
         return order;
     }
 
@@ -215,6 +248,59 @@ public class DispatchService {
             throw new BizException(ErrorCode.FORBIDDEN);
         }
         return order;
+    }
+
+    /** 校验工单可退单：存在、待到场（已接单）、且当前登录司机为被派司机 */
+    private WorkOrder mustGetOwnArrivedOrder(Long orderId) {
+        WorkOrder order = workOrderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BizException(ErrorCode.NOT_FOUND);
+        }
+        if (!STATUS_PENDING_ARRIVE.equals(order.getStatus())) {
+            throw new BizException(ErrorCode.RESOURCE_STATUS_NOT_ALLOWED, "工单当前状态不允许退单");
+        }
+        AuthContext ctx = AuthContext.get();
+        if (ctx == null || ctx.getStaffId() == null
+                || !ctx.getStaffId().equals(order.getStaffId())) {
+            throw new BizException(ErrorCode.FORBIDDEN);
+        }
+        return order;
+    }
+
+    /** 拒单 / 退单原因校验：类型枚举合法，其他必须填明细，返回规范化原因类型 */
+    private String validateRejectReason(RejectRequest request) {
+        String reasonType = request.getReasonType();
+        if (!"VEHICLE_FAULT".equals(reasonType) && !"TIME_CONFLICT".equals(reasonType)
+                && !"ABILITY_MISMATCH".equals(reasonType) && !"OTHER".equals(reasonType)) {
+            throw new BizException(ErrorCode.ENUM_INVALID, "拒单原因类型取值非法: " + reasonType);
+        }
+        if ("OTHER".equals(reasonType) && (request.getReason() == null || request.getReason().isBlank())) {
+            throw new BizException(ErrorCode.PARAM_MISSING, "拒单原因为其他时必须填写明细");
+        }
+        return reasonType;
+    }
+
+    /** 拒单 / 退单原因的中文展示文本（用于状态日志与通知内容） */
+    private String rejectReasonText(String reasonType, String reason) {
+        return switch (reasonType) {
+            case "VEHICLE_FAULT" -> "车辆故障";
+            case "TIME_CONFLICT" -> "时间冲突";
+            case "ABILITY_MISMATCH" -> "能力不匹配";
+            default -> "其他：" + (reason == null || reason.isBlank() ? "未填写" : reason);
+        };
+    }
+
+    /** 工单状态日志（退单等绕过状态机的直接置状态场景使用） */
+    private WorkOrderStatusLog buildStatusLog(Long orderId, String fromStatus, String toStatus,
+                                              Long operatorId, String remark) {
+        WorkOrderStatusLog statusLog = new WorkOrderStatusLog();
+        statusLog.setOrderId(orderId);
+        statusLog.setFromStatus(fromStatus);
+        statusLog.setToStatus(toStatus);
+        statusLog.setOperatorId(operatorId);
+        statusLog.setRemark(remark);
+        statusLog.setCreatedAt(LocalDateTime.now());
+        return statusLog;
     }
 
     /** 接单 / 拒单日志：轮次 = 该工单已有拒单次数 + 1（首次派单轮次为 1） */

@@ -74,7 +74,10 @@ function uuid(): string {
   return `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
-/** 统一请求：解包信封，code!=0 抛 ApiError；10001/10002/10004 触发未登录回调 */
+/** 默认请求超时（毫秒）：超时或网络失败时抛出友好错误，避免页面长时间空等 */
+export const DEFAULT_TIMEOUT_MS = 15000
+
+/** 统一请求：解包信封，code!=0 抛 ApiError；10001/10002/10004 触发未登录回调；超时/网络异常给出友好提示 */
 export async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const method = opts.method ?? 'GET'
   const headers: Record<string, string> = {
@@ -86,11 +89,25 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
   if (method !== 'GET') headers['Idempotency-Key'] = opts.idempotencyKey ?? uuid()
 
-  const res = await fetch(`${baseURL}${path}${buildQuery(opts.query)}`, {
-    method,
-    headers,
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
+  let res: Response
+  try {
+    res = await fetch(`${baseURL}${path}${buildQuery(opts.query)}`, {
+      method,
+      headers,
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      signal: controller.signal
+    })
+  } catch (e) {
+    // 超时与网络断开分别给出可理解的提示，而非裸 fetch 错误
+    if (controller.signal.aborted) {
+      throw new ApiError(50008, '请求超时，请检查网络后重试', '')
+    }
+    throw new ApiError(-1, '网络连接失败，请检查网络后重试', '')
+  } finally {
+    clearTimeout(timer)
+  }
   const json = (await res.json()) as ApiEnvelope<T>
   if (json.code !== 0) {
     if ([10001, 10002, 10004].includes(json.code) && onUnauthorized) onUnauthorized()

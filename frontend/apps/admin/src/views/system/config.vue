@@ -89,7 +89,14 @@ const AUTH_SWITCH_KEY = 'auth.password_login_enabled'
 const GROUP_LABEL: Record<string, string> = {
   system: '系统信息（可编辑）',
   map: '地图配置（可编辑）',
-  auth: '登录配置（可编辑）'
+  auth: '登录配置（可编辑）',
+  ai: 'AI 服务配置（运行参数，由后端维护）'
+}
+
+/** ai 组各项说明（AI 简报/日报调度参数，仅展示） */
+const AI_TIPS: Record<string, string> = {
+  'ai.daily_run_time': 'AI 日报每日执行时间（HH:mm），由后端调度任务读取',
+  'ai.briefing_retention_days': 'AI 简报保留天数，超期自动清理'
 }
 
 /** map 组各项说明（与后端代理 / 前端渲染 / mock 联调方式对应） */
@@ -150,6 +157,7 @@ function isAuthSwitch(row: SysConfig) {
 
 function rowTip(row: SysConfig) {
   if (row.groupName === 'map' && MAP_TIPS[row.configKey]) return MAP_TIPS[row.configKey]
+  if (row.groupName === 'ai' && AI_TIPS[row.configKey]) return AI_TIPS[row.configKey]
   return row.description || '-'
 }
 

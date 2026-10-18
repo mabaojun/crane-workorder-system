@@ -1,9 +1,11 @@
 <script setup lang="ts">
 // 客户端需求提报（T-33）：表单提交 → POST /demand/orders
 // 位置支持：自动定位 / 地图选点（MapPicker）；提交模式：全量（经纬度+地址，默认）或仅经纬度（野外无地址场景）
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { createDemandOrder, listDemands } from '../../api/modules/biz'
+import { listCommonPlaces } from '@crane/shared/api/place'
+import type { CommonPlace } from '@crane/shared/api/place'
 import type { DemandOrder } from '../../api/types'
 import MapPicker from '../../components/MapPicker.vue'
 import type { MapPickResult } from '../../components/MapPicker.vue'
@@ -18,7 +20,6 @@ const address = ref('')
 const coords = ref<{ longitude: number; latitude: number } | null>(null)
 const locating = ref(false)
 const description = ref('')
-const craneTonnage = ref('')
 const cargoWeight = ref('')
 const expectDate = ref('')
 const expectTime = ref('')
@@ -28,6 +29,18 @@ const parentDemandId = ref<number | undefined>(undefined)
 // ---- 位置提交模式：full=全量（经纬度+地址文本）；coord=仅经纬度（地址自动生成占位文本满足必填） ----
 const showPicker = ref(false)
 const locationMode = ref<'full' | 'coord'>('full')
+
+// ---- 常用施工地点：默认下拉全量展示，输入关键字即时模糊过滤（纯前端过滤，响应<100ms），点击回填地址 ----
+const places = ref<CommonPlace[]>([])
+const filteredPlaces = computed(() => {
+  const kw = address.value.trim().toLowerCase()
+  if (!kw) return places.value
+  return places.value.filter((p) => p.placeName.toLowerCase().includes(kw))
+})
+
+function pickPlace(p: CommonPlace) {
+  address.value = p.placeName
+}
 
 onLoad((opts) => {
   // 「再次提报」：读取驳回单草稿（由需求列表页写入）
@@ -39,7 +52,6 @@ onLoad((opts) => {
     contactPhone.value = d.contactPhone ?? ''
     address.value = d.address ?? ''
     description.value = d.description ?? ''
-    craneTonnage.value = d.craneTonnage != null ? String(d.craneTonnage) : ''
     cargoWeight.value = d.cargoWeight != null ? String(d.cargoWeight) : ''
     uni.removeStorageSync('demand_draft')
   }
@@ -49,6 +61,12 @@ onShow(() => {
   if (auth.me) {
     contactName.value = contactName.value || auth.me.name || ''
     contactPhone.value = contactPhone.value || auth.me.phone || ''
+  }
+  // 常用地点列表静默加载（失败不影响表单）
+  if (!places.value.length) {
+    listCommonPlaces()
+      .then((list) => (places.value = list))
+      .catch(() => {})
   }
 })
 
@@ -117,7 +135,6 @@ async function submit() {
       latitude: submitLat,
       description: description.value.trim() || undefined,
       imageUrls: photos.value.length ? ['mock://local'] : undefined,
-      craneTonnage: craneTonnage.value ? Number(craneTonnage.value) : undefined,
       cargoWeight: cargoWeight.value ? Number(cargoWeight.value) : undefined,
       expectedStartAt,
       parentDemandId: parentDemandId.value
@@ -151,9 +168,15 @@ async function submit() {
           v-if="locationMode === 'full'"
           v-model="address"
           class="input"
-          placeholder="请输入详细地址或使用地图选点"
+          placeholder="输入关键字选择常用地点，或直接填写地址"
           placeholder-class="ph"
         />
+        <!-- 常用地点下拉：默认全量展示，输入即时模糊过滤，点击回填地址 -->
+        <view v-if="locationMode === 'full' && filteredPlaces.length" class="place-list">
+          <view v-for="p in filteredPlaces" :key="p.id" class="place-item" @tap="pickPlace(p)">
+            {{ p.placeName }}
+          </view>
+        </view>
         <view class="locate-row">
           <view class="locate" @tap="locate">{{ locating ? '定位中...' : '自动定位' }}</view>
           <view class="locate" @tap="showPicker = true">地图选点</view>
@@ -175,15 +198,9 @@ async function submit() {
         <text class="label">需求描述</text>
         <textarea v-model="description" class="textarea" placeholder="吊装任务内容、现场条件等" :maxlength="500" />
       </view>
-      <view class="field half-wrap">
-        <view class="half">
-          <text class="label">期望吨位(吨)</text>
-          <input v-model="craneTonnage" class="input" type="digit" placeholder="如 25" placeholder-class="ph" />
-        </view>
-        <view class="half">
-          <text class="label">货物重量(吨)</text>
-          <input v-model="cargoWeight" class="input" type="digit" placeholder="如 8" placeholder-class="ph" />
-        </view>
+      <view class="field">
+        <text class="label">货物重量(吨)</text>
+        <input v-model="cargoWeight" class="input" type="digit" placeholder="选填，如 8" placeholder-class="ph" />
       </view>
       <view class="field half-wrap">
         <view class="half">
@@ -292,6 +309,29 @@ async function submit() {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.place-list {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  max-height: 180px;
+  overflow-y: auto;
+}
+.place-item {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 14px;
+  color: var(--txt);
+  border-bottom: 1px solid var(--line);
+}
+.place-item:last-child {
+  border-bottom: none;
+}
+.place-item:active {
+  background: var(--brand-weak);
+  color: var(--brand);
 }
 .locate {
   font-size: 13px;

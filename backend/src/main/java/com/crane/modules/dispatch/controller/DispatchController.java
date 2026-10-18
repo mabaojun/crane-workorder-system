@@ -97,6 +97,20 @@ public class DispatchController {
         ));
     }
 
+    /** API-DISP-008 退单（仅"待到场"司机本人，权限码 dispatch:reject）：工单回退待接单并实时通知管理端 */
+    @PostMapping("/orders/{workOrderId}/withdraw")
+    public ApiResult<Map<String, Object>> withdraw(@PathVariable Long workOrderId,
+                                                   @Valid @RequestBody RejectRequest request) {
+        requireDriver();
+        Long operatorId = currentUserId();
+        WorkOrder order = dispatchService.withdraw(workOrderId, request, operatorId);
+        return ApiResult.ok(Map.of(
+                "orderId", order.getId(),
+                "status", order.getStatus(),
+                "redispatchQueued", true
+        ));
+    }
+
     /** API-DISP-005 重新派单（仅管理员，权限码 dispatch:create） */
     @PostMapping("/orders/{workOrderId}/redispatch")
     public ApiResult<Map<String, Object>> redispatch(@PathVariable Long workOrderId,

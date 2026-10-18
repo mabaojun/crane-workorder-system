@@ -21,7 +21,8 @@ export const MENU_CONFIG: (MenuItem & { adminOnly?: boolean })[] = [
     children: [
       { key: 'staff', title: '员工', path: '/staff/list' },
       { key: 'vehicle', title: '车辆', path: '/staff/vehicle-list' },
-      { key: 'customer', title: '客户', path: '/customer/list' }
+      { key: 'customer', title: '客户', path: '/customer/list' },
+      { key: 'place', title: '常用施工地点', path: '/system/place-list' }
     ]
   },
   { key: 'user', title: '账号与权限', path: '/system/user-list', adminOnly: true },

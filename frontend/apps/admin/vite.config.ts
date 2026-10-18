@@ -20,6 +20,8 @@ export default defineConfig({
     ]
   },
   server: {
+    host: true, // 局域网测试：放开 0.0.0.0
+    allowedHosts: true,
     port: 7774,
     proxy: {
       '/api': {

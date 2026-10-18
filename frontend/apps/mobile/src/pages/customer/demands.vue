@@ -59,7 +59,6 @@ function reSubmit(d: DemandOrder) {
           </view>
           <view class="row"><text class="k">地址</text><text class="addr">{{ d.address }}</text></view>
           <view class="row"><text class="k">期望开始</text><text>{{ fmtDateTime(d.expectedStartAt) }}</text></view>
-          <view v-if="d.craneTonnage" class="row"><text class="k">期望吨位</text><text>{{ d.craneTonnage }} 吨</text></view>
           <view v-if="d.description" class="row"><text class="k">描述</text><text class="addr">{{ d.description }}</text></view>
           <view v-if="d.status === 'REJECTED' && d.reviewRemark" class="reject">
             <text class="k">驳回原因</text>
@@ -154,9 +153,12 @@ function reSubmit(d: DemandOrder) {
   color: var(--sub);
 }
 .resubmit {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--brand);
-  padding: 4px 10px;
+  padding: 0 14px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
   border: 1px solid var(--brand);
   border-radius: var(--radius);
 }

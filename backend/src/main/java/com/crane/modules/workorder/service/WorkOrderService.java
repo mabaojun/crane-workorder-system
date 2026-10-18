@@ -407,7 +407,10 @@ public class WorkOrderService {
 
     // ==================== 修改 ====================
 
-    /** 管理员修改工单：改派司机 / 车辆与时间变更分别校验；车辆改派同步占用与绑定调整 */
+    /**
+     * 管理员修改工单：转派由管理员自行判断是否合适，不做司机状态 / 工单互斥 / 车辆占用的强校验，
+     * 仅校验司机与车辆存在性；车辆改派同步占用与绑定调整。
+     */
     @Transactional
     public WorkOrder update(Long id, WorkOrderUpdateRequest request, Long operatorId) {
         requireAdmin();
@@ -424,11 +427,6 @@ public class WorkOrderService {
             if (staff == null) {
                 throw new BizException(ErrorCode.STAFF_NOT_FOUND);
             }
-            if (STAFF_AWAY.equals(staff.getStatus()) || STAFF_RESIGNED.equals(staff.getStatus())) {
-                throw new BizException(ErrorCode.DRIVER_NOT_AVAILABLE);
-            }
-            // 新司机不能存在其他进行中工单（排除本单，恢复执行场景）
-            checkStaffNoActiveOrder(request.getStaffId(), id);
         }
         boolean vehicleChanged = request.getVehicleId() != null && !request.getVehicleId().equals(oldVehicleId);
         Vehicle newVehicle = null;
@@ -436,9 +434,6 @@ public class WorkOrderService {
             newVehicle = vehicleMapper.selectById(request.getVehicleId());
             if (newVehicle == null) {
                 throw new BizException(ErrorCode.NOT_FOUND, "车辆不存在");
-            }
-            if (!VEHICLE_IDLE.equals(newVehicle.getStatus())) {
-                throw new BizException(ErrorCode.VEHICLE_NOT_IDLE);
             }
         }
         if (request.getPlanStartAt() != null && request.getPlanStartAt().isBefore(LocalDateTime.now())

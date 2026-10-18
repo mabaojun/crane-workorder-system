@@ -9,23 +9,45 @@
   >
     <el-form ref="formRef" :model="form" label-width="100px">
       <el-form-item label="执行司机" required>
-        <el-select v-model="form.staffId" placeholder="选择司机" filterable style="width: 100%">
+        <el-select
+          v-model="form.staffId"
+          placeholder="选择司机"
+          filterable
+          :loading="optionsLoading"
+          style="width: 100%"
+        >
           <el-option
             v-for="s in staffs"
             :key="s.id"
             :value="s.id"
             :label="`${s.name}（${s.phone}）`"
           />
+          <template #empty>
+            <p v-if="optionsLoading" class="select-hint">数据加载中…</p>
+            <p v-else-if="optionsError" class="select-hint">加载失败，请关闭弹窗重试</p>
+            <p v-else class="select-hint">暂无可用司机</p>
+          </template>
         </el-select>
       </el-form-item>
       <el-form-item label="施工车辆" required>
-        <el-select v-model="form.vehicleId" placeholder="选择空闲车辆" filterable style="width: 100%">
+        <el-select
+          v-model="form.vehicleId"
+          placeholder="选择空闲车辆"
+          filterable
+          :loading="optionsLoading"
+          style="width: 100%"
+        >
           <el-option
             v-for="v in idleVehicles"
             :key="v.id"
             :value="v.id"
             :label="`${v.plateNo}｜${v.tonnage}吨｜空闲`"
           />
+          <template #empty>
+            <p v-if="optionsLoading" class="select-hint">数据加载中…</p>
+            <p v-else-if="optionsError" class="select-hint">加载失败，请关闭弹窗重试</p>
+            <p v-else class="select-hint">暂无空闲车辆</p>
+          </template>
         </el-select>
         <div class="tip">仅展示空闲（IDLE）车辆；忙碌、维保车辆不可派</div>
       </el-form-item>
@@ -126,6 +148,9 @@ const vehicles = ref<Vehicle[]>([])
 const checks = ref<CheckItem[]>([])
 const checking = ref(false)
 const submitting = ref(false)
+// 下拉选项加载态：请求期间显示加载动画，避免"暂无数据"闪烁
+const optionsLoading = ref(false)
+const optionsError = ref(false)
 
 const idleVehicles = computed(() => vehicles.value.filter((v) => v.status === 'IDLE'))
 const needConfirmPast = computed(() =>
@@ -157,6 +182,8 @@ async function loadOptions() {
   form.craneTonnage = props.prefill?.craneTonnage
   form.cargoWeightTon = props.prefill?.cargoWeightTon
   form.remark = props.prefill?.remark ?? ''
+  optionsLoading.value = true
+  optionsError.value = false
   try {
     const [staffPage, vehiclePage] = await Promise.all([
       pageStaffs({ pageSize: 100 }),
@@ -165,7 +192,10 @@ async function loadOptions() {
     staffs.value = staffPage.list.filter((s) => s.position === 'DRIVER' && s.status !== 'RESIGNED')
     vehicles.value = vehiclePage.list
   } catch (e) {
+    optionsError.value = true
     ElMessage.error(e instanceof Error ? e.message : '加载司机车辆失败')
+  } finally {
+    optionsLoading.value = false
   }
 }
 
@@ -228,4 +258,5 @@ async function onSubmit() {
 .plan-start { width: 100%; }
 .quick-dates { margin-top: 4px; display: flex; }
 .quick-dates .el-button + .el-button { margin-left: 8px; }
+.select-hint { text-align: center; color: var(--sub, #909399); font-size: 13px; padding: 14px 0; margin: 0; }
 </style>

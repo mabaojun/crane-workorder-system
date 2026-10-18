@@ -27,7 +27,9 @@ public class WebConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/api/v1/auth/**",
                         "/api/v1/system/health",
-                        "/api/v1/system/public-config"
+                        "/api/v1/system/public-config",
+                        // SSE 事件流：EventSource 无法携带 Authorization 头，令牌经 query 传入并在控制器内校验
+                        "/api/v1/notify/stream"
                 );
     }
 

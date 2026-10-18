@@ -32,6 +32,11 @@ export function rejectOrder(id: number | string, body: { reasonType: string; rea
   return request<void>(`/dispatch/orders/${id}/reject`, { method: 'POST', body })
 }
 
+/** 司机退单（已接单待到场 PENDING_ARRIVE）：工单回退待接单并实时通知管理端 */
+export function withdrawOrder(id: number | string, body: { reasonType: string; reason: string }) {
+  return request<void>(`/dispatch/orders/${id}/withdraw`, { method: 'POST', body })
+}
+
 export function checkIn(body: {
   orderId: number | string
   // 定位/照片强制开关关闭（测试阶段）时允许为空
@@ -87,7 +92,6 @@ export function createDemandOrder(body: {
   latitude?: number
   description?: string
   imageUrls?: string[]
-  craneTonnage?: number
   cargoWeight?: number
   expectedStartAt?: string
   parentDemandId?: number

@@ -16,7 +16,15 @@
     {
       "path": "pages/driver/index",
       "style": {
-        "navigationBarTitleText": "当前工单",
+        "navigationBarTitleText": "我的工单",
+        "navigationBarBackgroundColor": "#1d4ed8",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/driver/order-detail",
+      "style": {
+        "navigationBarTitleText": "工单操作",
         "navigationBarBackgroundColor": "#1d4ed8",
         "navigationBarTextStyle": "white"
       }

@@ -149,27 +149,60 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="客户" required>
-              <el-select v-model="createForm.customerId" filterable placeholder="选择客户" style="width: 100%">
+              <el-select
+                v-model="createForm.customerId"
+                filterable
+                :loading="optionsLoading"
+                placeholder="选择客户"
+                style="width: 100%"
+              >
                 <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="`${c.name}（${c.customerNo}）`" />
+                <template #empty>
+                  <p v-if="optionsLoading" class="select-hint">数据加载中…</p>
+                  <p v-else-if="optionsError" class="select-hint">加载失败，请关闭弹窗重试</p>
+                  <p v-else class="select-hint">暂无客户数据</p>
+                </template>
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="执行司机" required>
-              <el-select v-model="createForm.staffId" filterable placeholder="选择司机" style="width: 100%">
+              <el-select
+                v-model="createForm.staffId"
+                filterable
+                :loading="optionsLoading"
+                placeholder="选择司机"
+                style="width: 100%"
+              >
                 <el-option v-for="s in staffs" :key="s.id" :value="s.id" :label="`${s.name}（${s.phone}）`" />
+                <template #empty>
+                  <p v-if="optionsLoading" class="select-hint">数据加载中…</p>
+                  <p v-else-if="optionsError" class="select-hint">加载失败，请关闭弹窗重试</p>
+                  <p v-else class="select-hint">暂无司机数据</p>
+                </template>
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="施工车辆" required>
-              <el-select v-model="createForm.vehicleId" filterable placeholder="选择空闲车辆" style="width: 100%">
+              <el-select
+                v-model="createForm.vehicleId"
+                filterable
+                :loading="optionsLoading"
+                placeholder="选择空闲车辆"
+                style="width: 100%"
+              >
                 <el-option
                   v-for="v in idleVehicles"
                   :key="v.id"
                   :value="v.id"
                   :label="`${v.plateNo}｜${v.tonnage}吨｜空闲`"
                 />
+                <template #empty>
+                  <p v-if="optionsLoading" class="select-hint">数据加载中…</p>
+                  <p v-else-if="optionsError" class="select-hint">加载失败，请关闭弹窗重试</p>
+                  <p v-else class="select-hint">暂无空闲车辆</p>
+                </template>
               </el-select>
             </el-form-item>
           </el-col>
@@ -195,6 +228,23 @@
           <el-col :span="12">
             <el-form-item label="吊车吨位" required>
               <el-input-number v-model="createForm.craneTonnage" :min="1" :precision="1" controls-position="right" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="常用地点">
+              <el-select
+                v-model="selectedPlaceName"
+                filterable
+                clearable
+                placeholder="从常用施工地点快速选择（可输入关键字过滤）"
+                style="width: 100%"
+                @change="onPickPlace"
+              >
+                <el-option v-for="p in commonPlaces" :key="p.id" :value="p.placeName" :label="p.placeName" />
+                <template #empty>
+                  <p class="select-hint">暂无常用地点，可在「档案管理-常用施工地点」中维护</p>
+                </template>
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -275,6 +325,7 @@ import {
 import { precheckDispatch, type CheckItem } from '@crane/shared/api/dispatch'
 import { pageStaffs, pageVehicles, type Staff, type Vehicle } from '@crane/shared/api/staff'
 import { pageCustomers, type Customer } from '@crane/shared/api/customer'
+import { listCommonPlaces, type CommonPlace } from '@crane/shared/api/place'
 import { fmtTime } from '../../utils/format'
 import { dispatchOrder } from '@crane/shared/api/dispatch'
 import dayjs from 'dayjs'
@@ -315,6 +366,11 @@ const checks = ref<CheckItem[]>([])
 const staffs = ref<Staff[]>([])
 const vehicles = ref<Vehicle[]>([])
 const customers = ref<Customer[]>([])
+const commonPlaces = ref<CommonPlace[]>([])
+// 下拉选项加载态：请求期间 el-select 显示加载动画，避免"暂无数据"闪烁
+const optionsLoading = ref(false)
+const optionsError = ref(false)
+const selectedPlaceName = ref('')
 const pickerVisible = ref(false)
 const createForm = reactive({
   taskName: '',
@@ -473,6 +529,7 @@ function openCreate() {
   createForm.vehicleId = undefined
   createForm.planStartAt = ''
   createForm.address = ''
+  selectedPlaceName.value = ''
   createForm.longitude = 117.1205
   createForm.latitude = 36.6519
   createForm.cargoName = ''
@@ -485,18 +542,30 @@ function openCreate() {
 }
 
 async function loadCreateOptions() {
+  optionsLoading.value = true
+  optionsError.value = false
   try {
-    const [staffPage, vehiclePage, customerPage] = await Promise.all([
+    const [staffPage, vehiclePage, customerPage, places] = await Promise.all([
       pageStaffs({ pageSize: 100 }),
       pageVehicles({ pageSize: 100 }),
-      pageCustomers({ pageSize: 100 })
+      pageCustomers({ pageSize: 100 }),
+      listCommonPlaces().catch(() => [] as CommonPlace[])
     ])
     staffs.value = staffPage.list.filter((s) => s.position === 'DRIVER' && s.status !== 'RESIGNED')
     vehicles.value = vehiclePage.list
     customers.value = customerPage.list
+    commonPlaces.value = places
   } catch (e) {
+    optionsError.value = true
     ElMessage.error(e instanceof Error ? e.message : '基础数据加载失败')
+  } finally {
+    optionsLoading.value = false
   }
+}
+
+/** 选择常用施工地点：回填地址文本（经纬度保持当前值，可后续地图选点校准） */
+function onPickPlace(name: string) {
+  if (name) createForm.address = name
 }
 
 async function onPrecheck() {
@@ -570,4 +639,5 @@ async function submitCreate() {
 .plan-start { width: 100%; }
 .quick-dates { margin-top: 4px; display: flex; gap: 0; }
 .quick-dates .el-button + .el-button { margin-left: 8px; }
+.select-hint { text-align: center; color: var(--sub, #909399); font-size: 13px; padding: 14px 0; margin: 0; }
 </style>

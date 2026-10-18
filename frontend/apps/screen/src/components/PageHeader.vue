@@ -9,6 +9,8 @@
       </div>
     </div>
     <div class="header-right">
+      <button class="back-btn" @click="goWorkbench">返回工作台</button>
+      <span class="sep">·</span>
       <span class="meta">管理员视角</span>
       <span class="sep">·</span>
       <span class="meta num">{{ fmtDate(now) }}</span>
@@ -59,6 +61,13 @@ const stale = computed(() => {
 const updatedText = computed(() =>
   statStore.lastUpdateAt ? fmtTime(new Date(statStore.lastUpdateAt)) : '--:--:--'
 )
+
+/** 返回后台工作台：dev 走独立端口 7774，生产为同源 /admin/ 子路径，当前窗口直接跳转 */
+function goWorkbench() {
+  window.location.href = import.meta.env.DEV
+    ? `http://${location.hostname}:7774/`
+    : `${location.origin}/admin/`
+}
 </script>
 
 <style scoped>
@@ -121,6 +130,24 @@ const updatedText = computed(() =>
   gap: 10px;
   font-size: 16px;
   color: var(--sub);
+}
+
+.back-btn {
+  height: 36px;
+  padding: 0 18px;
+  border: 1px solid var(--cyan);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cyan);
+  font-size: 15px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.back-btn:hover {
+  background: rgba(34, 211, 238, 0.15);
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.35);
 }
 
 .sep {
