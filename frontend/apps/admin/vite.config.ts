@@ -3,6 +3,8 @@ import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
+  // 生产部署在 /admin/ 子路径（见 docker/deploy/nginx.conf）；dev 不受影响
+  base: process.env.ADMIN_BASE || '/',
   plugins: [vue()],
   resolve: {
     // @crane/shared 仅声明了根出口，这里补齐子路径解析（api/client 等），不改共享包

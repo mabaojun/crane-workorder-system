@@ -7,12 +7,13 @@ configureClient({
   clientType: 'admin',
   onUnauthorized: () => {
     localStorage.removeItem('crane_token')
-    if (location.pathname !== '/login') location.href = '/login'
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+    if (!location.pathname.startsWith(`${base}/login`)) location.href = `${base}/login`
   }
 })
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/login', name: 'login', component: () => import('../views/login/index.vue') },
     {

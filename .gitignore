@@ -18,3 +18,7 @@ data/
 
 # Trae 本地配置
 .trae/
+
+# 部署密钥不入库
+docker/deploy/.env
+docker/deploy/dist-release/

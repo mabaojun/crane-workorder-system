@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")"
 source ./env.sh
 cd - >/dev/null
-BASE="http://127.0.0.1:8080/api/v1"
+BASE="${E2E_BASE:-http://127.0.0.1:8080/api/v1}"
 PASS=0; FAIL=0
 TS=$(date +%s)
 CUST_PHONE="139$((TS % 100000000))"
@@ -45,7 +45,7 @@ STAFF_USER_ID=$(jq_get data userId)
 req "创建车辆" POST /staff/vehicles "$ADMIN" "{\"plateNo\":\"鲁A$((TS%10000))E2\",\"model\":\"徐工XCT25\",\"tonnage\":25,\"defaultStaffId\":$SID}"
 
 echo "== 3. 激活账号（模拟完成绑定）=="
-CUST_UID=$(docker exec crane-mysql-dev mysql -ucrane -pcrane123 crane_workorder -N -e "SELECT id FROM sys_user WHERE phone='$CUST_PHONE' AND deleted=0;" 2>/dev/null | tr -d ' \n')
+CUST_UID=$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM sys_user WHERE phone='$CUST_PHONE' AND deleted=0;" 2>/dev/null | tr -d ' \n')
 echo "DEBUG CUST_PHONE=$CUST_PHONE CUST_UID=[$CUST_UID]"
 req "激活客户账号" PUT /iam/users/$CUST_UID/status "$ADMIN" '{"status":"ACTIVE"}'
 req "激活司机账号" PUT /iam/users/$STAFF_USER_ID/status "$ADMIN" '{"status":"ACTIVE"}'
@@ -60,7 +60,7 @@ DID=$(jq_get data id)
 
 echo "== 5. 复核与转工单 =="
 req "管理员复核通过" POST /demand/orders/$DID/review "$ADMIN" '{"approve":true,"reviewRemark":"复核通过"}'
-req "需求单转工单" POST /demand/orders/$DID/convert "$ADMIN" "{\"staffId\":$SID,\"vehicleId\":$(docker exec crane-mysql-dev mysql -ucrane -pcrane123 crane_workorder -N -e "SELECT id FROM biz_vehicle ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n'),\"planStartAt\":\"2026-12-01T09:00:00+08:00\",\"craneTonnage\":25,\"cargoWeightTon\":8,\"remark\":\"E2E转单\"}"
+req "需求单转工单" POST /demand/orders/$DID/convert "$ADMIN" "{\"staffId\":$SID,\"vehicleId\":$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_vehicle ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n'),\"planStartAt\":\"2026-12-01T09:00:00+08:00\",\"craneTonnage\":25,\"cargoWeightTon\":8,\"remark\":\"E2E转单\"}"
 OID=$(jq_get data convertedOrderId)
 
 echo "== 6. 司机接单与签到 =="
@@ -73,7 +73,7 @@ req "司机签到(定位+照片)" POST /attendance/check-in "$DRIVER" "{\"orderI
 
 echo "== 7. 异常上报与批复 =="
 req "司机异常上报" POST /exception/reports "$DRIVER" "{\"orderId\":$OID,\"type\":\"RAIN\",\"description\":\"突降大雨暂停作业\"}"
-req "管理员批复继续施工" POST /exception/reports/$(docker exec crane-mysql-dev mysql -ucrane -pcrane123 crane_workorder -N -e "SELECT id FROM biz_exception_record WHERE order_id=$OID AND deleted=0 ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n')/reply "$ADMIN" '{"approve":true,"instruction":"CONTINUE","opinion":"雨停后恢复"}'
+req "管理员批复继续施工" POST /exception/reports/$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_exception_record WHERE order_id=$OID AND deleted=0 ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n')/reply "$ADMIN" '{"approve":true,"instruction":"CONTINUE","opinion":"雨停后恢复"}'
 
 echo "== 8. 任务结束与评价 =="
 req "司机任务结束" POST /attendance/task-end "$DRIVER" "{\"orderId\":$OID,\"longitude\":117.12,\"latitude\":36.71,\"photoUrls\":[\"/files/e2e/end-$TS.jpg\"]}"

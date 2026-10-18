@@ -12,6 +12,7 @@
     "router": {
       "mode": "hash"
     },
+    "publicPath": "./",
     "devServer": {
       "port": 5175,
       "https": false,

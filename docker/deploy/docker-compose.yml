@@ -1,0 +1,99 @@
+# 生产/测试环境编排（单机 Docker，与同机其他应用隔离，见文档 08）
+# 约定：容器/网络/卷统一 crane- 前缀；仅 nginx 对外暴露端口；宿主端口集中在 .env
+name: crane
+
+services:
+  crane-nginx:
+    image: nginx:1.27-alpine
+    container_name: crane-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_HTTP_PORT:-8088}:80"
+      # - "${NGINX_HTTPS_PORT:-8443}:443"   # 证书就绪后放开
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${DEPLOY_DIR:-/opt/crane}/www/admin:/usr/share/nginx/html/admin:ro
+      - ${DEPLOY_DIR:-/opt/crane}/www/h5:/usr/share/nginx/html/h5:ro
+      - ${DEPLOY_DIR:-/opt/crane}/www/screen:/usr/share/nginx/html/screen:ro
+      - ${DEPLOY_DIR:-/opt/crane}/data/files:/data/files:ro
+    networks:
+      - crane-net
+    depends_on:
+      - crane-app
+
+  crane-app:
+    image: crane-backend:${APP_VERSION:-latest}
+    container_name: crane-app
+    restart: unless-stopped
+    environment:
+      MYSQL_HOST: crane-mysql
+      MYSQL_PORT: 3306
+      MYSQL_DB: crane_workorder
+      MYSQL_USERNAME: ${MYSQL_USERNAME:-crane}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 设置数据库密码}
+      CRANE_JWT_SECRET: ${CRANE_JWT_SECRET:?请在 .env 设置 JWT 密钥}
+      CRANE_ADMIN_PHONE: ${CRANE_ADMIN_PHONE:-13800000000}
+      CRANE_ADMIN_PASSWORD: ${CRANE_ADMIN_PASSWORD:?请在 .env 设置初始管理员密码}
+      CRANE_FILE_DIR: /data/files
+      TZ: Asia/Shanghai
+    volumes:
+      - ${DEPLOY_DIR:-/opt/crane}/data/files:/data/files
+    networks:
+      - crane-net
+    depends_on:
+      crane-mysql:
+        condition: service_healthy
+
+  crane-mysql:
+    image: mysql:8.0
+    container_name: crane-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 设置 root 密码}
+      MYSQL_DATABASE: crane_workorder
+      MYSQL_USER: ${MYSQL_USERNAME:-crane}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 设置数据库密码}
+      TZ: Asia/Shanghai
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
+    # 仅本机可连，供运维排查；不需要时整段 ports 可删除
+    ports:
+      - "127.0.0.1:${MYSQL_HOST_PORT:-33061}:3306"
+    volumes:
+      - ../mysql/init:/docker-entrypoint-initdb.d:ro
+      - crane-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - crane-net
+
+  crane-backup:
+    image: mysql:8.0
+    container_name: crane-backup
+    restart: unless-stopped
+    environment:
+      MYSQL_USERNAME: ${MYSQL_USERNAME:-crane}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
+      TZ: Asia/Shanghai
+    entrypoint: ["bash", "/scripts/backup-loop.sh"]
+    volumes:
+      - ./backup-loop.sh:/scripts/backup-loop.sh:ro
+      - ${DEPLOY_DIR:-/opt/crane}/backup:/backup
+      - ${DEPLOY_DIR:-/opt/crane}/data/files:/data/files:ro
+    networks:
+      - crane-net
+    depends_on:
+      crane-mysql:
+        condition: service_healthy
+
+networks:
+  crane-net:
+    name: crane-net
+    driver: bridge
+
+volumes:
+  crane-mysql-data:
+    name: crane-mysql-data
