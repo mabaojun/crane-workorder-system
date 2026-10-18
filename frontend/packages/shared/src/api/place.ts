@@ -29,6 +29,18 @@ export function listCommonPlaces(keyword?: string) {
   })
 }
 
+/** 客户端常用地点：本客户历史工单中使用过的施工地点（含经纬度，最近使用在前） */
+export interface MyPlace {
+  placeName: string
+  longitude: number | null
+  latitude: number | null
+}
+
+/** 我的常用地点（客户身份调用，仅含本客户提交过的地点） */
+export function listMyPlaces() {
+  return request<MyPlace[]>('/place/my-places')
+}
+
 /** 新增地点（仅管理员） */
 export function createCommonPlace(data: CommonPlaceUpsertRequest) {
   return request<CommonPlace>('/place/common-places', {

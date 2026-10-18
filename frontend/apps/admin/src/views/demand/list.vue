@@ -42,16 +42,16 @@
               v-if="row.status === 'PENDING' || row.status === 'REVIEWING'"
               size="small"
               text
-              type="primary"
-              @click="openReview(row)"
-            >复核</el-button>
+              type="warning"
+              @click="openConvert(row)"
+            >转工单</el-button>
             <el-button
               v-if="row.status === 'PENDING' || row.status === 'REVIEWING'"
               size="small"
               text
-              type="warning"
-              @click="openConvert(row)"
-            >转工单</el-button>
+              type="danger"
+              @click="openReject(row)"
+            >驳回</el-button>
             <el-button
               v-if="row.status === 'CONVERTED' && row.convertedOrderId"
               size="small"
@@ -112,29 +112,22 @@
       </el-descriptions>
     </el-drawer>
 
-    <!-- 复核弹窗 -->
-    <el-dialog v-model="reviewVisible" title="需求单复核" width="480px" :close-on-click-modal="false">
+    <!-- 驳回弹窗（不同意时直接驳回，无需复核流程） -->
+    <el-dialog v-model="rejectVisible" title="驳回需求单" width="480px" :close-on-click-modal="false">
       <el-form label-width="90px">
-        <el-form-item label="复核结论" required>
-          <el-radio-group v-model="reviewForm.approve">
-            <el-radio :value="true">通过（转待复核）</el-radio>
-            <el-radio :value="false">驳回</el-radio>
-          </el-radio-group>
-          <div class="tip">通过后需求单进入待复核状态，需再执行「转工单」完成转化。</div>
-        </el-form-item>
-        <el-form-item label="复核意见">
+        <el-form-item label="驳回原因" required>
           <el-input
-            v-model="reviewForm.reviewRemark"
+            v-model="rejectForm.reviewRemark"
             type="textarea"
             :rows="3"
             maxlength="500"
-            :placeholder="reviewForm.approve ? '复核意见（可选，对客户可见）' : '驳回原因（对客户可见）'"
+            placeholder="驳回原因（对客户可见，客户可修改后再次提报）"
           />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="reviewVisible = false">取消</el-button>
-        <el-button type="primary" :loading="reviewSubmitting" @click="submitReview">确认</el-button>
+        <el-button @click="rejectVisible = false">取消</el-button>
+        <el-button type="danger" :loading="rejectSubmitting" @click="submitReject">确认驳回</el-button>
       </template>
     </el-dialog>
 
@@ -183,11 +176,11 @@ const detailVisible = ref(false)
 const detail = ref<DemandOrder | null>(null)
 const detailImages = ref<string[]>([])
 
-// 复核弹窗
-const reviewVisible = ref(false)
-const reviewSubmitting = ref(false)
-const reviewTarget = ref<DemandOrder | null>(null)
-const reviewForm = reactive({ approve: true, reviewRemark: '' })
+// 驳回弹窗
+const rejectVisible = ref(false)
+const rejectSubmitting = ref(false)
+const rejectTarget = ref<DemandOrder | null>(null)
+const rejectForm = reactive({ reviewRemark: '' })
 
 // 转工单弹窗
 const convertVisible = ref(false)
@@ -231,32 +224,31 @@ function openDetail(row: DemandOrder) {
   detailVisible.value = true
 }
 
-function openReview(row: DemandOrder) {
-  reviewTarget.value = row
-  reviewForm.approve = true
-  reviewForm.reviewRemark = ''
-  reviewVisible.value = true
+function openReject(row: DemandOrder) {
+  rejectTarget.value = row
+  rejectForm.reviewRemark = ''
+  rejectVisible.value = true
 }
 
-async function submitReview() {
-  if (!reviewTarget.value) return
-  if (!reviewForm.approve && !reviewForm.reviewRemark.trim()) {
-    ElMessage.warning('驳回时请填写驳回原因')
+async function submitReject() {
+  if (!rejectTarget.value) return
+  if (!rejectForm.reviewRemark.trim()) {
+    ElMessage.warning('请填写驳回原因')
     return
   }
-  reviewSubmitting.value = true
+  rejectSubmitting.value = true
   try {
-    await reviewDemand(reviewTarget.value.id, {
-      approve: reviewForm.approve,
-      reviewRemark: reviewForm.reviewRemark.trim() || undefined
+    await reviewDemand(rejectTarget.value.id, {
+      approve: false,
+      reviewRemark: rejectForm.reviewRemark.trim()
     })
-    ElMessage.success('复核完成')
-    reviewVisible.value = false
+    ElMessage.success('已驳回，客户可修改后再次提报')
+    rejectVisible.value = false
     load()
   } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : '复核失败')
+    ElMessage.error(e instanceof Error ? e.message : '驳回失败')
   } finally {
-    reviewSubmitting.value = false
+    rejectSubmitting.value = false
   }
 }
 

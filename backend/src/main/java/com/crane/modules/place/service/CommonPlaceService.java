@@ -7,6 +7,8 @@ import com.crane.common.exception.ErrorCode;
 import com.crane.modules.place.dto.CommonPlaceUpsertRequest;
 import com.crane.modules.place.entity.CommonPlace;
 import com.crane.modules.place.mapper.CommonPlaceMapper;
+import com.crane.modules.workorder.entity.WorkOrder;
+import com.crane.modules.workorder.mapper.WorkOrderMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -14,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 /**
@@ -26,6 +30,33 @@ import java.util.List;
 public class CommonPlaceService {
 
     private final CommonPlaceMapper commonPlaceMapper;
+    private final WorkOrderMapper workOrderMapper;
+
+    /**
+     * 客户端常用地点：仅返回本客户历史工单中使用过的施工地点（最近使用在前，去重）。
+     * 客户未提交过的地点（含管理员维护的通用地点）不在此列，满足"常用地点=客户自己用过的地点"口径。
+     */
+    public List<CommonPlace> listMyPlaces(Long customerId) {
+        List<WorkOrder> orders = workOrderMapper.selectList(new LambdaQueryWrapper<WorkOrder>()
+                .eq(WorkOrder::getCustomerId, customerId)
+                .isNotNull(WorkOrder::getAddress)
+                .orderByDesc(WorkOrder::getId)
+                .last("LIMIT 200"));
+        LinkedHashMap<String, CommonPlace> places = new LinkedHashMap<>();
+        for (WorkOrder order : orders) {
+            String addr = order.getAddress().trim();
+            if (addr.isEmpty() || places.containsKey(addr)) {
+                continue;
+            }
+            CommonPlace place = new CommonPlace();
+            place.setPlaceName(addr);
+            place.setLongitude(order.getLongitude());
+            place.setLatitude(order.getLatitude());
+            place.setSortOrder(0);
+            places.put(addr, place);
+        }
+        return new ArrayList<>(places.values());
+    }
 
     /**
      * 全量地点列表（keyword 模糊过滤），按 sort_order 降序 + id 升序。

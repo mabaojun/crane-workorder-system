@@ -1,14 +1,15 @@
 <script setup lang="ts">
 // 客户端需求提报（T-33）：表单提交 → POST /demand/orders
-// 位置支持：自动定位 / 地图选点（MapPicker）；提交模式：全量（经纬度+地址，默认）或仅经纬度（野外无地址场景）
+// 位置：自动定位 / 地图选点 / 常用地点下拉（本客户历史工单地点），统一全量提交（经纬度+地址），转工单时管理员二次选点
 import { computed, ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { createDemandOrder, listDemands } from '../../api/modules/biz'
-import { listCommonPlaces } from '@crane/shared/api/place'
-import type { CommonPlace } from '@crane/shared/api/place'
+import { listMyPlaces } from '@crane/shared/api/place'
+import type { MyPlace } from '@crane/shared/api/place'
 import type { DemandOrder } from '../../api/types'
 import MapPicker from '../../components/MapPicker.vue'
 import type { MapPickResult } from '../../components/MapPicker.vue'
+import RoleTabbar from '../../components/RoleTabbar.vue'
 import { useAuthStore } from '../../stores/auth'
 import { chooseImages, getLocation, toastError, toastOk } from '../../utils'
 
@@ -26,24 +27,34 @@ const expectTime = ref('')
 const photos = ref<string[]>([])
 const parentDemandId = ref<number | undefined>(undefined)
 
-// ---- 位置提交模式：full=全量（经纬度+地址文本）；coord=仅经纬度（地址自动生成占位文本满足必填） ----
 const showPicker = ref(false)
-const locationMode = ref<'full' | 'coord'>('full')
 
-// ---- 常用施工地点：默认下拉全量展示，输入关键字即时模糊过滤（纯前端过滤，响应<100ms），点击回填地址 ----
-const places = ref<CommonPlace[]>([])
+// ---- 常用地点：本客户历史工单使用过的施工地点；下拉菜单式展示，输入即时过滤，一次最多 5 条 ----
+const places = ref<MyPlace[]>([])
 const filteredPlaces = computed(() => {
   const kw = address.value.trim().toLowerCase()
-  if (!kw) return places.value
-  return places.value.filter((p) => p.placeName.toLowerCase().includes(kw))
+  const matched = kw
+    ? places.value.filter((p) => p.placeName.toLowerCase().includes(kw))
+    : places.value
+  return matched.slice(0, 5)
 })
 
-function pickPlace(p: CommonPlace) {
+function pickPlace(p: MyPlace) {
   address.value = p.placeName
-  // 常用地点已维护经纬度时直接带入，免去重复定位/选点
+  // 常用地点自带经纬度时直接带入，免去重复定位/选点
   if (p.longitude != null && p.latitude != null) {
     coords.value = { longitude: p.longitude, latitude: p.latitude }
   }
+}
+
+/** 期望日期快捷：今天 / 明天 / 后天 */
+function setQuickDate(offset: number) {
+  const d = new Date()
+  d.setDate(d.getDate() + offset)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  expectDate.value = `${y}-${m}-${day}`
 }
 
 onLoad((opts) => {
@@ -66,9 +77,9 @@ onShow(() => {
     contactName.value = contactName.value || auth.me.name || ''
     contactPhone.value = contactPhone.value || auth.me.phone || ''
   }
-  // 常用地点列表静默加载（失败不影响表单）
+  // 常用地点（本客户历史工单地点）静默加载（失败不影响表单）
   if (!places.value.length) {
-    listCommonPlaces()
+    listMyPlaces()
       .then((list) => (places.value = list))
       .catch(() => {})
   }
@@ -112,17 +123,11 @@ async function submit() {
     uni.showToast({ title: '联系电话须为 11 位手机号', icon: 'none' })
     return
   }
-  // 位置按提交模式组装：coord 模式地址自动生成占位文本以满足后端必填
-  let submitAddress = address.value.trim()
+  // 位置统一全量提交：经纬度+地址文本（转工单时管理员可地图二次选点校准）
+  const submitAddress = address.value.trim()
   const submitLng = coords.value?.longitude
   const submitLat = coords.value?.latitude
-  if (locationMode.value === 'coord') {
-    if (submitLng == null || submitLat == null) {
-      uni.showToast({ title: '请先地图选点或自动定位获取坐标', icon: 'none' })
-      return
-    }
-    submitAddress = `自定义点位（经度${submitLng}，纬度${submitLat}）`
-  } else if (!submitAddress) {
+  if (!submitAddress) {
     uni.showToast({ title: '请填写施工地址', icon: 'none' })
     return
   }
@@ -144,7 +149,7 @@ async function submit() {
       parentDemandId: parentDemandId.value
     })
     uni.hideLoading()
-    toastOk('需求已提交，等待复核')
+    toastOk('需求已提交，管理员将尽快处置')
     setTimeout(() => {
       uni.redirectTo({ url: '/pages/customer/demands' })
     }, 800)
@@ -169,15 +174,14 @@ async function submit() {
       <view class="field col">
         <text class="label">施工地址</text>
         <input
-          v-if="locationMode === 'full'"
           v-model="address"
           class="input"
           placeholder="输入关键字选择常用地点，或直接填写地址"
           placeholder-class="ph"
         />
-        <!-- 常用地点下拉：默认全量展示，输入即时模糊过滤，点击回填地址 -->
-        <view v-if="locationMode === 'full' && filteredPlaces.length" class="place-list">
-          <view v-for="p in filteredPlaces" :key="p.id" class="place-item" @tap="pickPlace(p)">
+        <!-- 常用地点下拉：本客户历史工单地点，输入即时过滤，一次最多 5 条，点击回填地址与坐标 -->
+        <view v-if="filteredPlaces.length" class="place-list">
+          <view v-for="p in filteredPlaces" :key="p.placeName" class="place-item" @tap="pickPlace(p)">
             {{ p.placeName }}
           </view>
         </view>
@@ -186,17 +190,6 @@ async function submit() {
           <view class="locate" @tap="showPicker = true">地图选点</view>
           <text v-if="coords" class="located">已定位（{{ coords.longitude.toFixed(4) }}, {{ coords.latitude.toFixed(4) }}）</text>
         </view>
-        <text class="wild-hint">野外无地址时可直接拖动地图中心锚点选点</text>
-      </view>
-      <view class="field col">
-        <text class="label">位置信息提交模式</text>
-        <view class="mode-row">
-          <view class="mode-opt" :class="{ active: locationMode === 'full' }" @tap="locationMode = 'full'">全量（经纬度+地址）</view>
-          <view class="mode-opt" :class="{ active: locationMode === 'coord' }" @tap="locationMode = 'coord'">仅经纬度</view>
-        </view>
-        <text class="mode-tip">
-          {{ locationMode === 'full' ? '模式一：同时提交经纬度与地址文本，适用于有明确地址的现场' : '模式二：仅提交经纬度，提交时地址自动记为自定义点位，适用于野外无地址场景' }}
-        </text>
       </view>
       <view class="field col">
         <text class="label">需求描述</text>
@@ -212,12 +205,21 @@ async function submit() {
           <picker mode="date" :value="expectDate" @change="(e: any) => (expectDate = e.detail.value)">
             <view class="picker-value">{{ expectDate || '选择日期' }}</view>
           </picker>
+          <view class="quick-row">
+            <view class="quick" @tap="setQuickDate(0)">今天</view>
+            <view class="quick" @tap="setQuickDate(1)">明天</view>
+            <view class="quick" @tap="setQuickDate(2)">后天</view>
+          </view>
         </view>
         <view class="half">
           <text class="label">期望开始时间</text>
           <picker mode="time" :value="expectTime" @change="(e: any) => (expectTime = e.detail.value)">
             <view class="picker-value">{{ expectTime || '选择时间' }}</view>
           </picker>
+          <view class="quick-row">
+            <view class="quick" @tap="expectTime = '07:00'">上午 7:00</view>
+            <view class="quick" @tap="expectTime = '13:00'">下午 1:00</view>
+          </view>
         </view>
       </view>
       <view class="field col">
@@ -230,6 +232,8 @@ async function submit() {
 
       <button class="submit" @tap="submit">提交需求</button>
     </view>
+
+    <RoleTabbar role="customer" current="pages/customer/demand-create" />
 
     <!-- 地图选点弹层：带回显当前坐标 -->
     <MapPicker
@@ -318,8 +322,7 @@ async function submit() {
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  max-height: 180px;
-  overflow-y: auto;
+  overflow: hidden;
 }
 .place-item {
   min-height: 44px;
@@ -345,33 +348,26 @@ async function submit() {
   font-size: 12px;
   color: var(--success);
 }
-.wild-hint {
-  font-size: 12px;
-  color: var(--sub);
-  background: var(--brand-weak);
-  border-radius: var(--radius);
-  padding: 6px 10px;
-}
-.mode-row {
+.quick-row {
   display: flex;
   gap: 8px;
 }
-.mode-opt {
-  padding: 6px 14px;
+.quick {
+  flex: 1;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  font-size: 14px;
+  font-size: 13px;
   color: var(--txt);
-  background: var(--panel);
+  background: var(--bg);
 }
-.mode-opt.active {
+.quick:active {
   border-color: var(--brand);
   color: var(--brand);
   background: var(--brand-weak);
-}
-.mode-tip {
-  font-size: 12px;
-  color: var(--sub);
 }
 .picker-value {
   font-size: 15px;

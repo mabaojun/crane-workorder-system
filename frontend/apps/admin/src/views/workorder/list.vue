@@ -191,6 +191,7 @@
                 :loading="optionsLoading"
                 placeholder="选择空闲车辆"
                 style="width: 100%"
+                @change="onVehicleChange"
               >
                 <el-option
                   v-for="v in idleVehicles"
@@ -562,6 +563,12 @@ async function loadCreateOptions() {
   } finally {
     optionsLoading.value = false
   }
+}
+
+/** 选择车辆自动带出吊车吨位（车辆档案吨位，可手动覆盖） */
+function onVehicleChange(id: number) {
+  const vehicle = vehicles.value.find((v) => v.id === id)
+  if (vehicle?.tonnage) createForm.craneTonnage = vehicle.tonnage
 }
 
 /** 选择常用施工地点：回填地址文本与经纬度（无经纬度的地点保持当前值，可后续地图选点校准） */

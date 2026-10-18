@@ -31,6 +31,9 @@ class CommonPlaceServiceTest {
     @Mock
     private CommonPlaceMapper commonPlaceMapper;
 
+    @Mock
+    private com.crane.modules.workorder.mapper.WorkOrderMapper workOrderMapper;
+
     @InjectMocks
     private CommonPlaceService commonPlaceService;
 
@@ -142,5 +145,23 @@ class CommonPlaceServiceTest {
         commonPlaceService.upsertFromSite("   ", null, null);
         verify(commonPlaceMapper, never()).insert(any(CommonPlace.class));
         verify(commonPlaceMapper, never()).selectOne(any());
+    }
+
+    @Test
+    void listMyPlacesDedupeFromOwnOrders() {
+        // 客户常用地点 = 本客户历史工单地点：按最近使用去重，携带坐标
+        com.crane.modules.workorder.entity.WorkOrder first = new com.crane.modules.workorder.entity.WorkOrder();
+        first.setAddress("济南西站");
+        first.setLongitude(new java.math.BigDecimal("116.900000"));
+        first.setLatitude(new java.math.BigDecimal("36.650000"));
+        com.crane.modules.workorder.entity.WorkOrder dup = new com.crane.modules.workorder.entity.WorkOrder();
+        dup.setAddress("济南西站");
+        when(workOrderMapper.selectList(any())).thenReturn(java.util.List.of(first, dup));
+
+        java.util.List<CommonPlace> result = commonPlaceService.listMyPlaces(5L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getPlaceName()).isEqualTo("济南西站");
+        assertThat(result.get(0).getLongitude()).isEqualByComparingTo("116.900000");
     }
 }

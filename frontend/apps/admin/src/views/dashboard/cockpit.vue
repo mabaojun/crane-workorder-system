@@ -48,7 +48,7 @@
             <el-icon class="stat-icon" style="color: var(--warning); background: rgba(230,162,60,.12)"><View /></el-icon>
             <div class="stat-num" style="color: var(--warning)">{{ demandReviewing }}</div>
           </div>
-          <div class="stat-title">待复核需求单</div>
+          <div class="stat-title">处理中需求单</div>
         </div>
         <div class="stat-card" @click="goDispatch()">
           <div class="stat-top">

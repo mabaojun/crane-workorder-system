@@ -73,13 +73,13 @@
           <el-input-number v-model="form.craneTonnage" :min="1" :precision="1" controls-position="right" style="width: 200px" />
           <span class="unit">吨</span>
         </el-form-item>
-        <el-form-item label="货物重量" required>
-          <el-input-number v-model="form.cargoWeightTon" :min="0.1" :precision="2" controls-position="right" style="width: 200px" />
+        <el-form-item label="货物重量">
+          <el-input-number v-model="form.cargoWeightTon" :min="0.1" :precision="2" controls-position="right" placeholder="选填" style="width: 200px" />
           <span class="unit">吨</span>
         </el-form-item>
       </template>
-      <el-form-item :label="mode === 'convert' ? '任务备注' : '备注'" :required="mode === 'convert'">
-        <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" placeholder="任务备注（转工单必填）" />
+      <el-form-item :label="mode === 'convert' ? '任务备注' : '备注'">
+        <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" placeholder="任务备注（选填）" />
       </el-form-item>
       <el-form-item v-if="needConfirmPast" label="">
         <el-checkbox v-model="form.confirmPast">计划时间早于当前时间，确认按此时间派单</el-checkbox>
@@ -225,8 +225,6 @@ async function onSubmit() {
   if (!form.planStartAt) return ElMessage.warning('请选择计划开始时间')
   if (props.mode === 'convert') {
     if (!form.craneTonnage) return ElMessage.warning('请填写吊车吨位')
-    if (!form.cargoWeightTon) return ElMessage.warning('请填写货物重量')
-    if (!form.remark.trim()) return ElMessage.warning('任务备注必填')
   }
   if (needConfirmPast.value && !form.confirmPast) {
     ElMessage.warning('计划时间早于当前时间，请勾选二次确认')

@@ -186,6 +186,19 @@ req "查询自动命名工单" GET /work-order/orders/$AOID "$ADMIN" ""
 TASK=$(jq_get data taskName)
 if [[ "$TASK" == *"E2E测试客户"* && "$TASK" == *"吨"* && "$TASK" == *"E2E司机"* ]]; then PASS=$((PASS+1)); echo "PASS  任务名自动生成: $TASK"; else FAIL=$((FAIL+1)); echo "FAIL  自动任务名=$TASK"; fi
 
+echo "== 16. 客户常用地点（本客户历史工单地点）=="
+req "客户读取我的常用地点" GET /place/my-places "$CUST" ""
+MYPLACE=$(PLACENAME="济南市历下区经十路E2E测试点位$TS" python3 -c '
+import json,os
+d=json.load(open("/tmp/e2e-last.json"))
+name=os.environ.get("PLACENAME","")
+ps=[p for p in (d.get("data") or []) if p.get("placeName")==name]
+print("YES" if ps and ps[0].get("longitude") is not None else "NO")
+')
+if [ "$MYPLACE" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  我的常用地点含本客户工单地址（含经纬度）"; else FAIL=$((FAIL+1)); echo "FAIL  我的常用地点未含本客户工单地址"; fi
+code=$(curl -s "$BASE/place/my-places" -H 'X-Client: admin' -H "Authorization: Bearer $ADMIN" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("code"))')
+if [ "$code" = "0" ]; then PASS=$((PASS+1)); echo "PASS  管理员调用返回空列表不报错"; else FAIL=$((FAIL+1)); echo "FAIL  管理员调用 code=$code"; fi
+
 echo "=============================="
 echo "E2E 结果：PASS=$PASS FAIL=$FAIL"
 exit $FAIL
