@@ -1,0 +1,36 @@
+{
+  "name": "济南诚重吊装",
+  "appid": "",
+  "description": "济南诚重吊装业务管理系统移动端（司机/客户）",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "vueVersion": "3",
+  "locale": "zh-Hans",
+  "h5": {
+    "title": "济南诚重吊装",
+    "router": {
+      "mode": "hash"
+    },
+    "devServer": {
+      "port": 5175,
+      "https": false,
+      "proxy": {
+        "/api": {
+          "target": "http://127.0.0.1:8080",
+          "changeOrigin": true
+        }
+      }
+    }
+  },
+  "mp-weixin": {
+    "appid": "touristappid",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "minified": true
+    },
+    "usingComponents": true,
+    "requiredPrivateInfos": ["getLocation"]
+  }
+}

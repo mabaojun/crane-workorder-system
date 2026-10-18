@@ -7,7 +7,9 @@
   "scripts": {
     "dev:admin": "pnpm -F admin dev",
     "dev:screen": "pnpm -F screen dev",
+    "dev:mobile": "pnpm -F mobile dev:h5",
     "build:admin": "pnpm -F admin build",
-    "build:screen": "pnpm -F screen build"
+    "build:screen": "pnpm -F screen build",
+    "build:mobile:h5": "pnpm -F mobile build:h5"
   }
 }

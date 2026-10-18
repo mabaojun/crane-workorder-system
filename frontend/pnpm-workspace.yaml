@@ -5,3 +5,6 @@ packages:
 allowBuilds:
   esbuild: true
   vue-demi: true
+  '@parcel/watcher': true
+  core-js: true
+  core-js-pure: true

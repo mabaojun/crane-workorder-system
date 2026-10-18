@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { configureClient } from '@crane/shared/api/client'
 import { systemName } from '@crane/shared/api/branding'
+import { useAuthStore } from '../stores/auth'
 
 configureClient({
   clientType: 'admin',
@@ -24,16 +25,88 @@ const router = createRouter({
           name: 'cockpit',
           meta: { title: '工作台', menu: 'dashboard' },
           component: () => import('../views/dashboard/cockpit.vue')
+        },
+        {
+          path: 'demand/list',
+          name: 'demand-list',
+          meta: { title: '需求单', menu: 'demand', adminOnly: true },
+          component: () => import('../views/demand/list.vue')
+        },
+        {
+          path: 'workorder/list',
+          name: 'workorder-list',
+          meta: { title: '工单管理', menu: 'workorder', adminOnly: true },
+          component: () => import('../views/workorder/list.vue')
+        },
+        {
+          path: 'workorder/detail/:id',
+          name: 'workorder-detail',
+          meta: { title: '工单详情', menu: 'workorder', adminOnly: true },
+          component: () => import('../views/workorder/detail.vue')
+        },
+        {
+          path: 'dispatch/pending',
+          name: 'dispatch-pending',
+          meta: { title: '派单中心', menu: 'dispatch', adminOnly: true },
+          component: () => import('../views/dispatch/pending.vue')
+        },
+        {
+          path: 'staff/list',
+          name: 'staff-list',
+          meta: { title: '员工档案', menu: 'staff', adminOnly: true },
+          component: () => import('../views/staff/list.vue')
+        },
+        {
+          path: 'staff/vehicle-list',
+          name: 'vehicle-list',
+          meta: { title: '车辆档案', menu: 'vehicle', adminOnly: true },
+          component: () => import('../views/staff/vehicle-list.vue')
+        },
+        {
+          path: 'customer/list',
+          name: 'customer-list',
+          meta: { title: '客户档案', menu: 'customer', adminOnly: true },
+          component: () => import('../views/customer/list.vue')
+        },
+        {
+          path: 'system/user-list',
+          name: 'user-list',
+          meta: { title: '账号与权限', menu: 'user', adminOnly: true },
+          component: () => import('../views/system/user-list.vue')
+        },
+        {
+          path: 'system/config',
+          name: 'system-config',
+          meta: { title: '系统配置', menu: 'config', adminOnly: true },
+          component: () => import('../views/system/config.vue')
+        },
+        {
+          path: 'exception/list',
+          name: 'exception-list',
+          meta: { title: '异常处理', menu: 'exception', adminOnly: true },
+          component: () => import('../views/exception/list.vue')
         }
       ]
     }
   ]
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const token = localStorage.getItem('crane_token')
   if (to.path !== '/login' && !token) return '/login'
   if (to.path === '/login' && token) return '/'
+  // 角色过滤：adminOnly 路由仅 ADMIN 可入（本期后台仅管理员使用）
+  if (token) {
+    const auth = useAuthStore()
+    if (!auth.me) {
+      try {
+        await auth.fetchMe()
+      } catch {
+        return '/login'
+      }
+    }
+    if (to.meta?.adminOnly && auth.me?.role !== 'ADMIN') return '/dashboard/cockpit'
+  }
   document.title = to.meta?.title ? `${to.meta.title} - ${systemName()}` : systemName()
   return true
 })

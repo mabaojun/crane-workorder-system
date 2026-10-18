@@ -1,0 +1,50 @@
+/* 列表页统一模式：el-card 包表格 + 分页 + 顶部筛选栏 */
+.page-card + .page-card { margin-top: var(--gap); }
+
+.toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.toolbar-form .el-form-item { margin-bottom: 8px; margin-right: 12px; }
+
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+/* 自定义语义色标签（琥珀 / 紫）：实底白字 */
+.el-tag.tag-solid {
+  color: #fff;
+  border: none;
+}
+
+/* 详情描述列表 */
+.detail-label { color: var(--sub); }
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--gap);
+}
+.stat-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.stat-card:hover {
+  box-shadow: 0 4px 14px rgba(29, 78, 216, 0.12);
+  transform: translateY(-1px);
+}
+.stat-num {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.stat-title { color: var(--sub); font-size: 13px; }

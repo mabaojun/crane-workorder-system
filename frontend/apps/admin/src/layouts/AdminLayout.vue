@@ -10,7 +10,18 @@
         router
         class="menu"
       >
-        <el-menu-item index="dashboard" route="/dashboard/cockpit">工作台</el-menu-item>
+        <template v-for="item in menus" :key="item.key">
+          <el-sub-menu v-if="item.children?.length" :index="item.key">
+            <template #title>{{ item.title }}</template>
+            <el-menu-item
+              v-for="child in item.children"
+              :key="child.key"
+              :index="child.key"
+              :route="child.path"
+            >{{ child.title }}</el-menu-item>
+          </el-sub-menu>
+          <el-menu-item v-else :index="item.key" :route="item.path">{{ item.title }}</el-menu-item>
+        </template>
       </el-menu>
     </el-aside>
     <el-container>
@@ -36,11 +47,13 @@
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useVisibleMenus } from '../menus'
 import { getBranding, loadBranding, systemName } from '@crane/shared/api/branding'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const menus = useVisibleMenus()
 
 // 系统名称动态化：登录前后均从 /api/v1/system/public-config 读取，后台可改
 const sysName = computed(() => systemName())
@@ -48,7 +61,7 @@ const logoText = computed(() => getBranding()['system.logo_text'] || '吊装')
 
 onMounted(async () => {
   await loadBranding()
-  if (auth.token) {
+  if (auth.token && !auth.me) {
     try {
       await auth.fetchMe()
     } catch {

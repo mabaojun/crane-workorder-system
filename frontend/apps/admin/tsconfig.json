@@ -13,6 +13,10 @@
     "skipLibCheck": true,
     "noEmit": true,
     "baseUrl": ".",
+    "paths": {
+      "@crane/shared": ["../../packages/shared/src/index.ts"],
+      "@crane/shared/api/*": ["../../packages/shared/src/api/*"]
+    },
     "types": ["vite/client"]
   },
   "include": ["src/**/*.ts", "src/**/*.vue", "../../packages/shared/src/**/*.ts"]
