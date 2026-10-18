@@ -397,8 +397,9 @@ const createForm = reactive({
   vehicleId: undefined as number | undefined,
   planStartAt: '',
   address: '',
-  longitude: 117.1205 as number | undefined,
-  latitude: 36.6519 as number | undefined,
+  // 默认坐标与地图选点中心一致（公司驻地），管理员可地图选点修正
+  longitude: 116.467703 as number | undefined,
+  latitude: 36.189255 as number | undefined,
   cargoName: '',
   cargoQty: 1,
   cargoWeightTon: undefined as number | undefined,
@@ -548,8 +549,8 @@ function openCreate() {
   createForm.planStartAt = ''
   createForm.address = ''
   selectedPlaceName.value = ''
-  createForm.longitude = 117.1205
-  createForm.latitude = 36.6519
+  createForm.longitude = 116.467703
+  createForm.latitude = 36.189255
   createForm.cargoName = ''
   createForm.cargoQty = 1
   createForm.cargoWeightTon = undefined

@@ -116,8 +116,8 @@ const emit = defineEmits<{
   (e: 'cancel'): void
 }>()
 
-/** 济南默认中心点，与直建工单表单默认经纬度一致 */
-const DEFAULT_CENTER = { lng: 117.1205, lat: 36.6519 }
+/** 默认中心点：公司驻地（无初值时），管理员打开即见目标区域 */
+const DEFAULT_CENTER = { lng: 116.467703, lat: 36.189255 }
 
 const loading = ref(false)
 const ready = ref(false)

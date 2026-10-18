@@ -6,7 +6,7 @@ import { getCurrentInstance, nextTick, onMounted, ref } from 'vue'
 import { getAmapPublicKeys } from '@crane/shared/api/map'
 import { placeText, regeo } from '../api/map'
 import type { PoiItem, RegeoResult } from '../api/map'
-import { toastError } from '../utils'
+import { getLocation, toastError } from '../utils'
 
 export interface MapPickResult {
   lng: number
@@ -22,9 +22,9 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
-// 默认中心：济南市区（无初值时）
-const DEFAULT_LNG = 117.1205
-const DEFAULT_LAT = 36.6512
+// 默认中心：公司驻地（无定位权限时的回落点）
+const DEFAULT_LNG = 116.467703
+const DEFAULT_LAT = 36.189255
 
 const centerLng = ref(Number(props.initialLng) || DEFAULT_LNG)
 const centerLat = ref(Number(props.initialLat) || DEFAULT_LAT)
@@ -197,6 +197,25 @@ async function onConfirm() {
   }
 }
 
+/** 无初值时把地图中心设为当前位置；拒绝授权/失败保持默认中心 */
+function moveCenterTo(lng: number, lat: number) {
+  centerLng.value = lng
+  centerLat.value = lat
+  selLng.value = lng
+  selLat.value = lat
+  // #ifdef H5
+  amapInstance?.setCenter([lng, lat])
+  // #endif
+}
+
+function locateCenter() {
+  getLocation()
+    .then((loc) => moveCenterTo(loc.longitude, loc.latitude))
+    .catch(() => {
+      // 无定位权限：保持默认中心（公司驻地），不阻断选点
+    })
+}
+
 onMounted(async () => {
   try {
     const keys = await getAmapPublicKeys()
@@ -211,6 +230,8 @@ onMounted(async () => {
   } catch {
     amapFailed.value = true
   }
+  // 无传入坐标时自动定位到当前位置作为中心（失败回落默认中心）
+  if (!Number(props.initialLng)) locateCenter()
 })
 </script>
 
