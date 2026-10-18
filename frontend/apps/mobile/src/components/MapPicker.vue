@@ -304,8 +304,9 @@ onMounted(async () => {
       <!-- #endif -->
 
       <!-- #ifdef H5 -->
+      <!-- 容器必须是原生 div：高德 2.0 校验 HTMLDivElement，uni-view 自定义元素会报 Map container div not exist -->
       <view v-if="showAmap && !amapFailed" class="map-area">
-        <view id="amap-container" class="native-map" />
+        <div id="amap-container" class="native-map" />
         <view class="layer-toggle" @tap="toggleSatellite">{{ satelliteOn ? '标准图' : '卫星图' }}</view>
         <view class="crosshair"><view class="ch-v" /><view class="ch-h" /></view>
       </view>
