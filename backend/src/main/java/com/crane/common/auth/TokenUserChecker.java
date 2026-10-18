@@ -14,4 +14,12 @@ public interface TokenUserChecker {
      * @throws com.crane.common.exception.BizException 账号停用等业务异常
      */
     Long forceLogoutAt(Long userId);
+
+    /**
+     * 解析账号绑定的业务主体：返回 [staffId, customerId]，未绑定对应位为 null。
+     * 供 AuthInterceptor 回填 AuthContext，实现司机/客户数据范围过滤。
+     */
+    default Long[] resolveBinding(Long userId) {
+        return null;
+    }
 }

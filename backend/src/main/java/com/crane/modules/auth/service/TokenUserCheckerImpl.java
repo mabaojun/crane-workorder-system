@@ -32,4 +32,10 @@ public class TokenUserCheckerImpl implements TokenUserChecker {
         }
         return AuthService.toEpochMilli(user.getForceLogoutAt());
     }
+
+    @Override
+    public Long[] resolveBinding(Long userId) {
+        SysUser user = sysUserMapper.selectById(userId);
+        return user == null ? new Long[]{null, null} : new Long[]{user.getStaffId(), user.getCustomerId()};
+    }
 }

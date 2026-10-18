@@ -54,6 +54,12 @@ public class AuthInterceptor implements HandlerInterceptor {
         AuthContext ctx = new AuthContext();
         ctx.setUserId(userId);
         ctx.setRoleCode(claims.get("role", String.class));
+        // 回填员工/客户绑定关系，供各域做数据范围过滤（司机仅本人、客户仅本人关联）
+        Long[] binding = checker != null ? checker.resolveBinding(userId) : null;
+        if (binding != null && binding.length >= 2) {
+            ctx.setStaffId(binding[0]);
+            ctx.setCustomerId(binding[1]);
+        }
         AuthContext.set(ctx);
         request.setAttribute("userId", userId);
         request.setAttribute("role", ctx.getRoleCode());

@@ -385,6 +385,25 @@ CREATE TABLE IF NOT EXISTS biz_work_order (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='工单表';
 
 -- ------------------------------------------------------------
+-- 13.1 工单状态变更记录表（01 §6.4 状态变更与记录同事务；MVP 计划 T-13）
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS biz_work_order_status_log (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    order_id    BIGINT UNSIGNED NOT NULL COMMENT '关联工单',
+    from_status VARCHAR(16)  NULL COMMENT '变更前状态',
+    to_status   VARCHAR(16)  NOT NULL COMMENT '变更后状态',
+    operator_id BIGINT UNSIGNED NULL COMMENT '操作账号',
+    remark      VARCHAR(255) NULL COMMENT '变更说明',
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    created_by  BIGINT UNSIGNED NULL COMMENT '创建人',
+    updated_by  BIGINT UNSIGNED NULL COMMENT '更新人',
+    deleted     TINYINT(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+    PRIMARY KEY (id),
+    KEY idx_wosl_order (order_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='工单状态变更记录表';
+
+-- ------------------------------------------------------------
 -- 14. biz_order_accept_log 接单拒单记录表（02 §3.3.7）
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS biz_order_accept_log (
