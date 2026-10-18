@@ -1,0 +1,51 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: crane-backend
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:33061}/${MYSQL_DB:crane_workorder}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USERNAME:crane}
+    password: ${MYSQL_PASSWORD:crane123}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 60MB
+  jackson:
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+crane:
+  jwt:
+    secret: ${CRANE_JWT_SECRET:crane-dev-secret-change-in-prod-0123456789abcdef}
+    expire-hours: 720
+  init:
+    # 首次启动无账号时自动创建管理员（生产环境用环境变量覆盖）
+    admin-phone: ${CRANE_ADMIN_PHONE:13800000000}
+    admin-password: ${CRANE_ADMIN_PASSWORD:Admin@123}
+  file:
+    upload-dir: ${CRANE_FILE_DIR:./data/files}
+  cors:
+    # 生产经 Nginx 反代同源；本地联调放开
+    allowed-origins: "*"
+
+logging:
+  level:
+    com.crane: info
+    org.apache.ibatis: warn

@@ -1,0 +1,45 @@
+/* 设计令牌（文档 11 §2）：全端唯一色彩语义基准 */
+:root {
+  --brand: #1d4ed8;
+  --brand-weak: #dbeafe;
+  --bg: #f5f7fa;
+  --panel: #ffffff;
+  --line: #e5e7eb;
+  --txt: #1f2937;
+  --sub: #6b7280;
+  --danger: #dc2626;
+  --success: #16a34a;
+  --warning: #d97706;
+  --third-party: #7c3aed;
+  --arrived: #eab308;
+  --radius: 8px;
+  --gap: 16px;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--txt);
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Element Plus 主色对齐设计令牌 */
+:root {
+  --el-color-primary: var(--brand);
+  --el-color-primary-light-3: #4f7be8;
+  --el-color-primary-light-5: #8aa8f0;
+  --el-color-primary-light-7: #bcd0f7;
+  --el-color-primary-light-8: #dbeafe;
+  --el-color-primary-light-9: #eef4fd;
+  --el-color-primary-dark-2: #163ea9;
+  --el-border-radius-base: 6px;
+}

@@ -1,0 +1,26 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: crane-mysql-dev
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: crane_workorder
+      MYSQL_USER: crane
+      MYSQL_PASSWORD: crane123
+    ports:
+      - "33061:3306"
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d
+      - crane-mysql-data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
+    dns:
+      - 223.5.5.5
+      - 8.8.8.8
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  crane-mysql-data:

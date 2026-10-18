@@ -1,0 +1,13 @@
+{
+  "name": "crane-frontend",
+  "private": true,
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "vue-demi"]
+  },
+  "scripts": {
+    "dev:admin": "pnpm -F admin dev",
+    "dev:screen": "pnpm -F screen dev",
+    "build:admin": "pnpm -F admin build",
+    "build:screen": "pnpm -F screen build"
+  }
+}
