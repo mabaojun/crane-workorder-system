@@ -13,7 +13,7 @@ docker compose up -d
 echo "等待 MySQL 就绪..."
 for i in $(seq 1 30); do
   if docker exec crane-mysql-dev mysqladmin ping -h localhost -uroot -proot123 >/dev/null 2>&1; then
-    echo "MySQL 已就绪（宿主机端口 33061）"
+    echo "MySQL 已就绪（宿主机端口 7772）"
     exit 0
   fi
   sleep 2

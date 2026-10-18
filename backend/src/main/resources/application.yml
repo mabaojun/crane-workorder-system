@@ -1,12 +1,12 @@
 server:
-  port: 8080
+  port: 7777
 
 spring:
   application:
     name: crane-backend
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:33061}/${MYSQL_DB:crane_workorder}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:7772}/${MYSQL_DB:crane_workorder}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: ${MYSQL_USERNAME:crane}
     password: ${MYSQL_PASSWORD:crane123}
     hikari:

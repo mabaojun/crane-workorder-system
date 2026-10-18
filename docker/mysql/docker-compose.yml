@@ -8,7 +8,7 @@ services:
       MYSQL_USER: crane
       MYSQL_PASSWORD: crane123
     ports:
-      - "33061:3306"
+      - "7772:3306"
     volumes:
       - ./init:/docker-entrypoint-initdb.d
       - crane-mysql-data:/var/lib/mysql

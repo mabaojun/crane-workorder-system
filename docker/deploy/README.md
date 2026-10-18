@@ -3,11 +3,21 @@
 单机 Docker 部署，四容器：`crane-nginx` / `crane-app` / `crane-mysql` / `crane-backup`。
 全部资源 `crane-` 前缀 + 独立网络 `crane-net`，与同机其他应用隔离；数据在 `/opt/crane`。
 
+## 端口规划（全部收敛在 7771~7777）
+
+| 端口 | 用途 | 暴露 |
+|---|---|---|
+| 7771 | 生产统一入口（nginx：后台 /admin/、H5 /h5/、大屏 /screen/、API /api/） | 0.0.0.0 |
+| 7772 | MySQL 宿主映射 | 仅 127.0.0.1 |
+| 7773 | HTTPS 预留（证书就绪后放开） | — |
+| 7774/7775/7776 | 本地开发：后台管理 / 移动端 H5 / 数据大屏（vite dev） | 本机 |
+| 7777 | Spring Boot 后端（生产仅容器内网，本地开发直连） | 容器内网 |
+
 ## 0. 前提（云服务器）
 
 - Linux x86_64/aarch64，已安装 Docker 24+ 与 docker compose 插件
-- 已放行端口：宿主 `NGINX_HTTP_PORT`（默认 8088）；如需 MySQL 远程运维再放行 33061（默认仅本机）
-- 建议先在服务器核对端口占用：`ss -lntp | grep -E '8088|33061'`
+- 已放行端口：宿主 `NGINX_HTTP_PORT`（默认 7771）；如需 MySQL 远程运维再放行 7772（默认仅本机）
+- 建议先在服务器核对端口占用：`ss -lntp | grep -E '7771|7772'`
 
 ## 1. 本地打包（开发机执行）
 
@@ -42,9 +52,9 @@ curl -s http://127.0.0.1:${NGINX_HTTP_PORT}/api/v1/system/health
 
 | 通道 | 地址 |
 |---|---|
-| PC 后台管理 | `http://IP:8088/admin/`（初始账号 .env 中的 CRANE_ADMIN_PHONE / CRANE_ADMIN_PASSWORD） |
-| 移动端 H5 | `http://IP:8088/h5/`（手机号 + 验证码登录；短信通道二期前为 MOCK 模式） |
-| 数据大屏 | `http://IP:8088/screen/`（二期） |
+| PC 后台管理 | `http://IP:7771/admin/`（初始账号 .env 中的 CRANE_ADMIN_PHONE / CRANE_ADMIN_PASSWORD） |
+| 移动端 H5 | `http://IP:7771/h5/`（手机号 + 验证码登录；短信通道二期前为 MOCK 模式） |
+| 数据大屏 | `http://IP:7771/screen/`（管理员账号密码登录，运营监控只读） |
 
 首次启动自动建库（31 表 + 字典/配置种子）与初始管理员账号。
 

@@ -6,10 +6,10 @@ export default defineConfig({
   base: process.env.SCREEN_BASE || '/',
   plugins: [vue()],
   server: {
-    port: 5174,
+    port: 7776,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8080',
+        target: 'http://127.0.0.1:7777',
         changeOrigin: true
       }
     }

@@ -13,7 +13,7 @@ WORKDIR /app
 COPY --from=build /app/target/crane-backend.jar app.jar
 # 时区与容器内临时目录
 ENV TZ=Asia/Shanghai JAVA_OPTS="-Xms256m -Xmx512m"
-EXPOSE 8080
+EXPOSE 7777
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
-  CMD curl -sf http://127.0.0.1:8080/api/v1/system/health >/dev/null || exit 1
+  CMD curl -sf http://127.0.0.1:7777/api/v1/system/health >/dev/null || exit 1
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

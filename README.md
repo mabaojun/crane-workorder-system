@@ -20,13 +20,13 @@
 所有工具安装于 `~/crane-tools`（JDK/Maven/colima/docker/pnpm shim），不写入系统目录与 shell 配置；清理时 `rm -rf ~/crane-tools` 即完全移除。详见 `~/crane-tools/setup.sh`。
 
 ```bash
-# 1. 启动本地 MySQL（宿主机端口 33061，账号 crane/crane123，库名 crane_workorder）
+# 1. 启动本地 MySQL（宿主机端口 7772，账号 crane/crane123，库名 crane_workorder）
 bash scripts/dev-mysql.sh
 
-# 2. 启动后端（8080）
+# 2. 启动后端（7777）
 bash scripts/dev-backend.sh
 
-# 3. 启动后台管理前端（5173，代理 /api 到 8080）
+# 3. 启动后台管理前端（7774，代理 /api 到 7777）
 cd frontend && corepack pnpm install && corepack pnpm dev:admin
 ```
 

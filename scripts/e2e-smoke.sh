@@ -1,11 +1,11 @@
 #!/bin/bash
 # 端到端 API 冒烟：管理员建档 → 客户提报 → 复核转工单 → 司机接单签到 → 异常上报批复 → 任务结束 → 客户评价
-# 用法：bash scripts/e2e-smoke.sh（需后端 8080 已启动、MySQL 已初始化）
+# 用法：bash scripts/e2e-smoke.sh（需后端 7777 已启动、MySQL 已初始化）
 set -e
 cd "$(dirname "$0")"
 source ./env.sh
 cd - >/dev/null
-BASE="${E2E_BASE:-http://127.0.0.1:8080/api/v1}"
+BASE="${E2E_BASE:-http://127.0.0.1:7777/api/v1}"
 PASS=0; FAIL=0
 TS=$(date +%s)
 CUST_PHONE="139$((TS % 100000000))"

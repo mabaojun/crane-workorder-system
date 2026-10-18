@@ -1,0 +1,58 @@
+/* 大屏深色主题令牌（06 §6.1，全应用唯一定义处；基准 11 §2.1 深色列，不另建第二套色板） */
+:root {
+  --bg0: #060c1a;
+  --bg1: #0a1428;
+  --panel: rgba(13, 28, 54, 0.72);
+  --line: rgba(64, 156, 255, 0.18);
+  --line2: rgba(64, 156, 255, 0.35);
+  --cyan: #38bdf8;
+  --cyan2: #7dd3fc;
+  --txt: #dbe7f5;
+  --sub: #7d93b5;
+  --green: #3ddc97;
+  --amber: #ffd54f;
+  --orange: #ffab40;
+  --red: #fb4d63;
+  --purple: #b388ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg0);
+  color: var(--txt);
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+}
+
+/* 数字等宽对齐（11 §3.1） */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 滚动条（深色细条） */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(64, 156, 255, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

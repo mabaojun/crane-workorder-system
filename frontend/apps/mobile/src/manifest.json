@@ -14,11 +14,11 @@
     },
     "publicPath": "./",
     "devServer": {
-      "port": 5175,
+      "port": 7775,
       "https": false,
       "proxy": {
         "/api": {
-          "target": "http://127.0.0.1:8080",
+          "target": "http://127.0.0.1:7777",
           "changeOrigin": true
         }
       }
