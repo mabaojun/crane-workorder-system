@@ -1,11 +1,12 @@
 <script setup lang="ts">
-// 地图选点弹层：小程序用原生 map 组件（中心锚点 + regionchange 取中心），H5 用高德 JS API 2.0；
-// H5 未配置 map.amap.jsapi_key 时降级为手动经纬度 + regeo 反查。确认统一走 regeo 反查结构化地址。
-import { computed, getCurrentInstance, onMounted, ref, watch } from 'vue'
-import { getBranding, loadBranding } from '@crane/shared/api/branding'
+// 地图选点弹层：小程序用原生 map 组件（卫星图层默认开，中心锚点 + regionchange 取中心）；
+// H5 与 admin 选点器同一套高德 JSAPI 2.0 加载方式（getAmapPublicKeys + 同步 script），
+// 卫星图层默认叠加、可一键切换；不再提供手动经纬度输入（地图不可用时用关键词搜索选点）。
+import { getCurrentInstance, nextTick, onMounted, ref } from 'vue'
+import { getAmapPublicKeys } from '@crane/shared/api/map'
 import { placeText, regeo } from '../api/map'
 import type { PoiItem, RegeoResult } from '../api/map'
-import { toastError, toastOk } from '../utils'
+import { toastError } from '../utils'
 
 export interface MapPickResult {
   lng: number
@@ -30,11 +31,12 @@ const centerLat = ref(Number(props.initialLat) || DEFAULT_LAT)
 const selLng = ref(centerLng.value)
 const selLat = ref(centerLat.value)
 
-const jsApiKey = ref('')
+const showAmap = ref(false)
 const amapFailed = ref(false)
-const showAmap = computed(() => !!jsApiKey.value && !amapFailed.value)
+/** 卫星图层默认开启，可切换标准图 */
+const satelliteOn = ref(true)
 
-// ---- 关键字搜索（防抖 300ms） ----
+// ---- 关键字搜索（防抖 300ms，走后端代理，不依赖前端地图加载成功） ----
 const keyword = ref('')
 const searching = ref(false)
 const results = ref<PoiItem[]>([])
@@ -73,7 +75,7 @@ function choosePoi(p: PoiItem) {
   results.value = []
 }
 
-// ---- 小程序：原生 map 取中心 ----
+// ---- 小程序：原生 map 取中心（卫星图层默认开） ----
 // #ifdef MP-WEIXIN
 const instance = getCurrentInstance()
 let mapCtx: ReturnType<typeof uni.createMapContext> | null = null
@@ -98,35 +100,42 @@ function onRegionChange(e?: { detail?: { type?: string }; type?: string }) {
 }
 // #endif
 
-// ---- H5：高德 JS API 2.0 ----
+// ---- H5：高德 JS API 2.0（与 admin AMapPicker 同款加载，卫星图层默认叠加） ----
 let amapInstance: any = null
 let amapLoader: Promise<any> | null = null
+let satelliteLayer: any = null
 
-function loadAmapScript(key: string): Promise<any> {
+function loadAmapScript(jsapiKey: string, securityJscode: string): Promise<any> {
+  if ((window as any).AMap) return Promise.resolve((window as any).AMap)
   if (amapLoader) return amapLoader
+  if (securityJscode) (window as any)._AMapSecurityConfig = { securityJsCode: securityJscode }
   amapLoader = new Promise((resolve, reject) => {
-    if ((window as any).AMap) {
-      resolve((window as any).AMap)
-      return
-    }
-    const securityCode = getBranding()['map.amap.security_jscode'] ?? ''
-    if (securityCode) (window as any)._AMapSecurityConfig = { securityJsCode: securityCode }
-    const cbName = '__craneAmapLoaded'
-    ;(window as any)[cbName] = () => resolve((window as any).AMap)
     const script = document.createElement('script')
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(key)}&callback=${cbName}`
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(jsapiKey)}`
+    script.onload = () => {
+      if ((window as any).AMap) resolve((window as any).AMap)
+      else reject(new Error('高德地图脚本加载异常'))
+    }
     script.onerror = () => {
       amapLoader = null
-      reject(new Error('高德地图脚本加载失败'))
+      reject(new Error('高德地图脚本加载失败，请检查网络或 Key 配置'))
     }
     document.head.appendChild(script)
   })
   return amapLoader
 }
 
-async function initAmap() {
+function toggleSatellite() {
+  satelliteOn.value = !satelliteOn.value
+  if (!satelliteLayer) return
+  if (satelliteOn.value) satelliteLayer.show()
+  else satelliteLayer.hide()
+}
+
+async function initAmap(jsapiKey: string, securityJscode: string) {
   try {
-    const AMap = await loadAmapScript(jsApiKey.value)
+    const AMap = await loadAmapScript(jsapiKey, securityJscode)
+    await nextTick()
     const el = document.getElementById('amap-container')
     if (!el) {
       amapFailed.value = true
@@ -136,6 +145,10 @@ async function initAmap() {
       zoom: Number(props.initialLng) ? 16 : 12,
       center: [centerLng.value, centerLat.value]
     })
+    // 卫星图层：默认叠加显示，可一键切换标准图
+    satelliteOn.value = true
+    satelliteLayer = new AMap.TileLayer.Satellite({ zIndex: 1 })
+    amapInstance.add(satelliteLayer)
     amapInstance.on('moveend', () => {
       const c = amapInstance.getCenter()
       if (!c) return
@@ -154,60 +167,18 @@ async function initAmap() {
   }
 }
 
-// ---- H5 无 key 降级：手动经纬度 ----
-const manualLng = ref(props.initialLng != null ? String(props.initialLng) : '')
-const manualLat = ref(props.initialLat != null ? String(props.initialLat) : '')
-const manualAddress = ref('')
-let manualStructured: RegeoResult | null = null
-
-watch([manualLng, manualLat], () => {
-  const lng = Number(manualLng.value)
-  const lat = Number(manualLat.value)
-  if (Number.isFinite(lng) && Number.isFinite(lat)) {
-    selLng.value = lng
-    selLat.value = lat
-  }
-})
-
-async function manualRegeo() {
-  const lng = Number(manualLng.value)
-  const lat = Number(manualLat.value)
-  if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
-    uni.showToast({ title: '请先输入合法的经纬度', icon: 'none' })
-    return
-  }
-  try {
-    const r = await regeo(lng, lat)
-    manualStructured = r
-    manualAddress.value = r.formattedAddress
-    toastOk('已反查到地址')
-  } catch (e) {
-    toastError(e)
-  }
-}
-
 // ---- 确认选点：统一 regeo 反查 ----
 const confirming = ref(false)
 
 async function onConfirm() {
   const lng = selLng.value
   const lat = selLat.value
-  // 手动输入模式下必须先填合法坐标
-  if (!showAmap.value && (!Number.isFinite(Number(manualLng.value)) || !Number.isFinite(Number(manualLat.value)))) {
-    uni.showToast({ title: '请先输入经纬度', icon: 'none' })
-    return
-  }
-  // 手动模式已反查成功：直接复用结果，避免重复请求再失败
-  if (manualStructured && manualAddress.value) {
-    emit('confirm', { lng, lat, address: manualAddress.value, structured: manualStructured })
-    return
-  }
   confirming.value = true
   try {
     const r = await regeo(lng, lat)
     emit('confirm', { lng, lat, address: r.formattedAddress, structured: r })
   } catch (e) {
-    // Key 未配且非 mock 等 regeo 失败场景：允许仅经纬度确认，地址由页面兜底
+    // 地址反查失败：允许仅经纬度确认，地址由页面兜底
     const msg = e instanceof Error ? e.message : '地址反查失败'
     uni.showModal({
       title: '未获取到地址',
@@ -222,11 +193,19 @@ async function onConfirm() {
 }
 
 onMounted(async () => {
-  await loadBranding(true)
-  jsApiKey.value = getBranding()['map.amap.jsapi_key'] ?? ''
-  // #ifdef H5
-  if (jsApiKey.value) await initAmap()
-  // #endif
+  try {
+    const keys = await getAmapPublicKeys()
+    if (keys.jsapiKey) {
+      showAmap.value = true
+      // #ifdef H5
+      await initAmap(keys.jsapiKey, keys.securityJscode)
+      // #endif
+    } else {
+      amapFailed.value = true
+    }
+  } catch {
+    amapFailed.value = true
+  }
 })
 </script>
 
@@ -265,29 +244,22 @@ onMounted(async () => {
           :latitude="centerLat"
           :longitude="centerLng"
           :scale="16"
+          :enable-satellite="satelliteOn"
           @regionchange="onRegionChange"
         />
+        <view class="layer-toggle" @tap="satelliteOn = !satelliteOn">{{ satelliteOn ? '标准图' : '卫星图' }}</view>
         <view class="crosshair"><view class="ch-v" /><view class="ch-h" /></view>
       </view>
       <!-- #endif -->
 
       <!-- #ifdef H5 -->
-      <view v-if="showAmap" class="map-area">
+      <view v-if="showAmap && !amapFailed" class="map-area">
         <view id="amap-container" class="native-map" />
+        <view class="layer-toggle" @tap="toggleSatellite">{{ satelliteOn ? '标准图' : '卫星图' }}</view>
         <view class="crosshair"><view class="ch-v" /><view class="ch-h" /></view>
       </view>
-      <view v-else class="map-area manual">
-        <text class="manual-tip">H5 地图需在后台配置 map.amap.jsapi_key，当前可手动输入经纬度选点</text>
-        <view class="manual-row">
-          <text class="k">经度</text>
-          <input v-model="manualLng" class="manual-input" type="digit" placeholder="如 117.120500" placeholder-class="ph" />
-        </view>
-        <view class="manual-row">
-          <text class="k">纬度</text>
-          <input v-model="manualLat" class="manual-input" type="digit" placeholder="如 36.651200" placeholder-class="ph" />
-        </view>
-        <view class="regeo-btn" @tap="manualRegeo">反查地址</view>
-        <text v-if="manualAddress" class="manual-addr">地址：{{ manualAddress }}</text>
+      <view v-else class="map-area no-map">
+        <text class="map-tip">{{ amapFailed ? '地图加载失败，可通过关键词搜索选择地点，或返回使用自动定位' : '地图加载中...' }}</text>
       </view>
       <!-- #endif -->
 
@@ -395,12 +367,37 @@ onMounted(async () => {
 .map-area {
   position: relative;
   flex: 1;
-  min-height: 0;
+  /* 保证地图容器非零高度，避免 JSAPI 初始化时读到 0 尺寸导致空白 */
+  min-height: 300px;
   background: var(--bg);
 }
 .native-map {
   width: 100%;
   height: 100%;
+}
+.layer-toggle {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 20;
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--txt);
+  box-shadow: var(--shadow);
+}
+.no-map {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.map-tip {
+  font-size: 13px;
+  color: var(--sub);
+  padding: 0 24px;
+  text-align: center;
 }
 .crosshair {
   position: absolute;
@@ -410,6 +407,7 @@ onMounted(async () => {
   height: 30px;
   margin: -15px 0 0 -15px;
   pointer-events: none;
+  z-index: 15;
 }
 .ch-v {
   position: absolute;
@@ -441,54 +439,6 @@ onMounted(async () => {
   background: var(--brand);
   border: 2px solid #fff;
   box-sizing: border-box;
-}
-.manual {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  box-sizing: border-box;
-}
-.manual-tip {
-  font-size: 13px;
-  color: var(--warning);
-  background: #fef3c7;
-  border-radius: var(--radius);
-  padding: 8px 12px;
-}
-.manual-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 10px 16px;
-}
-.manual-row .k {
-  flex: none;
-  font-size: 14px;
-  color: var(--sub);
-  width: 32px;
-}
-.manual-input {
-  flex: 1;
-  font-size: 15px;
-  min-height: 24px;
-}
-.regeo-btn {
-  height: 40px;
-  line-height: 40px;
-  text-align: center;
-  border-radius: var(--radius);
-  border: 1px solid var(--brand);
-  color: var(--brand);
-  font-size: 15px;
-  background: var(--panel);
-}
-.manual-addr {
-  font-size: 13px;
-  color: var(--success);
 }
 .foot {
   display: flex;

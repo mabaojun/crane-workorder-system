@@ -290,7 +290,19 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="备注">
-              <el-input v-model="createForm.remark" type="textarea" :rows="2" maxlength="500" />
+              <div class="remark-block">
+                <div class="remark-chips">
+                  <el-tag
+                    v-for="t in REMARK_PRESETS"
+                    :key="t"
+                    :type="createForm.remark.includes(t) ? 'primary' : 'info'"
+                    effect="plain"
+                    class="remark-chip"
+                    @click="toggleRemarkPreset(t)"
+                  >{{ t }}</el-tag>
+                </div>
+                <el-input v-model="createForm.remark" type="textarea" :rows="2" maxlength="500" placeholder="备注（选填，可点选上方常用项）" />
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -600,6 +612,23 @@ function onVehicleChange(id: number) {
   if (vehicle?.tonnage) createForm.craneTonnage = vehicle.tonnage
 }
 
+/** 备注常用项：点选追加、再点移除（与转工单弹窗一致） */
+const REMARK_PRESETS = ['带吊笼', '带顶笼']
+
+function toggleRemarkPreset(text: string) {
+  if (createForm.remark.includes(text)) {
+    createForm.remark = createForm.remark
+      .split(/[，,]/)
+      .map((s) => s.trim())
+      .filter((s) => s && s !== text)
+      .join('，')
+  } else {
+    createForm.remark = createForm.remark.trim()
+      ? `${createForm.remark.trim().replace(/[，,]$/, '')}，${text}`
+      : text
+  }
+}
+
 /** 选择常用施工地点：回填地址文本与经纬度（无经纬度的地点保持当前值，可后续地图选点校准） */
 function onPickPlace(name: string) {
   if (!name) return
@@ -699,4 +728,7 @@ async function submitCreate() {
 .quick-dates .el-button + .el-button { margin-left: 8px; }
 .select-hint { text-align: center; color: var(--sub, #909399); font-size: 13px; padding: 14px 0; margin: 0; }
 .place-row { display: flex; gap: 8px; width: 100%; }
+.remark-block { width: 100%; }
+.remark-chips { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.remark-chip { cursor: pointer; }
 </style>

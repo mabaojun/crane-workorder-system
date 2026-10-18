@@ -45,16 +45,21 @@
 
       <!-- 地图模式 -->
       <template v-else-if="ready && mode === 'map'">
-        <el-autocomplete
-          v-model="keyword"
-          class="search-box"
-          :fetch-suggestions="onSearch"
-          placeholder="搜索地点关键词，如：济南奥体中心"
-          clearable
-          :trigger-on-focus="false"
-          value-key="label"
-          @select="onSelectPoi"
-        />
+        <div class="search-row">
+          <el-autocomplete
+            v-model="keyword"
+            class="search-box"
+            :fetch-suggestions="onSearch"
+            placeholder="搜索地点关键词，如：济南奥体中心"
+            clearable
+            :trigger-on-focus="false"
+            value-key="label"
+            @select="onSelectPoi"
+          />
+          <el-button :type="satelliteOn ? 'primary' : 'default'" plain @click="toggleSatellite">
+            {{ satelliteOn ? '标准图' : '卫星图' }}
+          </el-button>
+        </div>
         <div class="map-wrap">
           <div ref="mapRef" class="map-container"></div>
           <div class="crosshair" title="拖动地图取中心点">
@@ -123,6 +128,16 @@ const keyword = ref('')
 const mapRef = ref<HTMLDivElement | null>(null)
 let map: any = null
 let marker: any = null
+let satelliteLayer: any = null
+/** 卫星图层默认开启，可切换标准图 */
+const satelliteOn = ref(true)
+
+function toggleSatellite() {
+  satelliteOn.value = !satelliteOn.value
+  if (!satelliteLayer) return
+  if (satelliteOn.value) satelliteLayer.show()
+  else satelliteLayer.hide()
+}
 
 const picked = reactive<{ lng: number | null; lat: number | null; address: string }>({
   lng: null,
@@ -206,6 +221,10 @@ async function initMap(jsapiKey: string, securityJscode: string) {
       picked.lat ?? DEFAULT_CENTER.lat
     ]
   })
+  // 卫星图层：默认叠加显示，可一键切换标准图
+  satelliteOn.value = true
+  satelliteLayer = new AMap.TileLayer.Satellite({ zIndex: 1 })
+  map.add(satelliteLayer)
   // 交互一：点击取点
   map.on('click', (e: any) => {
     pick(e.lnglat.getLng(), e.lnglat.getLat())
@@ -344,6 +363,7 @@ function destroyMap() {
     map = null
   }
   marker = null
+  satelliteLayer = null
 }
 </script>
 
@@ -362,9 +382,13 @@ function destroyMap() {
   gap: 8px;
   width: 100%;
 }
-.search-box {
-  width: 100%;
+.search-row {
+  display: flex;
+  gap: 8px;
   margin-bottom: 8px;
+}
+.search-box {
+  flex: 1;
 }
 .map-wrap {
   position: relative;

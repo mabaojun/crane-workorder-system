@@ -79,7 +79,19 @@
         </el-form-item>
       </template>
       <el-form-item :label="mode === 'convert' ? '任务备注' : '备注'">
-        <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" placeholder="任务备注（选填）" />
+        <div class="remark-block">
+          <div class="remark-chips">
+            <el-tag
+              v-for="t in REMARK_PRESETS"
+              :key="t"
+              :type="form.remark.includes(t) ? 'primary' : 'info'"
+              effect="plain"
+              class="remark-chip"
+              @click="toggleRemarkPreset(t)"
+            >{{ t }}</el-tag>
+          </div>
+          <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" placeholder="任务备注（选填，可点选上方常用项快速填写）" />
+        </div>
       </el-form-item>
       <el-form-item v-if="needConfirmPast" label="">
         <el-checkbox v-model="form.confirmPast">计划时间早于当前时间，确认按此时间派单</el-checkbox>
@@ -156,6 +168,21 @@ const idleVehicles = computed(() => vehicles.value.filter((v) => v.status === 'I
 const needConfirmPast = computed(() =>
   !!form.planStartAt && dayjs(form.planStartAt).isBefore(dayjs())
 )
+
+/** 任务备注常用项：点选追加、再点移除（转工单/派单共用） */
+const REMARK_PRESETS = ['带吊笼', '带顶笼']
+
+function toggleRemarkPreset(text: string) {
+  if (form.remark.includes(text)) {
+    form.remark = form.remark
+      .split(/[，,]/)
+      .map((s) => s.trim())
+      .filter((s) => s && s !== text)
+      .join('，')
+  } else {
+    form.remark = form.remark.trim() ? `${form.remark.trim().replace(/[，,]$/, '')}，${text}` : text
+  }
+}
 
 watch(
   () => props.modelValue,
@@ -251,6 +278,18 @@ async function onSubmit() {
 </script>
 
 <style scoped>
+.remark-block {
+  width: 100%;
+}
+.remark-chips {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.remark-chip {
+  cursor: pointer;
+}
 .tip { color: var(--sub); font-size: 12px; line-height: 1.5; }
 .unit { margin-left: 8px; color: var(--sub); }
 .plan-start { width: 100%; }
