@@ -1,0 +1,40 @@
+package com.crane.modules.workorder.dto;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+/**
+ * API-WO-004 修改工单请求体（PATCH，未传字段不变）。
+ * 仅管理员可用；改派司机 / 车辆与变更约定时间触发对应业务校验。
+ */
+@Data
+public class WorkOrderUpdateRequest {
+
+    /** 改派车辆 */
+    private Long vehicleId;
+
+    /** 改派司机 */
+    private Long staffId;
+
+    /** 变更约定服务时间 */
+    private LocalDateTime planStartAt;
+
+    /** 变更地点 */
+    private String address;
+
+    /** 与 latitude 成对 */
+    private BigDecimal longitude;
+
+    /** 与 longitude 成对 */
+    private BigDecimal latitude;
+
+    /** 复核后重量（吨） */
+    private BigDecimal cargoWeightTon;
+
+    private String remark;
+
+    /** 预计开始时间早于当前时间时的二次确认标记，默认 false */
+    private Boolean confirmPast;
+}
