@@ -217,11 +217,14 @@ function toggleRemarkPreset(text: string) {
   }
 }
 
+// immediate：弹窗随 v-if 挂载时 modelValue 已是 true，watch 不会再触发，
+// 首次打开必须立即执行 loadOptions，否则 prefill（计划时间/吨位/重量/需求描述）与司机车辆列表全空
 watch(
   () => props.modelValue,
   (open) => {
     if (open) loadOptions()
-  }
+  },
+  { immediate: true }
 )
 
 function onOpen() {
