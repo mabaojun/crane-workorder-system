@@ -28,6 +28,8 @@ services:
     restart: unless-stopped
     # 发布镜像统一按 linux/amd64 构建，避免 Apple Silicon / ARM 服务器架构错配
     platform: linux/amd64
+    # 后端镜像是服务器本地构建的，禁止 compose 去 Docker Hub 拉取
+    pull_policy: never
     environment:
       MYSQL_HOST: crane-mysql
       MYSQL_PORT: 3306

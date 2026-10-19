@@ -232,7 +232,7 @@ vi .env
 | `CRANE_ADMIN_PASSWORD` | 初始管理员密码 |
 | `WECHAT_APPID` | `wxcd19e4508b62d824`（已预填） |
 | `WECHAT_SECRET` | 小程序 AppSecret（必填，否则微信登录不可用） |
-| `APP_VERSION` | 与 `version.json` 中 `version` 一致 |
+| `APP_VERSION` | 发布包已按当前版本预填，通常无需修改；手工修改时须与 `version.json` 一致 |
 
 示例：
 
@@ -259,12 +259,17 @@ cat /crane/version.json
 # 1) 服务器原生构建后端镜像（首次需拉取 eclipse-temurin:17-jre）
 bash /crane/deploy/build-server-image.sh
 
-# 2) 启动全部容器
+# 2) 确认本地镜像已生成（必须有 crane-backend:<APP_VERSION>）
+docker images | grep crane-backend
+
+# 3) 启动全部容器
 cd /crane/deploy
 docker compose config >/dev/null && echo "compose 配置校验通过"
 docker compose up -d
 docker compose ps
 ```
+
+> `docker-compose.yml` 已为 `crane-app` 设置 `pull_policy: never`，后端镜像只使用服务器本地构建结果，不会再尝试从 Docker Hub 拉取。
 
 首次启动流程：
 
@@ -490,6 +495,7 @@ docker exec crane-mysql mysql -ucrane -p"$MYSQL_PASSWORD" crane_workorder -e "SH
 
 | 现象 | 排查 |
 |---|---|
+| 启动报 `failed to resolve reference ... crane-backend` | 本地后端镜像未构建成功。执行 `bash /crane/deploy/build-server-image.sh`，再用 `docker images` 确认存在 crane-backend 镜像；compose 已设置 `pull_policy: never` |
 | 502 Bad Gateway | `docker logs crane-app`；确认 MySQL healthy；确认后端监听 7777 |
 | Nginx 起不来 | `docker exec crane-nginx nginx -t`；检查证书文件名/权限 |
 | 证书告警 | 确认 `fullchain.crt` 为完整链、域名 `jndys.top`、系统时间正确 |

@@ -62,7 +62,8 @@ mkdir -p "$STAGE"/{deploy,mysql/init,backend,www/admin,www/h5,www/screen,mp-weix
 cp docker/deploy/docker-compose.yml "$STAGE/deploy/"
 cp docker/deploy/nginx.conf          "$STAGE/deploy/"
 cp docker/deploy/backup-loop.sh      "$STAGE/deploy/"
-cp docker/deploy/.env.example        "$STAGE/deploy/"
+# .env.example 预填本次版本号，避免部署时 APP_VERSION 为空回退到 latest
+sed "s|^APP_VERSION=.*|APP_VERSION=$VERSION|" docker/deploy/.env.example > "$STAGE/deploy/.env.example"
 cp docker/deploy/DEPLOY.md           "$STAGE/DEPLOY.md"
 cp docker/mysql/init/*.sql           "$STAGE/mysql/init/"
 cp backend/target/crane-backend.jar  "$STAGE/backend/"
