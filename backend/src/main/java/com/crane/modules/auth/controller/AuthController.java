@@ -1,5 +1,7 @@
 package com.crane.modules.auth.controller;
 
+import com.crane.common.exception.BizException;
+import com.crane.common.exception.ErrorCode;
 import com.crane.common.result.ApiResult;
 import com.crane.modules.auth.dto.BindPhoneRequest;
 import com.crane.modules.auth.dto.LoginResponse;
@@ -9,6 +11,7 @@ import com.crane.modules.auth.dto.SelectRoleRequest;
 import com.crane.modules.auth.dto.SmsCodeRequest;
 import com.crane.modules.auth.dto.SmsCodeResponse;
 import com.crane.modules.auth.dto.SmsLoginRequest;
+import com.crane.modules.auth.dto.WechatBindPhoneRequest;
 import com.crane.modules.auth.dto.WechatLoginRequest;
 import com.crane.modules.auth.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -72,6 +75,19 @@ public class AuthController {
         }
         Long userId = authService.resolveUserId(request, true);
         return ApiResult.ok(authService.bindPhone(userId, req));
+    }
+
+    /** API-AUTH-002b 微信手机号快速验证绑定：Authorization: Bind &lt;bindTicket&gt;，免短信验证码 */
+    @PostMapping("/wechat-bind-phone")
+    public ApiResult<LoginResponse> wechatBindPhone(@Valid @RequestBody WechatBindPhoneRequest req,
+                                                    HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header == null || !header.startsWith("Bind ")) {
+            throw new BizException(ErrorCode.TOKEN_INVALID);
+        }
+        io.jsonwebtoken.Claims claims = authService.resolveBindClaims(header.substring(5).trim());
+        return ApiResult.ok(authService.bindPhoneByWechatPhoneCode(
+                claims.get("openId", String.class), claims.get("unionId", String.class), req.getPhoneCode()));
     }
 
     /** API-AUTH-005 登出并失效令牌；重复登出幂等成功 */

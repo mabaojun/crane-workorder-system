@@ -1,9 +1,8 @@
 <script setup lang="ts">
 // 登录页：仅保留「账号密码登录」与「微信授权登录」两种方式，登录后按角色分流
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { getBranding, loadBranding } from '@crane/shared/api/branding'
-import { sendSmsCode } from '../../api/modules/auth'
 import { useAuthStore } from '../../stores/auth'
 import { toastError, toastOk } from '../../utils'
 
@@ -105,19 +104,11 @@ function goAgreement() {
   uni.navigateTo({ url: '/pages/agreement' })
 }
 
-/** 微信一键登录（仅小程序通道渲染）：uni.login 取 code → 已绑定直登，未绑定引导绑定预留手机号 */
+/** 微信一键登录（仅小程序通道渲染）：uni.login 取 code → 已绑定直登，未绑定引导授权手机号 */
 const wxLogging = ref(false)
 const bindVisible = ref(false)
 const bindTicket = ref('')
-const bindPhone = ref('')
-const bindCode = ref('')
-const bindSending = ref(false)
-const bindCountdown = ref(0)
 const bindSubmitting = ref(false)
-let bindTimer: ReturnType<typeof setInterval> | null = null
-
-const bindPhoneValid = computed(() => /^1\d{10}$/.test(bindPhone.value))
-const bindCanSubmit = computed(() => bindPhoneValid.value && bindCode.value.length === 6)
 
 /** uni.login 取微信登录 code（单次有效） */
 function getWechatCode(): Promise<string> {
@@ -142,10 +133,8 @@ async function wechatLogin() {
     const res = await auth.wechatLogin(code)
     uni.hideLoading()
     if (res.needBind) {
-      // 首次登录：凭 bindTicket 绑定管理员预留手机号后激活
+      // 首次登录：凭 bindTicket 授权微信手机号后激活
       bindTicket.value = res.bindTicket || ''
-      bindPhone.value = ''
-      bindCode.value = ''
       bindVisible.value = true
       return
     }
@@ -158,40 +147,23 @@ async function wechatLogin() {
   }
 }
 
-/** 绑定场景验证码（BIND_PHONE） */
-async function getBindCode() {
-  if (!bindPhoneValid.value) {
-    uni.showToast({ title: '请输入 11 位手机号', icon: 'none' })
+/** getPhoneNumber 返回一次性 code，交后端换取手机号并绑定预留账号 */
+async function onGetPhoneNumber(e: any) {
+  if (bindSubmitting.value) return
+  const errMsg = String(e?.detail?.errMsg || '')
+  if (!errMsg.includes(':ok')) {
+    const title =
+      errMsg.includes('deny') || errMsg.includes('cancel')
+        ? '已取消授权'
+        : errMsg.includes('no permission')
+          ? '小程序未开通手机号快速验证能力'
+          : '手机号获取失败，请重试'
+    uni.showToast({ title, icon: 'none' })
     return
   }
-  if (bindCountdown.value > 0 || bindSending.value) return
-  bindSending.value = true
-  try {
-    const res = await sendSmsCode(bindPhone.value, 'BIND_PHONE')
-    bindCountdown.value = res.interval || 60
-    bindTimer = setInterval(() => {
-      bindCountdown.value -= 1
-      if (bindCountdown.value <= 0 && bindTimer) {
-        clearInterval(bindTimer)
-        bindTimer = null
-      }
-    }, 1000)
-    if (res.debugCode) {
-      bindCode.value = res.debugCode
-      uni.showToast({ title: '验证码已发送（开发模式自动填入）', icon: 'none' })
-    } else {
-      uni.showToast({ title: '验证码已发送', icon: 'none' })
-    }
-  } catch (e) {
-    toastError(e)
-  } finally {
-    bindSending.value = false
-  }
-}
-
-async function doBind() {
-  if (!bindCanSubmit.value) {
-    uni.showToast({ title: '请填写手机号与验证码', icon: 'none' })
+  const phoneCode = e?.detail?.code
+  if (!phoneCode) {
+    uni.showToast({ title: '当前微信版本过低，请升级后重试', icon: 'none' })
     return
   }
   if (!bindTicket.value) {
@@ -199,17 +171,16 @@ async function doBind() {
     cancelBind()
     return
   }
-  if (bindSubmitting.value) return
   bindSubmitting.value = true
   try {
     uni.showLoading({ title: '绑定中' })
-    await auth.bindPhone(bindPhone.value, bindCode.value, bindTicket.value)
+    await auth.bindPhoneByWechat(phoneCode, bindTicket.value)
     uni.hideLoading()
     bindVisible.value = false
     await afterLogin()
-  } catch (e) {
+  } catch (err) {
     uni.hideLoading()
-    toastError(e)
+    toastError(err)
   } finally {
     bindSubmitting.value = false
   }
@@ -218,18 +189,7 @@ async function doBind() {
 function cancelBind() {
   bindVisible.value = false
   bindTicket.value = ''
-  bindPhone.value = ''
-  bindCode.value = ''
-  bindCountdown.value = 0
-  if (bindTimer) {
-    clearInterval(bindTimer)
-    bindTimer = null
-  }
 }
-
-onUnmounted(() => {
-  if (bindTimer) clearInterval(bindTimer)
-})
 </script>
 
 <template>
@@ -309,42 +269,20 @@ onUnmounted(() => {
       </view>
     </view>
 
-    <!-- 微信授权后绑定管理员预留手机号（首次登录激活） -->
+    <!-- 微信授权后绑定管理员预留手机号（首次登录激活，免短信） -->
     <view v-if="bindVisible" class="role-mask">
       <view class="bind-panel">
         <text class="role-kicker">WECHAT · BIND</text>
         <text class="role-heading">绑定预留手机号</text>
-        <text class="role-hint">首次微信登录需绑定管理员预留的手机号完成激活</text>
-        <view class="bind-field">
-          <text class="bind-label">手机号</text>
-          <input
-            v-model="bindPhone"
-            class="bind-input"
-            type="number"
-            maxlength="11"
-            placeholder="请输入预留手机号"
-            placeholder-class="ph"
-          />
-        </view>
-        <view class="bind-field">
-          <text class="bind-label">验证码</text>
-          <input
-            v-model="bindCode"
-            class="bind-input"
-            type="number"
-            maxlength="6"
-            placeholder="请输入验证码"
-            placeholder-class="ph"
-          />
-          <view
-            class="code-btn"
-            :class="{ disabled: bindCountdown > 0 || bindSending || !bindPhoneValid }"
-            @click="getBindCode"
-          >
-            {{ bindCountdown > 0 ? bindCountdown + 's 后重发' : '获取验证码' }}
-          </view>
-        </view>
-        <button class="bind-submit" :disabled="!bindCanSubmit || bindSubmitting" @click="doBind">绑定并登录</button>
+        <text class="role-hint">首次微信登录需绑定管理员预留的手机号完成激活，手机号由微信安全提供</text>
+        <button
+          class="bind-submit"
+          open-type="getPhoneNumber"
+          :disabled="bindSubmitting || !bindTicket"
+          @getphonenumber="onGetPhoneNumber"
+        >
+          {{ bindSubmitting ? '绑定中…' : '微信手机号一键绑定' }}
+        </button>
         <text class="bind-cancel" @click="cancelBind">暂不绑定，返回登录</text>
       </view>
     </view>
@@ -601,37 +539,6 @@ onUnmounted(() => {
   box-shadow: 0 -12px 40px rgba(4, 12, 26, 0.45);
   display: flex;
   flex-direction: column;
-}
-.bind-field {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 14px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(125, 211, 252, 0.22);
-}
-.bind-label {
-  flex: none;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.82);
-}
-.bind-input {
-  flex: 1;
-  min-height: 24px;
-  font-size: 15px;
-  color: #fff;
-}
-.bind-panel .ph {
-  color: rgba(255, 255, 255, 0.4);
-}
-.bind-panel .code-btn {
-  border-left-color: rgba(125, 211, 252, 0.3);
-  color: #7dd3fc;
-}
-.bind-panel .code-btn.disabled {
-  color: rgba(255, 255, 255, 0.35);
 }
 .bind-submit {
   margin-top: 20px;

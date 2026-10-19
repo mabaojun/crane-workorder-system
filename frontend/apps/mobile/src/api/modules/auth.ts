@@ -82,3 +82,15 @@ export function bindPhone(phone: string, smsCode: string, bindTicket?: string) {
     headers: bindTicket ? { Authorization: `Bind ${bindTicket}` } : undefined
   })
 }
+
+/**
+ * 微信手机号快速验证绑定（仅小程序）：
+ * phoneCode 为 getPhoneNumber 返回的一次性 code，由后端换取手机号并激活账号。
+ */
+export function wechatBindPhone(phoneCode: string, bindTicket: string) {
+  return request<LoginResult>('/auth/wechat-bind-phone', {
+    method: 'POST',
+    body: { phoneCode },
+    headers: { Authorization: `Bind ${bindTicket}` }
+  })
+}

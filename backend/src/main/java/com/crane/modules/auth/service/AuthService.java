@@ -295,13 +295,26 @@ public class AuthService {
     }
 
     /**
-     * 微信绑定通道（API-AUTH-002，Authorization: Bind &lt;bindTicket&gt;）：
-     * 以微信 openid 写入管理员预设账号并激活，手机号须与员工档案 / 客户预留手机号匹配。
+     * 微信短信绑定通道（API-AUTH-002，Authorization: Bind &lt;bindTicket&gt;）：
+     * 校验短信验证码后，以微信 openid 写入管理员预设账号并激活。
      */
     public LoginResponse bindPhoneByTicket(String openId, String unionId, BindPhoneRequest req) {
         verifySmsCode(req.getPhone(), SCENE_BIND_PHONE, req.getSmsCode());
+        return bindByWechatPhone(openId, unionId, req.getPhone());
+    }
+
+    /**
+     * 微信手机号快速验证绑定（API-AUTH-002b）：
+     * 手机号由小程序 getPhoneNumber 一次性 code 换取，无需短信验证码。
+     */
+    public LoginResponse bindPhoneByWechatPhoneCode(String openId, String unionId, String phoneCode) {
+        return bindByWechatPhone(openId, unionId, wechatService.getPhoneNumber(phoneCode));
+    }
+
+    /** 以手机号匹配管理员预设账号，写入微信 openid 并激活 */
+    private LoginResponse bindByWechatPhone(String openId, String unionId, String phone) {
         SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getPhone, req.getPhone()));
+                .eq(SysUser::getPhone, phone));
         if (user == null) {
             throw new BizException(ErrorCode.ACCOUNT_NOT_OPENED);
         }
@@ -312,8 +325,8 @@ public class AuthService {
             throw new BizException(ErrorCode.PHONE_ALREADY_BOUND);
         }
         // 手机号须匹配员工档案 / 客户预留手机号；管理员账号无业务档案，凭预留手机号即可绑定
-        Long staffId = queryBizId("biz_staff", req.getPhone());
-        Long customerId = queryBizId("biz_customer", req.getPhone());
+        Long staffId = queryBizId("biz_staff", phone);
+        Long customerId = queryBizId("biz_customer", phone);
         if (staffId == null && customerId == null && !roleCodes(user).contains("ADMIN")) {
             throw new BizException(ErrorCode.ACCOUNT_NOT_OPENED);
         }

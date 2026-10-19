@@ -9,6 +9,7 @@ import {
   passwordLogin,
   selectRole,
   smsLogin,
+  wechatBindPhone as wechatBindPhoneApi,
   wechatLogin as wechatLoginApi
 } from '../api/modules/auth'
 import type { MeInfo } from '../api/types'
@@ -57,6 +58,14 @@ export const useAuthStore = defineStore('auth', () => {
     await loadMe()
   }
 
+  /** 微信手机号快速验证绑定：phoneCode 由 getPhoneNumber 返回，免短信验证码 */
+  async function bindPhoneByWechat(phoneCode: string, bindTicket: string) {
+    const res = await wechatBindPhoneApi(phoneCode, bindTicket)
+    token.value = res.accessToken
+    uniTokenAdapter.set(res.accessToken)
+    await loadMe()
+  }
+
   /** 多角色账号：按所选身份重新签发令牌并刷新个人信息 */
   async function switchRole(roleCode: string) {
     const res = await selectRole(roleCode)
@@ -95,6 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
     loginByPassword,
     wechatLogin,
     bindPhone,
+    bindPhoneByWechat,
     loadMe,
     switchRole,
     doLogout,
