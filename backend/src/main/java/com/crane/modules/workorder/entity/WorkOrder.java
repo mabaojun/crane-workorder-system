@@ -65,6 +65,9 @@ public class WorkOrder {
     /** 吊车吨位 */
     private BigDecimal craneTonnage;
 
+    /** 预计使用时长（天），仅备注提示帮助司机与管理员建立时长预期，不参与时间换算 */
+    private BigDecimal estimatedDays;
+
     /** 预计开始时间 */
     private LocalDateTime expectedStartAt;
 

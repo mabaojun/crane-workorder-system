@@ -16,6 +16,8 @@ export interface WorkOrder {
   cargoName?: string
   cargoWeight?: number
   craneTonnage?: number
+  /** 预计使用时长（天），仅备注提示 */
+  estimatedDays?: number
   expectedStartAt?: string
   acceptedAt?: string
   startedAt?: string
@@ -38,6 +40,8 @@ export interface DemandOrder {
   description?: string
   craneTonnage?: number
   cargoWeight?: number
+  /** 预计使用时长（天），客户自估仅备注提示 */
+  estimatedDays?: number
   expectedStartAt?: string
   status: string
   reviewRemark?: string

@@ -21,6 +21,8 @@ export interface DemandOrder {
   intendedVehicleId: number | null
   craneTonnage: number | null
   cargoWeight: number | null
+  /** 预计使用时长（天），客户自估仅备注提示 */
+  estimatedDays: number | null
   expectedStartAt: string | null
   /** PENDING / REVIEWING / CONVERTED / REJECTED / CLOSED */
   status: string
@@ -46,6 +48,8 @@ export interface DemandConvertRequest {
   planStartAt: string
   craneTonnage: number
   cargoWeightTon: number
+  /** 预计使用时长（天），选填，缺省带入需求单客户自估值 */
+  estimatedDays?: number
   remark: string
 }
 

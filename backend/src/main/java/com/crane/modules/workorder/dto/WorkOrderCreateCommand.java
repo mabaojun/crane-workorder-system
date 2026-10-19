@@ -55,6 +55,9 @@ public class WorkOrderCreateCommand {
     /** 吊车吨位 */
     private BigDecimal craneTonnage;
 
+    /** 预计使用时长（天），选填，仅备注提示 */
+    private BigDecimal estimatedDays;
+
     /** 预计开始时间 */
     private LocalDateTime planStartAt;
 

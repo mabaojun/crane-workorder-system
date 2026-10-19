@@ -231,6 +231,20 @@
               <el-input-number v-model="createForm.craneTonnage" :min="1" :precision="1" controls-position="right" style="width: 100%" />
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item label="预计使用时长">
+              <el-input-number v-model="createForm.estimatedDays" :min="0.5" :step="0.5" :precision="1" controls-position="right" placeholder="选填" style="width: 100%" />
+              <div class="quick-heights">
+                <span class="quick-label">常用：</span>
+                <el-check-tag
+                  v-for="d in COMMON_ESTIMATE_DAYS"
+                  :key="d"
+                  :checked="createForm.estimatedDays === d"
+                  @change="createForm.estimatedDays = d"
+                >{{ d }}天</el-check-tag>
+              </div>
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <el-form-item label="常用地点">
               <div class="place-row">
@@ -404,9 +418,13 @@ const createForm = reactive({
   cargoQty: 1,
   cargoWeightTon: undefined as number | undefined,
   craneTonnage: undefined as number | undefined,
+  estimatedDays: undefined as number | undefined,
   remark: '',
   confirmPast: false
 })
+
+/** 预计使用时长常用档位（天），仅备注提示不作换算 */
+const COMMON_ESTIMATE_DAYS = [0.5, 1, 1.5, 2, 3]
 
 /** 可派车辆：停用不可派，其余（含作业中）均可选，作业中提交时按 6 小时施工时段校验冲突 */
 const availableVehicles = computed(() => vehicles.value.filter((v) => v.status !== 'DISABLED'))
@@ -560,6 +578,7 @@ function openCreate() {
   createForm.cargoQty = 1
   createForm.cargoWeightTon = undefined
   createForm.craneTonnage = undefined
+  createForm.estimatedDays = undefined
   createForm.remark = ''
   createForm.confirmPast = false
   createVisible.value = true
@@ -711,6 +730,7 @@ async function submitCreate() {
       ...(createForm.cargoName.trim() ? { cargoName: createForm.cargoName.trim() } : {}),
       cargoWeightTon: createForm.cargoWeightTon,
       craneTonnage: createForm.craneTonnage,
+      estimatedDays: createForm.estimatedDays,
       remark: createForm.remark.trim() || undefined,
       confirmPast: createForm.confirmPast
     })
@@ -732,6 +752,8 @@ async function submitCreate() {
 .quick-dates .el-button + .el-button { margin-left: 8px; }
 .select-hint { text-align: center; color: var(--sub, #909399); font-size: 13px; padding: 14px 0; margin: 0; }
 .place-row { display: flex; gap: 8px; width: 100%; }
+.quick-heights { display: flex; align-items: center; gap: 8px; margin-top: 6px; width: 100%; }
+.quick-label { color: var(--sub); font-size: 12px; }
 .remark-block { width: 100%; }
 .remark-chips { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .remark-chip { cursor: pointer; }

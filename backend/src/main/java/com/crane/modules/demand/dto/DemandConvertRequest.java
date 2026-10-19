@@ -34,6 +34,9 @@ public class DemandConvertRequest {
     @NotNull(message = "货物重量不能为空")
     private BigDecimal cargoWeightTon;
 
+    /** 预计使用时长（天），选填，缺省带入需求单客户自估值，仅备注提示 */
+    private BigDecimal estimatedDays;
+
     /** 任务备注 */
     @NotBlank(message = "任务备注不能为空")
     private String remark;

@@ -117,6 +117,7 @@ const EXC_STATUS: Record<string, string> = {
         <view class="row"><text class="k">司机</text><text>{{ order.staffName || '-' }}</text></view>
         <view class="row"><text class="k">车牌</text><text>{{ order.vehiclePlateNo || '-' }}</text></view>
         <view class="row"><text class="k">货物</text><text>{{ order.cargoName || '-' }}{{ order.cargoWeight ? ' / ' + order.cargoWeight + ' 吨' : '' }}</text></view>
+        <view v-if="order.estimatedDays" class="row"><text class="k">预计使用</text><text>{{ order.estimatedDays }} 天</text></view>
         <view class="row"><text class="k">完成时间</text><text>{{ fmtDateTime(order.completedAt) }}</text></view>
       </SectionCard>
 

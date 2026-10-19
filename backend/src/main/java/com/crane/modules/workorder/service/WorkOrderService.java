@@ -118,6 +118,7 @@ public class WorkOrderService {
         command.setCargoQuantity(request.getCargoQty() == null ? null : BigDecimal.valueOf(request.getCargoQty()));
         command.setCargoWeightTon(request.getCargoWeightTon());
         command.setCraneTonnage(request.getCraneTonnage());
+        command.setEstimatedDays(request.getEstimatedDays());
         command.setPlanStartAt(request.getPlanStartAt());
         command.setRemark(request.getRemark());
         command.setRequirement(request.getRequirement());
@@ -190,6 +191,7 @@ public class WorkOrderService {
         order.setCargoQuantity(command.getCargoQuantity());
         order.setCargoWeight(command.getCargoWeightTon());
         order.setCraneTonnage(command.getCraneTonnage());
+        order.setEstimatedDays(command.getEstimatedDays());
         order.setExpectedStartAt(command.getPlanStartAt());
         order.setRemark(command.getRemark());
         order.setRequirement(command.getRequirement());
@@ -517,6 +519,7 @@ public class WorkOrderService {
         resp.setCargoQuantity(order.getCargoQuantity());
         resp.setCargoWeight(order.getCargoWeight());
         resp.setCraneTonnage(order.getCraneTonnage());
+        resp.setEstimatedDays(order.getEstimatedDays());
         resp.setExpectedStartAt(order.getExpectedStartAt());
         resp.setAcceptedAt(order.getAcceptedAt());
         resp.setStartedAt(order.getStartedAt());
@@ -591,6 +594,9 @@ public class WorkOrderService {
         }
         if (request.getCraneTonnage() != null) {
             order.setCraneTonnage(request.getCraneTonnage());
+        }
+        if (request.getEstimatedDays() != null) {
+            order.setEstimatedDays(request.getEstimatedDays());
         }
         if (request.getRequirement() != null) {
             order.setRequirement(request.getRequirement());

@@ -55,6 +55,9 @@ public class WorkOrderDetailResponse {
 
     private BigDecimal craneTonnage;
 
+    /** 预计使用时长（天），仅备注提示 */
+    private BigDecimal estimatedDays;
+
     private LocalDateTime expectedStartAt;
 
     private LocalDateTime acceptedAt;

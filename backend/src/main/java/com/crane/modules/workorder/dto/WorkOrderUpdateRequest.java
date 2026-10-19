@@ -1,5 +1,6 @@
 package com.crane.modules.workorder.dto;
 
+import jakarta.validation.constraints.DecimalMin;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -38,6 +39,10 @@ public class WorkOrderUpdateRequest {
 
     /** 吊车吨位 */
     private BigDecimal craneTonnage;
+
+    /** 预计使用时长（天），选填，仅备注提示 */
+    @DecimalMin(value = "0.5", message = "estimatedDays 最小 0.5 天")
+    private BigDecimal estimatedDays;
 
     /** 施工要求 */
     private String requirement;

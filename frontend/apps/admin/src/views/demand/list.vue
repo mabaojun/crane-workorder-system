@@ -97,6 +97,7 @@
         <el-descriptions-item label="意向车辆">{{ detail.intendedVehicleId ?? '无' }}</el-descriptions-item>
         <el-descriptions-item label="吊车吨位">{{ detail.craneTonnage != null ? `${detail.craneTonnage} 吨` : '未填' }}</el-descriptions-item>
         <el-descriptions-item label="货物重量">{{ detail.cargoWeight != null ? `${detail.cargoWeight} 吨` : '未填' }}</el-descriptions-item>
+        <el-descriptions-item label="预计使用时长">{{ detail.estimatedDays != null ? `${detail.estimatedDays} 天` : '未填' }}</el-descriptions-item>
         <el-descriptions-item label="期望开始">{{ fmtTime(detail.expectedStartAt) }}</el-descriptions-item>
         <el-descriptions-item label="复核意见">{{ detail.reviewRemark || '无' }}</el-descriptions-item>
         <el-descriptions-item label="驳回次数">{{ detail.rejectCount ?? 0 }}</el-descriptions-item>
@@ -189,6 +190,8 @@ const convertPrefill = ref<{
   planStartAt?: string
   craneTonnage?: number
   cargoWeightTon?: number
+  /** 预计使用时长（天），客户自估值带入可编辑 */
+  estimatedDays?: number
   address?: string
   longitude?: number
   latitude?: number
@@ -267,6 +270,7 @@ function openConvert(row: DemandOrder) {
     planStartAt: row.expectedStartAt || undefined,
     craneTonnage: row.craneTonnage ?? undefined,
     cargoWeightTon: row.cargoWeight ?? undefined,
+    estimatedDays: row.estimatedDays ?? undefined,
     // 客户提报的位置信息：成功选点（含经纬度）时在转工单弹窗自动带出展示
     address: row.address || undefined,
     longitude: row.longitude ?? undefined,
@@ -283,6 +287,7 @@ async function submitConvert(payload: {
   planStartAt: string
   craneTonnage?: number
   cargoWeightTon?: number
+  estimatedDays?: number
   remark: string
 }) {
   if (!convertTarget.value) return
@@ -292,6 +297,7 @@ async function submitConvert(payload: {
     planStartAt: payload.planStartAt,
     craneTonnage: payload.craneTonnage as number,
     cargoWeightTon: payload.cargoWeightTon as number,
+    estimatedDays: payload.estimatedDays,
     remark: payload.remark
   })
   ElMessage.success('已转工单')

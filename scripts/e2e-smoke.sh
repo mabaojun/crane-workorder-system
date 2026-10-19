@@ -55,13 +55,15 @@ req "发送客户验证码" POST /auth/sms-code "" "{\"phone\":\"$CUST_PHONE\",\
 SMSG=$(jq_get data debugCode)
 req "客户验证码登录" POST /auth/sms-login "" "{\"phone\":\"$CUST_PHONE\",\"smsCode\":\"$SMSG\"}"
 CUST=$(jq_get data accessToken)
-req "客户提报需求单" POST /demand/orders "$CUST" "{\"source\":\"CUSTOMER_MP\",\"contactName\":\"E2E联系人\",\"contactPhone\":\"$CUST_PHONE\",\"address\":\"济南市历下区经十路E2E测试点位$TS\",\"longitude\":117.12,\"latitude\":36.71,\"description\":\"吊装钢结构一批\",\"craneTonnage\":25,\"cargoWeight\":8,\"expectedStartAt\":\"2026-12-01T09:00:00+08:00\"}"
+req "客户提报需求单" POST /demand/orders "$CUST" "{\"source\":\"CUSTOMER_MP\",\"contactName\":\"E2E联系人\",\"contactPhone\":\"$CUST_PHONE\",\"address\":\"济南市历下区经十路E2E测试点位$TS\",\"longitude\":117.12,\"latitude\":36.71,\"description\":\"吊装钢结构一批\",\"craneTonnage\":25,\"cargoWeight\":8,\"estimatedDays\":1.5,\"expectedStartAt\":\"2026-12-01T09:00:00+08:00\"}"
 DID=$(jq_get data id)
 
 echo "== 5. 复核与转工单 =="
 req "管理员复核通过" POST /demand/orders/$DID/review "$ADMIN" '{"approve":true,"reviewRemark":"复核通过"}'
-req "需求单转工单" POST /demand/orders/$DID/convert "$ADMIN" "{\"staffId\":$SID,\"vehicleId\":$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_vehicle ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n'),\"planStartAt\":\"2026-12-01T09:00:00+08:00\",\"craneTonnage\":25,\"cargoWeightTon\":8,\"remark\":\"E2E转单\"}"
+req "需求单转工单" POST /demand/orders/$DID/convert "$ADMIN" "{\"staffId\":$SID,\"vehicleId\":$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_vehicle ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n'),\"planStartAt\":\"2026-12-01T09:00:00+08:00\",\"craneTonnage\":25,\"cargoWeightTon\":8,\"estimatedDays\":2,\"remark\":\"E2E转单\"}"
 OID=$(jq_get data convertedOrderId)
+EST_DAYS=$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT estimated_days FROM biz_work_order WHERE id=$OID;" 2>/dev/null | tr -d ' \n')
+if [ "$EST_DAYS" = "2.0" ]; then PASS=$((PASS+1)); echo "PASS  预计使用时长转单落库(2天)"; else FAIL=$((FAIL+1)); echo "FAIL  预计使用时长落库=$EST_DAYS 期望 2.0"; fi
 
 echo "== 6. 司机接单与签到 =="
 req "发送司机验证码" POST /auth/sms-code "" "{\"phone\":\""$STAFF_PHONE"\",\"scene\":\"LOGIN\"}"

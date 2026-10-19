@@ -57,6 +57,9 @@ public class DemandCreateRequest {
     /** 被吊装货物重量（吨） */
     private BigDecimal cargoWeight;
 
+    /** 预计使用时长（天），选填，快捷 0.5/1/1.5/2 天或自定义，仅备注提示 */
+    private BigDecimal estimatedDays;
+
     /** 期望施工时间 */
     private LocalDateTime expectedStartAt;
 

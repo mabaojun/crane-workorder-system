@@ -60,6 +60,10 @@ public class WorkOrderCreateRequest {
     @NotNull(message = "craneTonnage 必填")
     private BigDecimal craneTonnage;
 
+    /** 预计使用时长（天），选填，快捷 0.5/1/1.5/2 天或自定义，仅备注提示 */
+    @DecimalMin(value = "0.5", message = "estimatedDays 最小 0.5 天")
+    private BigDecimal estimatedDays;
+
     /** 枚举 DEMAND、DIRECT */
     @NotBlank(message = "source 必填")
     private String source;

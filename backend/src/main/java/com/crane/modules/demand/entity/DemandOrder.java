@@ -62,6 +62,9 @@ public class DemandOrder {
     /** 被吊装货物重量（吨，需管理员复核） */
     private BigDecimal cargoWeight;
 
+    /** 预计使用时长（天），客户自估仅作备注提示，不参与时间换算 */
+    private BigDecimal estimatedDays;
+
     private LocalDateTime expectedStartAt;
 
     /** 状态：PENDING / REVIEWING / CONVERTED / REJECTED / CLOSED */

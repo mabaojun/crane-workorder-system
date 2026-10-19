@@ -113,6 +113,7 @@ public class DemandService {
         demand.setIntendedVehicleId(req.getIntendedVehicleId());
         demand.setCraneTonnage(req.getCraneTonnage());
         demand.setCargoWeight(req.getCargoWeight());
+        demand.setEstimatedDays(req.getEstimatedDays());
         demand.setExpectedStartAt(req.getExpectedStartAt());
         demand.setStatus("PENDING");
         demand.setRejectCount(0);
@@ -212,6 +213,8 @@ public class DemandService {
         cmd.setLatitude(demand.getLatitude());
         cmd.setCargoWeightTon(req.getCargoWeightTon());
         cmd.setCraneTonnage(req.getCraneTonnage());
+        // 预计使用时长：转单未填时回落需求单客户自估值
+        cmd.setEstimatedDays(req.getEstimatedDays() != null ? req.getEstimatedDays() : demand.getEstimatedDays());
         cmd.setPlanStartAt(req.getPlanStartAt());
         cmd.setRemark(req.getRemark());
         WorkOrder order = workOrderService.create(cmd, operatorId);

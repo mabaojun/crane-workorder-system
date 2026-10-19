@@ -93,6 +93,12 @@
             <span class="unit">吨</span>
           </el-form-item>
         </el-col>
+        <el-col :span="12">
+          <el-form-item label="预计使用时长">
+            <el-input-number v-model="form.estimatedDays" :min="0.5" :step="0.5" :precision="1" controls-position="right" style="width: 100%" />
+            <span class="unit">天</span>
+          </el-form-item>
+        </el-col>
         <el-col :span="24">
           <el-form-item label="施工地址">
             <el-input v-model="form.address" maxlength="255" placeholder="施工地址">
@@ -178,6 +184,7 @@ const form = reactive({
   vehicleId: undefined as number | undefined,
   craneTonnage: undefined as number | undefined,
   cargoWeightTon: undefined as number | undefined,
+  estimatedDays: undefined as number | undefined,
   address: '',
   longitude: undefined as number | undefined,
   latitude: undefined as number | undefined,
@@ -194,6 +201,7 @@ const snapshot = ref({
   vehicleId: null as number | null,
   craneTonnage: null as number | null,
   cargoWeightTon: null as number | null,
+  estimatedDays: null as number | null,
   address: '',
   longitude: null as number | null,
   latitude: null as number | null,
@@ -230,6 +238,7 @@ function onOpen() {
   form.vehicleId = o.vehicleId ?? undefined
   form.craneTonnage = o.craneTonnage ?? undefined
   form.cargoWeightTon = o.cargoWeight ?? undefined
+  form.estimatedDays = o.estimatedDays ?? undefined
   form.address = o.address || ''
   form.longitude = o.longitude ?? undefined
   form.latitude = o.latitude ?? undefined
@@ -243,6 +252,7 @@ function onOpen() {
     vehicleId: o.vehicleId,
     craneTonnage: o.craneTonnage,
     cargoWeightTon: o.cargoWeight,
+    estimatedDays: o.estimatedDays,
     address: form.address,
     longitude: o.longitude,
     latitude: o.latitude,
@@ -305,6 +315,7 @@ function buildBody(): WorkOrderUpdateRequest | null {
   if (form.planStartAt !== snapshot.value.planStartAt) body.planStartAt = form.planStartAt
   if (numChanged(form.craneTonnage, snapshot.value.craneTonnage)) body.craneTonnage = form.craneTonnage
   if (numChanged(form.cargoWeightTon, snapshot.value.cargoWeightTon)) body.cargoWeightTon = form.cargoWeightTon
+  if (numChanged(form.estimatedDays, snapshot.value.estimatedDays)) body.estimatedDays = form.estimatedDays
   const remark = form.remark.trim()
   if (remark !== snapshot.value.remark) body.remark = remark
   const requirement = form.requirement.trim()

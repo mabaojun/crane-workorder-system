@@ -90,6 +90,11 @@
           <el-input-number v-model="form.cargoWeightTon" :min="0.1" :precision="2" controls-position="right" placeholder="选填" style="width: 200px" />
           <span class="unit">吨</span>
         </el-form-item>
+        <el-form-item label="预计使用时长">
+          <el-input-number v-model="form.estimatedDays" :min="0.5" :step="0.5" :precision="1" controls-position="right" placeholder="选填" style="width: 200px" />
+          <span class="unit">天</span>
+          <span class="unit">仅备注提示，不作换算</span>
+        </el-form-item>
       </template>
       <el-form-item :label="mode === 'convert' ? '任务备注' : '备注'">
         <div class="remark-block">
@@ -159,6 +164,8 @@ const props = defineProps<{
     planStartAt?: string
     craneTonnage?: number
     cargoWeightTon?: number
+    /** 预计使用时长（天），转工单时带入需求单客户自估值，可编辑 */
+    estimatedDays?: number
     remark?: string
     /** 客户提报的位置信息（转工单时带出展示） */
     address?: string
@@ -171,6 +178,8 @@ const props = defineProps<{
     planStartAt: string
     craneTonnage?: number
     cargoWeightTon?: number
+    /** 预计使用时长（天），选填，仅备注提示 */
+    estimatedDays?: number
     remark: string
     confirmPast: boolean
   }) => Promise<void>
@@ -185,6 +194,7 @@ const form = reactive({
   planStartAt: '',
   craneTonnage: undefined as number | undefined,
   cargoWeightTon: undefined as number | undefined,
+  estimatedDays: undefined as number | undefined,
   remark: '',
   confirmPast: false
 })
@@ -250,6 +260,7 @@ async function loadOptions() {
   form.planStartAt = props.prefill?.planStartAt ?? ''
   form.craneTonnage = props.prefill?.craneTonnage
   form.cargoWeightTon = props.prefill?.cargoWeightTon
+  form.estimatedDays = props.prefill?.estimatedDays
   form.remark = props.prefill?.remark ?? ''
   optionsLoading.value = true
   optionsError.value = false
@@ -307,6 +318,7 @@ async function onSubmit() {
       planStartAt: form.planStartAt,
       craneTonnage: form.craneTonnage,
       cargoWeightTon: form.cargoWeightTon,
+      estimatedDays: form.estimatedDays,
       remark: form.remark.trim(),
       confirmPast: form.confirmPast
     })

@@ -26,6 +26,8 @@ export interface WorkOrder {
   cargoQuantity: number | null
   cargoWeight: number | null
   craneTonnage: number | null
+  /** 预计使用时长（天），仅备注提示 */
+  estimatedDays: number | null
   expectedStartAt: string | null
   acceptedAt: string | null
   startedAt: string | null
@@ -77,6 +79,8 @@ export interface WorkOrderCreateRequest {
   /** 选填：货物重量（吨） */
   cargoWeightTon?: number
   craneTonnage: number
+  /** 预计使用时长（天），选填，快捷 0.5/1/1.5/2 或自定义，仅备注提示 */
+  estimatedDays?: number
   remark?: string
   requirement?: string
   /** 时间早于当前时的二次确认 */
@@ -96,6 +100,8 @@ export interface WorkOrderUpdateRequest {
   planStartAt?: string
   craneTonnage?: number
   cargoWeightTon?: number
+  /** 预计使用时长（天），选填，仅备注提示 */
+  estimatedDays?: number
   remark?: string
   requirement?: string
   /** 计划时间早于当前时的二次确认 */

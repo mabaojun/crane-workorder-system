@@ -100,6 +100,8 @@ export function createDemandOrder(body: {
   cargoWeight?: number
   /** 设备吨位（点选常用档位或直接输入），选填 */
   craneTonnage?: number
+  /** 预计使用时长（天），选填，仅备注提示 */
+  estimatedDays?: number
   expectedStartAt?: string
   parentDemandId?: number
 }) {

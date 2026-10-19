@@ -23,8 +23,11 @@ const locating = ref(false)
 const description = ref('')
 const cargoWeight = ref('')
 const craneTonnage = ref('')
+const estimatedDays = ref('')
 /** 设备吨位常用档位：点选快捷，也可直接输入其他吨位 */
 const TONNAGE_PRESETS = [8, 16, 25, 50, 70, 80, 100, 110, 130, 150, 200, 300]
+/** 预计使用时长常用档位（天）：点选快捷，也可直接输入（0.5 步进），仅备注提示 */
+const DAYS_PRESETS = [0.5, 1, 1.5, 2, 3]
 const expectDate = ref('')
 const expectTime = ref('')
 const photos = ref<string[]>([])
@@ -88,6 +91,7 @@ onLoad((opts) => {
     address.value = d.address ?? ''
     description.value = d.description ?? ''
     cargoWeight.value = d.cargoWeight != null ? String(d.cargoWeight) : ''
+    estimatedDays.value = d.estimatedDays != null ? String(d.estimatedDays) : ''
     uni.removeStorageSync('demand_draft')
   }
 })
@@ -167,6 +171,8 @@ async function submit() {
       cargoWeight: cargoWeight.value ? Number(cargoWeight.value) : undefined,
       // 设备吨位：点选常用档位或直接输入
       craneTonnage: craneTonnage.value ? Number(craneTonnage.value) : undefined,
+      // 预计使用时长：点选常用档位或直接输入，仅备注提示不作换算
+      estimatedDays: estimatedDays.value ? Number(estimatedDays.value) : undefined,
       expectedStartAt,
       parentDemandId: parentDemandId.value
     })
@@ -242,6 +248,20 @@ async function submit() {
             @tap="craneTonnage = craneTonnage === String(t) ? '' : String(t)"
           >{{ t }}</view>
         </view>
+      </view>
+      <view class="field">
+        <text class="label">预计使用时长(天)</text>
+        <input v-model="estimatedDays" class="input" type="digit" placeholder="选填，点选下方常用时长，或直接输入" placeholder-class="ph" />
+        <view class="tonnage-chips">
+          <view
+            v-for="d in DAYS_PRESETS"
+            :key="d"
+            class="tonnage-chip"
+            :class="{ active: estimatedDays === String(d) }"
+            @tap="estimatedDays = estimatedDays === String(d) ? '' : String(d)"
+          >{{ d }}天</view>
+        </view>
+        <text class="hint-line">仅作备注提示，帮助司机与调度安排，不作为结算依据</text>
       </view>
       <view class="field half-wrap">
         <view class="half">
@@ -442,6 +462,11 @@ async function submit() {
   color: var(--brand);
   background: var(--brand-weak);
   font-weight: 600;
+}
+.hint-line {
+  font-size: 12px;
+  color: var(--sub);
+  margin-top: 6px;
 }
 .desc-chips {
   display: flex;

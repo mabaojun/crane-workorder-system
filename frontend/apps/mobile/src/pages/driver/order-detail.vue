@@ -374,6 +374,7 @@ function onTaskEnd() {
         </view>
         <view class="row"><text class="k">计划开始</text><text>{{ order.expectedStartAt || '-' }}</text></view>
         <view class="row"><text class="k">货物</text><text>{{ order.cargoName || '-' }}{{ order.cargoWeight ? ' / ' + order.cargoWeight + ' 吨' : '' }}</text></view>
+        <view v-if="order.estimatedDays" class="row"><text class="k">预计使用</text><text>{{ order.estimatedDays }} 天（备注提示）</text></view>
       </view>
 
       <!-- 状态化操作区：核心操作高度 48px，全宽（≥44dp） -->
