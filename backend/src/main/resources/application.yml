@@ -35,6 +35,15 @@ crane:
   jwt:
     secret: ${CRANE_JWT_SECRET:crane-dev-secret-change-in-prod-0123456789abcdef}
     expire-hours: 720
+  wechat:
+    # 微信小程序登录（jscode2session）：生产用环境变量注入；留空表示微信登录通道未配置
+    appid: ${WECHAT_APPID:}
+    secret: ${WECHAT_SECRET:}
+    # 未绑定手机号时签发的绑定凭据有效期（分钟）
+    bind-ticket-minutes: 10
+  sms:
+    # 短信通道尚未接入真实供应商：生产必须设为 false，避免验证码 debugCode 回显
+    mock: ${CRANE_SMS_MOCK:true}
   init:
     # 首次启动无账号时自动创建管理员（生产环境用环境变量覆盖）
     admin-phone: ${CRANE_ADMIN_PHONE:13800000000}
@@ -42,8 +51,8 @@ crane:
   file:
     upload-dir: ${CRANE_FILE_DIR:./data/files}
   cors:
-    # 生产经 Nginx 反代同源；本地联调放开
-    allowed-origins: "*"
+    # 生产经 Nginx 反代同源；本地联调默认放开
+    allowed-origins: ${CRANE_CORS_ORIGINS:*}
 
 logging:
   level:

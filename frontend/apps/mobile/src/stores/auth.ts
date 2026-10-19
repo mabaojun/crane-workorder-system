@@ -2,7 +2,15 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { uniTokenAdapter } from '../api/client'
-import { fetchMe, logout, passwordLogin, smsLogin } from '../api/modules/auth'
+import {
+  bindPhone as bindPhoneApi,
+  fetchMe,
+  logout,
+  passwordLogin,
+  selectRole,
+  smsLogin,
+  wechatLogin as wechatLoginApi
+} from '../api/modules/auth'
 import type { MeInfo } from '../api/types'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -29,6 +37,34 @@ export const useAuthStore = defineStore('auth', () => {
     me.value = await fetchMe()
   }
 
+  /** 微信授权登录：未绑定手机号时返回 bindTicket，由登录页继续引导绑定 */
+  async function wechatLogin(code: string): Promise<{ needBind: boolean; bindTicket?: string }> {
+    const res = await wechatLoginApi(code, 'mp')
+    if (!res.bound) {
+      return { needBind: true, bindTicket: res.bindTicket }
+    }
+    token.value = res.accessToken
+    uniTokenAdapter.set(res.accessToken)
+    await loadMe()
+    return { needBind: false }
+  }
+
+  /** 微信授权后绑定预留手机号，成功后与验证码登录同流程 */
+  async function bindPhone(phone: string, smsCode: string, bindTicket: string) {
+    const res = await bindPhoneApi(phone, smsCode, bindTicket)
+    token.value = res.accessToken
+    uniTokenAdapter.set(res.accessToken)
+    await loadMe()
+  }
+
+  /** 多角色账号：按所选身份重新签发令牌并刷新个人信息 */
+  async function switchRole(roleCode: string) {
+    const res = await selectRole(roleCode)
+    token.value = res.accessToken
+    uniTokenAdapter.set(res.accessToken)
+    await loadMe()
+  }
+
   async function doLogout() {
     try {
       if (token.value) await logout()
@@ -51,5 +87,18 @@ export const useAuthStore = defineStore('auth', () => {
     uni.reLaunch({ url: '/pages/login/index' })
   }
 
-  return { token, me, role, login, loginByPassword, loadMe, doLogout, clear, handleUnauthorized }
+  return {
+    token,
+    me,
+    role,
+    login,
+    loginByPassword,
+    wechatLogin,
+    bindPhone,
+    loadMe,
+    switchRole,
+    doLogout,
+    clear,
+    handleUnauthorized
+  }
 })

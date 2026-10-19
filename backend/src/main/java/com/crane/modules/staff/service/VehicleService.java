@@ -34,8 +34,8 @@ public class VehicleService {
     /** 车辆状态合法取值（01 §6.3 锁定） */
     private static final Set<String> STATUSES = Set.of("IDLE", "BUSY", "BUSY_THIRD", "MAINTENANCE", "DISABLED");
 
-    /** 车辆类型合法取值 */
-    private static final Set<String> TYPES = Set.of("CRANE", "LIFT");
+    /** 车辆种类合法取值 */
+    private static final Set<String> TYPES = Set.of("CRANE", "LIFT", "SEMI_TRAILER", "HEAVY_TRAILER");
 
     /** 司机端允许手动切换的目标状态（停用仅管理员） */
     private static final Set<String> DRIVER_ALLOWED_TARGETS = Set.of("IDLE", "BUSY_THIRD", "MAINTENANCE");
@@ -193,23 +193,20 @@ public class VehicleService {
         vehicle.setModel(req.getModel());
         vehicle.setDefaultStaffId(req.getDefaultStaffId());
         vehicle.setRemark(req.getRemark());
-        // 车辆类型规格：吊车维护吨位、举升车维护举升高度，互斥清理
+        // 车辆种类：吊车维护吨位、举升车维护举升高度，其余种类不设专属属性；所有属性均选填
         String type = req.getType() == null || req.getType().isBlank() ? "CRANE" : req.getType();
         if (!TYPES.contains(type)) {
-            throw new BizException(ErrorCode.ENUM_INVALID, "车辆类型取值非法");
+            throw new BizException(ErrorCode.ENUM_INVALID, "车辆种类取值非法");
         }
         vehicle.setType(type);
-        if ("LIFT".equals(type)) {
-            if (req.getLiftHeight() == null) {
-                throw new BizException(ErrorCode.PARAM_MISSING, "举升车必须填写举升高度");
-            }
+        if ("CRANE".equals(type)) {
+            vehicle.setTonnage(req.getTonnage());
+            vehicle.setLiftHeight(null);
+        } else if ("LIFT".equals(type)) {
             vehicle.setLiftHeight(req.getLiftHeight());
             vehicle.setTonnage(null);
         } else {
-            if (req.getTonnage() == null) {
-                throw new BizException(ErrorCode.PARAM_MISSING, "吊车必须填写吨位");
-            }
-            vehicle.setTonnage(req.getTonnage());
+            vehicle.setTonnage(null);
             vehicle.setLiftHeight(null);
         }
         // 证照信息：车架号 / 车险购买日 / 审车日；审车周期未指定时按 VIN 年款自动带出

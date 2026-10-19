@@ -47,6 +47,10 @@ public class DemandService {
     /** 需求单来源合法取值（02 §3.3.5） */
     private static final Set<String> SOURCES = Set.of("CUSTOMER_MP", "PHONE", "ADMIN");
 
+    /** 用车种类合法取值 */
+    private static final Set<String> VEHICLE_TYPES =
+            Set.of("CRANE", "LIFT", "SEMI_TRAILER", "HEAVY_TRAILER");
+
     private static final DateTimeFormatter NO_DATE = DateTimeFormatter.BASIC_ISO_DATE;
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -114,7 +118,10 @@ public class DemandService {
         demand.setDescription(req.getDescription());
         demand.setImageUrls(toJson(req.getImageUrls()));
         demand.setIntendedVehicleId(req.getIntendedVehicleId());
-        demand.setCraneTonnage(req.getCraneTonnage());
+        // 用车种类：客户提报必选，缺省按吊车兼容历史数据；非吊车不保留吊车吨位
+        String vehicleType = normalizeVehicleType(req.getVehicleType());
+        demand.setVehicleType(vehicleType);
+        demand.setCraneTonnage("CRANE".equals(vehicleType) ? req.getCraneTonnage() : null);
         demand.setCargoWeight(req.getCargoWeight());
         demand.setEstimatedDays(req.getEstimatedDays());
         demand.setSettlementType(settlementType);
@@ -209,14 +216,21 @@ public class DemandService {
         cmd.setSource("DEMAND");
         cmd.setDemandOrderId(demand.getId());
         cmd.setCustomerId(demand.getCustomerId());
-        cmd.setContactId(demand.getContactId());
+        // 联系人：转单时管理员可改选企业客户下的具体联系人，未改选沿用需求单提报联系人
+        cmd.setContactId(req.getContactId() != null ? req.getContactId() : demand.getContactId());
         cmd.setStaffId(req.getStaffId());
         cmd.setVehicleId(req.getVehicleId());
+        // 用车种类：转单可覆盖，未选沿用需求单；吊车吨位仅吊车类型保留
+        String vehicleType = normalizeVehicleType(
+                req.getVehicleType() != null ? req.getVehicleType() : demand.getVehicleType());
+        cmd.setVehicleType(vehicleType);
         cmd.setAddress(demand.getAddress());
         cmd.setLongitude(demand.getLongitude());
         cmd.setLatitude(demand.getLatitude());
         cmd.setCargoWeightTon(req.getCargoWeightTon());
-        cmd.setCraneTonnage(req.getCraneTonnage());
+        if ("CRANE".equals(vehicleType)) {
+            cmd.setCraneTonnage(req.getCraneTonnage() != null ? req.getCraneTonnage() : demand.getCraneTonnage());
+        }
         // 预计使用时长：转单未填时回落需求单客户自估值
         cmd.setEstimatedDays(req.getEstimatedDays() != null ? req.getEstimatedDays() : demand.getEstimatedDays());
         // 结算主体：转单未选时回落需求单提报值（企业带出/个人）
@@ -296,14 +310,25 @@ public class DemandService {
         return "客户用户";
     }
 
-    /** 任务名称：需求描述截断 100 字符，缺省“吊装任务-需求单编号” */
+    /** 任务名称：需求描述截断 100 字符，缺省“用车任务-需求单编号” */
     private String resolveTaskName(DemandOrder demand) {
         String description = demand.getDescription();
         if (description != null && !description.isBlank()) {
             String trimmed = description.trim();
             return trimmed.length() <= TASK_NAME_MAX_LEN ? trimmed : trimmed.substring(0, TASK_NAME_MAX_LEN);
         }
-        return "吊装任务-" + demand.getDemandNo();
+        return "用车任务-" + demand.getDemandNo();
+    }
+
+    /** 用车种类解析：缺省 CRANE（兼容历史数据），非法取值 20008 */
+    private String normalizeVehicleType(String type) {
+        if (type == null || type.isBlank()) {
+            return "CRANE";
+        }
+        if (!VEHICLE_TYPES.contains(type)) {
+            throw new BizException(ErrorCode.ENUM_INVALID, "用车种类取值非法");
+        }
+        return type;
     }
 
     /** 图片列表转 JSON 字符串落库 */

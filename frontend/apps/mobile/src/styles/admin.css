@@ -1,0 +1,502 @@
+/* 管理员移动办公：科技风、卡片化基础样式（全端统一前缀 adm-，避免与业务样式冲突） */
+.adm-page {
+  min-height: 100vh;
+  background: #f2f5fa;
+  padding: 12px 16px calc(92px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 深色指挥台头部 */
+.adm-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  padding: 18px;
+  background: linear-gradient(135deg, #0b1f3a 0%, #123a6b 58%, #0e7490 100%);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(11, 31, 58, 0.22);
+}
+.adm-hero::after {
+  content: '';
+  position: absolute;
+  right: -46px;
+  top: -64px;
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.38), transparent 68%);
+  pointer-events: none;
+}
+.adm-hero-kicker {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.62);
+  text-transform: uppercase;
+}
+.adm-hero-title {
+  display: block;
+  margin: 6px 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.adm-hero-title .hl {
+  color: #67e8f9;
+}
+.adm-hero-sub {
+  display: block;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.adm-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: #a5f3fc;
+  background: rgba(34, 211, 238, 0.14);
+  border: 1px solid rgba(103, 232, 249, 0.36);
+}
+
+/* 两列统计 */
+.adm-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.adm-stat {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+.adm-stat::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent, #3b82f6);
+}
+.adm-stat-num {
+  display: block;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+.adm-stat-label {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  color: #334155;
+}
+.adm-stat-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* 通用白色区块 */
+.adm-section {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+.adm-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.adm-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.adm-section-link {
+  font-size: 12px;
+  color: #0e7490;
+}
+
+/* 快捷入口 */
+.adm-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.adm-quick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+.adm-quick:active {
+  border-color: #38bdf8;
+  background: #f0f9ff;
+}
+.adm-quick-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  flex: none;
+}
+.adm-quick-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+.adm-quick-desc {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* 顶部筛选标签 */
+.adm-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.adm-tab {
+  flex: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: #475569;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+.adm-tab.active {
+  color: #fff;
+  background: linear-gradient(135deg, #0b1f3a, #0e7490);
+  border-color: transparent;
+  box-shadow: 0 3px 10px rgba(14, 116, 144, 0.24);
+}
+
+/* 列表卡片 */
+.adm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.adm-item {
+  position: relative;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 13px 14px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+.adm-item:active {
+  border-color: #7dd3fc;
+}
+.adm-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.adm-item-no {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+.adm-item-title {
+  display: block;
+  margin: 6px 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+}
+.adm-item-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #64748b;
+}
+.adm-item-row {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  color: #334155;
+  margin-top: 4px;
+}
+.adm-item-row .k {
+  flex: none;
+  width: 60px;
+  color: #94a3b8;
+}
+.adm-item-row .v {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+}
+.adm-item-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #e2e8f0;
+}
+.adm-time {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* 待办标记 */
+.adm-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 11px;
+  color: #fff;
+  background: #ef4444;
+}
+
+/* 提示条 */
+.adm-error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.adm-info {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.adm-empty {
+  padding: 36px 0;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+}
+.adm-loading {
+  padding: 28px 0;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* 详情键值 */
+.adm-kv {
+  display: flex;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 14px;
+  color: #1e293b;
+  border-bottom: 1px dashed #eef2f7;
+}
+.adm-kv:last-child {
+  border-bottom: none;
+}
+.adm-kv .k {
+  flex: none;
+  width: 76px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+.adm-kv .v {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+}
+.adm-kv .v.strong {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+/* 表单 */
+.adm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.adm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.adm-label {
+  font-size: 12px;
+  color: #64748b;
+}
+.adm-input,
+.adm-textarea,
+.adm-picker {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 14px;
+  color: #0f172a;
+}
+.adm-textarea {
+  min-height: 76px;
+}
+.adm-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #0f172a;
+}
+.adm-picker .placeholder {
+  color: #94a3b8;
+}
+.adm-picker .arrow {
+  width: 7px;
+  height: 7px;
+  border-top: 1.5px solid #94a3b8;
+  border-right: 1.5px solid #94a3b8;
+  transform: rotate(45deg);
+  flex: none;
+}
+.adm-inline {
+  display: flex;
+  gap: 10px;
+}
+.adm-inline > .adm-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 日期 / 时间 / 吨位快捷档位 */
+.adm-chip-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.adm-chip-row .adm-chip {
+  flex: 1;
+}
+.adm-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+.adm-chip {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.adm-chip.active {
+  color: #fff;
+  background: linear-gradient(135deg, #0b1f3a, #0e7490);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+/* 按钮 */
+.adm-btn {
+  min-height: 46px;
+  line-height: 46px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  border: none;
+}
+.adm-btn::after {
+  border: none;
+}
+.adm-btn.primary {
+  color: #fff;
+  background: linear-gradient(135deg, #0b1f3a, #0e7490);
+  box-shadow: 0 6px 16px rgba(14, 116, 144, 0.24);
+}
+.adm-btn.ghost {
+  color: #0e7490;
+  background: #ecfeff;
+  border: 1px solid #a5f3fc;
+}
+.adm-btn.danger {
+  color: #fff;
+  background: #dc2626;
+}
+.adm-btn.plain-danger {
+  color: #dc2626;
+  background: #fff;
+  border: 1px solid #fecaca;
+}
+.adm-btn[disabled] {
+  opacity: 0.55;
+}
+.adm-btn-row {
+  display: flex;
+  gap: 10px;
+}
+.adm-btn-row .adm-btn {
+  flex: 1;
+}
+.adm-sticky-actions {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  display: flex;
+  gap: 10px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid #e2e8f0;
+  backdrop-filter: blur(8px);
+}
+.adm-sticky-actions .adm-btn {
+  flex: 1;
+}

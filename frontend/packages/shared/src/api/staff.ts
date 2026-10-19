@@ -1,6 +1,7 @@
 // 员工与车辆档案域接口封装（管理端专用）
 import { request } from './client'
 import type { PageData } from '../index'
+import { VEHICLE_TYPE_LABEL } from '../index'
 
 /** 员工档案，字段与后端 Staff 一致 */
 export interface Staff {
@@ -21,6 +22,8 @@ export interface Staff {
   hireDate: string | null
   /** 绑定登录账号 sys_user.id，null 表示未创建账号 */
   userId: number | null
+  /** 是否具有管理员角色（司机/员工可一人多角色） */
+  adminRole?: boolean
   remark: string | null
   createdAt: string
   updatedAt: string
@@ -31,7 +34,7 @@ export interface Vehicle {
   id: number
   plateNo: string
   model: string | null
-  /** 车辆类型：CRANE 吊车 / LIFT 举升车 */
+  /** 车辆种类：CRANE 吊车 / LIFT 举升车 / SEMI_TRAILER 板车（半挂）/ HEAVY_TRAILER 大件托盘车 */
   type: string
   /** 吊车吨位（吨），仅 CRANE 有值 */
   tonnage: number | null
@@ -68,6 +71,8 @@ export interface StaffUpsertRequest {
   hireDate?: string
   /** 创建时是否顺带创建登录账号 */
   createAccount?: boolean
+  /** 是否赋予管理员角色（一人多角色，登录后在小程序选择身份） */
+  adminRole?: boolean
   /** 登录账号初始密码（仅创建账号时生效，选填，≥6 位） */
   initialPassword?: string
   remark?: string
@@ -76,11 +81,11 @@ export interface StaffUpsertRequest {
 export interface VehicleUpsertRequest {
   plateNo: string
   model?: string
-  /** CRANE 吊车 / LIFT 举升车，缺省 CRANE */
+  /** CRANE 吊车 / LIFT 举升车 / SEMI_TRAILER 板车（半挂）/ HEAVY_TRAILER 大件托盘车，缺省 CRANE */
   type?: string
-  /** CRANE 必填 */
+  /** 选填 */
   tonnage?: number
-  /** LIFT 必填，常用 20/30 米 */
+  /** 选填，常用 20/30 米 */
   liftHeight?: number
   defaultStaffId?: number
   status?: string
@@ -142,10 +147,18 @@ export function driverChangeVehicleStatus(id: number | string, status: string) {
   return request<Vehicle>(`/staff/vehicles/${id}/driver-status`, { method: 'POST', body: { status } })
 }
 
-/** 车辆规格展示文案：吊车「25吨」/ 举升车「举升20米」 */
+/** 车辆规格展示文案：吊车「25吨」/ 举升车「举升20米」/ 板车 / 大件托盘车 */
 export function vehicleSpecLabel(vehicle: Pick<Vehicle, 'type' | 'tonnage' | 'liftHeight'>): string {
   if (vehicle.type === 'LIFT') {
     return vehicle.liftHeight != null ? `举升${vehicle.liftHeight}米` : '举升车'
   }
+  if (vehicle.type === 'SEMI_TRAILER' || vehicle.type === 'HEAVY_TRAILER') {
+    return VEHICLE_TYPE_LABEL[vehicle.type] || vehicle.type
+  }
   return vehicle.tonnage != null ? `${vehicle.tonnage}吨` : '吊车'
+}
+
+/** 车辆种类中文标签（空值按吊车） */
+export function vehicleTypeLabel(type?: string | null): string {
+  return VEHICLE_TYPE_LABEL[type || 'CRANE'] || '吊车'
 }

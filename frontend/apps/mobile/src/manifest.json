@@ -26,13 +26,18 @@
     }
   },
   "mp-weixin": {
-    "appid": "touristappid",
+    "appid": "wxcd19e4508b62d824",
     "setting": {
       "urlCheck": false,
       "es6": true,
       "minified": true
     },
     "usingComponents": true,
-    "requiredPrivateInfos": ["getLocation"]
+    "requiredPrivateInfos": ["getLocation"],
+    "permission": {
+      "scope.userLocation": {
+        "desc": "用于司机定位打卡、地图选点与导航"
+      }
+    }
   }
 }

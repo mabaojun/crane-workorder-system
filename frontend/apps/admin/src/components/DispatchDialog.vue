@@ -42,6 +42,11 @@
           </template>
         </el-select>
       </el-form-item>
+      <el-form-item label="用车种类" required>
+        <el-select v-model="form.vehicleType" style="width: 100%" @change="onTypeChange">
+          <el-option v-for="opt in VEHICLE_TYPE_OPTIONS" :key="opt.value" :value="opt.value" :label="opt.label" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="施工车辆" required>
         <el-select
           v-model="form.vehicleId"
@@ -59,7 +64,7 @@
           <template #empty>
             <p v-if="optionsLoading" class="select-hint">数据加载中…</p>
             <p v-else-if="optionsError" class="select-hint">加载失败，请关闭弹窗重试</p>
-            <p v-else class="select-hint">暂无可派车辆</p>
+            <p v-else class="select-hint">该种类暂无可用车辆</p>
           </template>
         </el-select>
         <div class="tip">停用/维保/第三方外出车辆不可派；作业中车辆提交时按 6 小时施工时段校验冲突</div>
@@ -82,6 +87,28 @@
         </div>
       </el-form-item>
       <template v-if="mode === 'convert'">
+        <el-form-item v-if="!prefill?.settlementCustomerIsPerson" label="客户联系人">
+          <el-select
+            v-model="form.contactId"
+            filterable
+            clearable
+            :loading="contactsLoading"
+            placeholder="选择该公司联系人"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="c in contacts"
+              :key="c.id"
+              :value="c.id"
+              :label="`${c.name}（${c.phone}）${c.isDefault === 1 ? ' · 默认' : ''}`"
+            />
+            <template #empty>
+              <p v-if="contactsLoading" class="select-hint">数据加载中…</p>
+              <p v-else class="select-hint">该公司暂无联系人，可在客户档案中补充</p>
+            </template>
+          </el-select>
+          <div class="tip">选择具体联系人后，司机接单即可直接联系对接人</div>
+        </el-form-item>
         <el-form-item label="结算主体" required>
           <el-radio-group v-model="form.settlementType">
             <el-radio value="ENTERPRISE" :disabled="!!prefill?.settlementCustomerIsPerson">
@@ -95,7 +122,7 @@
               : '企业主体：订单统一归属该企业结算；个人结算：以个人名义结算' }}
           </div>
         </el-form-item>
-        <el-form-item label="吊车吨位" required>
+        <el-form-item v-if="form.vehicleType === 'CRANE'" label="吊车吨位" required>
           <el-input-number v-model="form.craneTonnage" :min="1" :precision="1" controls-position="right" style="width: 200px" />
           <span class="unit">吨</span>
         </el-form-item>
@@ -161,7 +188,8 @@ import {
 import type { CheckItem } from '@crane/shared/api/dispatch'
 import { pageStaffs, type Staff, type Vehicle } from '@crane/shared/api/staff'
 import { pageVehicles, vehicleSpecLabel } from '@crane/shared/api/staff'
-import { VEHICLE_STATUS_LABEL } from '@crane/shared'
+import { listContacts, type CustomerContact } from '@crane/shared/api/customer'
+import { VEHICLE_STATUS_LABEL, VEHICLE_TYPE_OPTIONS } from '@crane/shared'
 import PrecheckList from './PrecheckList.vue'
 import dayjs from 'dayjs'
 
@@ -175,6 +203,8 @@ const props = defineProps<{
   title: string
   prefill?: {
     planStartAt?: string
+    /** 用车种类：转工单带入需求单值，改派带入工单值 */
+    vehicleType?: string
     craneTonnage?: number
     cargoWeightTon?: number
     /** 预计使用时长（天），转工单时带入需求单客户自估值，可编辑 */
@@ -189,10 +219,15 @@ const props = defineProps<{
     /** 需求单所属客户名称与类型（企业主体展示客户名；个人客户仅个人结算） */
     settlementCustomerName?: string
     settlementCustomerIsPerson?: boolean
+    /** 需求单所属客户 id 与提报联系人 id（转工单时带出企业联系人列表） */
+    customerId?: number
+    contactId?: number
   }
   submit: (payload: {
     staffId: number
     vehicleId: number
+    /** 用车种类：须与所选车辆种类一致 */
+    vehicleType?: string
     planStartAt: string
     craneTonnage?: number
     cargoWeightTon?: number
@@ -200,6 +235,8 @@ const props = defineProps<{
     estimatedDays?: number
     /** 结算主体，仅转工单场景提交 */
     settlementType?: string
+    /** 客户联系人，仅转工单场景提交 */
+    contactId?: number
     remark: string
     confirmPast: boolean
   }) => Promise<void>
@@ -211,17 +248,22 @@ const formRef = ref<FormInstance>()
 const form = reactive({
   staffId: undefined as number | undefined,
   vehicleId: undefined as number | undefined,
+  vehicleType: 'CRANE',
   planStartAt: '',
   craneTonnage: undefined as number | undefined,
   cargoWeightTon: undefined as number | undefined,
   estimatedDays: undefined as number | undefined,
   settlementType: 'ENTERPRISE' as string,
+  contactId: undefined as number | undefined,
   remark: '',
   confirmPast: false
 })
 
 const staffs = ref<Staff[]>([])
 const vehicles = ref<Vehicle[]>([])
+// 企业客户联系人（转工单场景）
+const contacts = ref<CustomerContact[]>([])
+const contactsLoading = ref(false)
 const checks = ref<CheckItem[]>([])
 const checking = ref(false)
 const submitting = ref(false)
@@ -229,8 +271,15 @@ const submitting = ref(false)
 const optionsLoading = ref(false)
 const optionsError = ref(false)
 
-/** 可派车辆：停用不可派，其余（含作业中）均可选，作业中提交时按 6 小时施工时段校验冲突 */
-const availableVehicles = computed(() => vehicles.value.filter((v) => v.status !== 'DISABLED'))
+/** 可派车辆：按用车种类过滤；停用不可派，其余（含作业中）均可选，作业中提交时按 6 小时施工时段校验冲突 */
+const availableVehicles = computed(() =>
+  vehicles.value.filter((v) => v.status !== 'DISABLED' && (v.type || 'CRANE') === form.vehicleType)
+)
+
+/** 切换用车种类后清空已选车辆，避免种类与车辆不一致 */
+function onTypeChange() {
+  form.vehicleId = undefined
+}
 
 function vehicleStatusText(status: string) {
   return VEHICLE_STATUS_LABEL[status] || status
@@ -278,6 +327,7 @@ function setQuickDate(offsetDays: number) {
 async function loadOptions() {
   form.staffId = undefined
   form.vehicleId = undefined
+  form.vehicleType = props.prefill?.vehicleType || 'CRANE'
   form.planStartAt = props.prefill?.planStartAt ?? ''
   form.craneTonnage = props.prefill?.craneTonnage
   form.cargoWeightTon = props.prefill?.cargoWeightTon
@@ -295,11 +345,35 @@ async function loadOptions() {
     ])
     staffs.value = staffPage.list.filter((s) => s.position === 'DRIVER' && s.status !== 'RESIGNED')
     vehicles.value = vehiclePage.list
+    if (props.mode === 'convert') {
+      await loadContacts()
+    }
   } catch (e) {
     optionsError.value = true
     ElMessage.error(e instanceof Error ? e.message : '加载司机车辆失败')
   } finally {
     optionsLoading.value = false
+  }
+}
+
+/** 企业客户联系人：优先需求单提报人，其次默认联系人，最后第一位 */
+async function loadContacts() {
+  form.contactId = undefined
+  contacts.value = []
+  const customerId = props.prefill?.customerId
+  if (!customerId || props.prefill?.settlementCustomerIsPerson) return
+  contactsLoading.value = true
+  try {
+    contacts.value = await listContacts(customerId)
+    const reported = props.prefill?.contactId != null
+      ? contacts.value.find((c) => c.id === props.prefill?.contactId)
+      : undefined
+    const preferred = reported ?? contacts.value.find((c) => c.isDefault === 1) ?? contacts.value[0]
+    if (preferred) form.contactId = preferred.id
+  } catch {
+    contacts.value = []
+  } finally {
+    contactsLoading.value = false
   }
 }
 
@@ -328,7 +402,7 @@ async function onSubmit() {
   if (!form.vehicleId) return ElMessage.warning('请选择施工车辆')
   if (!form.planStartAt) return ElMessage.warning('请选择计划开始时间')
   if (props.mode === 'convert') {
-    if (!form.craneTonnage) return ElMessage.warning('请填写吊车吨位')
+    if (form.vehicleType === 'CRANE' && !form.craneTonnage) return ElMessage.warning('请填写吊车吨位')
   }
   if (needConfirmPast.value && !form.confirmPast) {
     ElMessage.warning('计划时间早于当前时间，请勾选二次确认')
@@ -339,11 +413,13 @@ async function onSubmit() {
     await props.submit({
       staffId: form.staffId,
       vehicleId: form.vehicleId,
+      vehicleType: form.vehicleType,
       planStartAt: form.planStartAt,
-      craneTonnage: form.craneTonnage,
+      craneTonnage: form.vehicleType === 'CRANE' ? form.craneTonnage : undefined,
       cargoWeightTon: form.cargoWeightTon,
       estimatedDays: form.estimatedDays,
       settlementType: props.mode === 'convert' ? form.settlementType : undefined,
+      contactId: props.mode === 'convert' ? form.contactId : undefined,
       remark: form.remark.trim(),
       confirmPast: form.confirmPast
     })

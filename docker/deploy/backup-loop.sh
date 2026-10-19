@@ -10,7 +10,7 @@ run_backup() {
   mkdir -p "$BACKUP_DIR/db" "$BACKUP_DIR/files"
   echo "[$(date '+%F %T')] 开始数据库备份 crane_workorder_$ts.sql.gz"
   mysqldump -h crane-mysql -u"$MYSQL_USERNAME" -p"$MYSQL_PWD" \
-    --single-transaction --routines --triggers crane_workorder \
+    --single-transaction --routines --triggers --no-tablespaces crane_workorder \
     | gzip > "$BACKUP_DIR/db/crane_workorder_$ts.sql.gz"
   echo "[$(date '+%F %T')] 数据库备份完成：$(du -h "$BACKUP_DIR/db/crane_workorder_$ts.sql.gz" | cut -f1)"
   # 上传文件打包（照片/附件卷）

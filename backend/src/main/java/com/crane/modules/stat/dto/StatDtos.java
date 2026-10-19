@@ -105,6 +105,8 @@ public final class StatDtos {
         private long externalOccupyVehicles;
         /** 当日 BUSY_THIRD 车辆外部占用分钟数求和 */
         private long externalOccupyMinutesToday;
+        /** 车辆种类分布：CRANE/LIFT/SEMI_TRAILER/HEAVY_TRAILER → 台数 */
+        private java.util.Map<String, Integer> typeCounts;
     }
 
     /** 员工统计块 */
@@ -198,6 +200,10 @@ public final class StatDtos {
     public static class MapPoint {
         private Long vehicleId;
         private String plateNo;
+        /** 用车种类：CRANE/LIFT/SEMI_TRAILER/HEAVY_TRAILER */
+        private String vehicleType;
+        /** 车辆规格展示：25吨 / 举升20米 / 板车 / 大件托盘车 */
+        private String vehicleSpec;
         private String staffName;
         private String orderNo;
         private String status;

@@ -141,7 +141,7 @@
     <el-dialog
       v-model="createVisible"
       title="直建工单"
-      width="640px"
+      width="760px"
       :close-on-click-modal="false"
       @open="loadCreateOptions"
     >
@@ -149,7 +149,7 @@
         <el-row :gutter="12">
           <el-col :span="12">
             <el-form-item label="任务名称">
-              <el-input v-model="createForm.taskName" maxlength="100" placeholder="选填，不填自动按 客户·吨位·司机 生成" />
+              <el-input v-model="createForm.taskName" maxlength="100" placeholder="选填，不填自动按 客户·吨位/车型·司机 生成" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -170,6 +170,29 @@
               </el-select>
             </el-form-item>
           </el-col>
+          <el-col v-if="selectedCustomer?.type === 'COMPANY'" :span="12">
+            <el-form-item label="客户联系人">
+              <el-select
+                v-model="createForm.contactId"
+                filterable
+                clearable
+                :loading="contactsLoading"
+                placeholder="选择该公司联系人"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="c in contacts"
+                  :key="c.id"
+                  :value="c.id"
+                  :label="`${c.name}（${c.phone}）${c.isDefault === 1 ? ' · 默认' : ''}`"
+                />
+                <template #empty>
+                  <p v-if="contactsLoading" class="select-hint">数据加载中…</p>
+                  <p v-else class="select-hint">该公司暂无联系人，可在客户档案中补充</p>
+                </template>
+              </el-select>
+            </el-form-item>
+          </el-col>
           <el-col :span="12">
             <el-form-item label="结算主体" required>
               <el-radio-group v-model="createForm.settlementType">
@@ -178,6 +201,57 @@
                 </el-radio>
                 <el-radio value="PERSONAL">个人结算</el-radio>
               </el-radio-group>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="计划开始" required>
+              <div class="plan-start">
+                <el-date-picker
+                  v-model="createForm.planStartAt"
+                  type="datetime"
+                  value-format="YYYY-MM-DDTHH:mm:ss"
+                  format="YYYY-MM-DD HH:mm"
+                  placeholder="计划开始时间"
+                  style="width: 100%"
+                />
+                <div class="quick-dates quick-grid quick-dates-grid">
+                  <el-check-tag
+                    v-for="q in DATE_PRESETS"
+                    :key="q.label"
+                    :checked="isQuickDate(q.offset)"
+                    @change="setQuickDate(q.offset)"
+                  >{{ q.label }}</el-check-tag>
+                </div>
+                <div class="quick-times quick-grid">
+                  <el-check-tag
+                    v-for="t in PLAN_TIME_PRESETS"
+                    :key="t"
+                    :checked="planTimeValue === t"
+                    @change="setQuickTime(t)"
+                  >{{ t }}</el-check-tag>
+                </div>
+              </div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="用车种类" required>
+              <el-select v-model="createForm.vehicleType" style="width: 100%" @change="onVehicleTypeChange">
+                <el-option v-for="opt in VEHICLE_TYPE_OPTIONS" :key="opt.value" :value="opt.value" :label="opt.label" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col v-if="createForm.vehicleType === 'CRANE'" :span="12">
+            <el-form-item label="吊车吨位" required>
+              <el-input-number v-model="createForm.craneTonnage" :min="1" :precision="1" controls-position="right" style="width: 100%" />
+              <div class="quick-label tonnage-label">常用吨位</div>
+              <div class="quick-tonnages quick-grid">
+                <el-check-tag
+                  v-for="t in COMMON_TONNAGES"
+                  :key="t"
+                  :checked="createForm.craneTonnage === t"
+                  @change="createForm.craneTonnage = t"
+                >{{ t }}吨</el-check-tag>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -206,7 +280,6 @@
                 :loading="optionsLoading"
                 placeholder="选择车辆（作业中车辆按施工时段校验）"
                 style="width: 100%"
-                @change="onVehicleChange"
               >
                 <el-option
                   v-for="v in availableVehicles"
@@ -223,34 +296,10 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="计划开始" required>
-              <div class="plan-start">
-                <el-date-picker
-                  v-model="createForm.planStartAt"
-                  type="datetime"
-                  value-format="YYYY-MM-DDTHH:mm:ss"
-                  format="YYYY-MM-DD HH:mm"
-                  placeholder="计划开始时间"
-                  style="width: 100%"
-                />
-                <div class="quick-dates">
-                  <el-button size="small" @click="setQuickDate(0)">今天</el-button>
-                  <el-button size="small" @click="setQuickDate(1)">明天</el-button>
-                  <el-button size="small" @click="setQuickDate(2)">后天</el-button>
-                </div>
-              </div>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="吊车吨位" required>
-              <el-input-number v-model="createForm.craneTonnage" :min="1" :precision="1" controls-position="right" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
             <el-form-item label="预计使用时长">
               <el-input-number v-model="createForm.estimatedDays" :min="0.5" :step="0.5" :precision="1" controls-position="right" placeholder="选填" style="width: 100%" />
-              <div class="quick-heights">
-                <span class="quick-label">常用：</span>
+              <div class="quick-label tonnage-label">常用时长</div>
+              <div class="quick-grid quick-grid-5">
                 <el-check-tag
                   v-for="d in COMMON_ESTIMATE_DAYS"
                   :key="d"
@@ -361,7 +410,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { WORK_ORDER_STATUS_LABEL, VEHICLE_STATUS_LABEL } from '@crane/shared'
+import { WORK_ORDER_STATUS_LABEL, VEHICLE_STATUS_LABEL, VEHICLE_TYPE_OPTIONS } from '@crane/shared'
 import {
   pageWorkOrders,
   createWorkOrder,
@@ -372,7 +421,7 @@ import {
 } from '@crane/shared/api/workorder'
 import { precheckDispatch, type CheckItem } from '@crane/shared/api/dispatch'
 import { pageStaffs, pageVehicles, vehicleSpecLabel, type Staff, type Vehicle } from '@crane/shared/api/staff'
-import { pageCustomers, type Customer } from '@crane/shared/api/customer'
+import { pageCustomers, listContacts, type Customer, type CustomerContact } from '@crane/shared/api/customer'
 import { listMyPlaces, type MyPlace } from '@crane/shared/api/place'
 import { fmtTime } from '../../utils/format'
 import { dispatchOrder } from '@crane/shared/api/dispatch'
@@ -400,7 +449,7 @@ const loading = ref(false)
 // 派单弹窗
 const dispatchVisible = ref(false)
 const dispatchTarget = ref<WorkOrder | null>(null)
-const dispatchPrefill = ref<{ planStartAt?: string }>({})
+const dispatchPrefill = ref<{ planStartAt?: string; vehicleType?: string }>({})
 
 // 修改工单弹窗
 const editVisible = ref(false)
@@ -414,6 +463,9 @@ const checks = ref<CheckItem[]>([])
 const staffs = ref<Staff[]>([])
 const vehicles = ref<Vehicle[]>([])
 const customers = ref<Customer[]>([])
+// 企业客户联系人：选定公司后可再选具体联系人，随工单带给司机
+const contacts = ref<CustomerContact[]>([])
+const contactsLoading = ref(false)
 // 下拉选项加载态：请求期间 el-select 显示加载动画，避免"暂无数据"闪烁
 const optionsLoading = ref(false)
 const optionsError = ref(false)
@@ -422,8 +474,12 @@ const pickerVisible = ref(false)
 const createForm = reactive({
   taskName: '',
   customerId: undefined as number | undefined,
+  /** 企业客户下的具体联系人 */
+  contactId: undefined as number | undefined,
   staffId: undefined as number | undefined,
   vehicleId: undefined as number | undefined,
+  /** 用车种类：客户下单/直建统一，非吊车不显示吨位 */
+  vehicleType: 'CRANE' as string,
   planStartAt: '',
   address: '',
   // 默认坐标与地图选点中心一致（公司驻地），管理员可地图选点修正
@@ -446,8 +502,53 @@ const selectedCustomerIsPerson = computed(() => selectedCustomer.value?.type ===
 /** 预计使用时长常用档位（天），仅备注提示不作换算 */
 const COMMON_ESTIMATE_DAYS = [0.5, 1, 1.5, 2, 3]
 
-/** 可派车辆：停用不可派，其余（含作业中）均可选，作业中提交时按 6 小时施工时段校验冲突 */
-const availableVehicles = computed(() => vehicles.value.filter((v) => v.status !== 'DISABLED'))
+/** 吊车吨位常用档位（吨），直建时手动选择或输入，不随车辆档案自动带出 */
+const COMMON_TONNAGES = [8, 12, 16, 25, 50, 70, 80, 100, 110, 130, 150, 200, 260, 300]
+
+/** 计划开始时间快捷档位 */
+const PLAN_TIME_PRESETS = ['06:00', '06:30', '07:00', '07:30', '12:30', '13:00', '13:30']
+
+/** 计划开始日期快捷档位 */
+const DATE_PRESETS = [
+  { label: '今天', offset: 0 },
+  { label: '明天', offset: 1 },
+  { label: '后天', offset: 2 }
+]
+
+/** 当前计划开始日期，用于快捷日期高亮 */
+const planDateValue = computed(() =>
+  createForm.planStartAt ? dayjs(createForm.planStartAt).format('YYYY-MM-DD') : ''
+)
+
+/** 快捷日期是否命中当前计划开始日期 */
+function isQuickDate(offset: number) {
+  return planDateValue.value === dayjs().add(offset, 'day').format('YYYY-MM-DD')
+}
+
+/** 当前计划开始时间的时间部分，用于快捷档位高亮 */
+const planTimeValue = computed(() =>
+  createForm.planStartAt ? dayjs(createForm.planStartAt).format('HH:mm') : ''
+)
+
+/** 选择计划开始时间快捷档位：保留已选日期，未选日期时取今天 */
+function setQuickTime(time: string) {
+  const date = createForm.planStartAt
+    ? dayjs(createForm.planStartAt).format('YYYY-MM-DD')
+    : dayjs().format('YYYY-MM-DD')
+  createForm.planStartAt = `${date}T${time}:00`
+}
+
+/** 可派车辆：按用车种类过滤；停用不可派，其余（含作业中）均可选，作业中提交时按 6 小时施工时段校验冲突 */
+const availableVehicles = computed(() =>
+  vehicles.value.filter(
+    (v) => v.status !== 'DISABLED' && (v.type || 'CRANE') === createForm.vehicleType
+  )
+)
+
+/** 切换用车种类后清空已选车辆，避免种类与车辆不一致 */
+function onVehicleTypeChange() {
+  createForm.vehicleId = undefined
+}
 
 function vehicleStatusText(status: string) {
   return VEHICLE_STATUS_LABEL[status] || status
@@ -501,13 +602,17 @@ function openEdit(row: WorkOrder) {
 // ==================== 派单 / 改派 ====================
 function openDispatch(row: WorkOrder) {
   dispatchTarget.value = row
-  dispatchPrefill.value = { planStartAt: row.expectedStartAt || undefined }
+  dispatchPrefill.value = {
+    planStartAt: row.expectedStartAt || undefined,
+    vehicleType: row.vehicleType || 'CRANE'
+  }
   dispatchVisible.value = true
 }
 
 async function submitDispatch(payload: {
   staffId: number
   vehicleId: number
+  vehicleType?: string
   planStartAt: string
   remark: string
   confirmPast: boolean
@@ -516,6 +621,7 @@ async function submitDispatch(payload: {
   await dispatchOrder(dispatchTarget.value.id, {
     staffId: payload.staffId,
     vehicleId: payload.vehicleId,
+    vehicleType: payload.vehicleType,
     planStartAt: payload.planStartAt,
     confirmPast: payload.confirmPast,
     remark: payload.remark || undefined
@@ -587,8 +693,10 @@ function openCreate() {
   checks.value = []
   createForm.taskName = ''
   createForm.customerId = undefined
+  createForm.contactId = undefined
   createForm.staffId = undefined
   createForm.vehicleId = undefined
+  createForm.vehicleType = 'CRANE'
   createForm.planStartAt = ''
   createForm.address = ''
   selectedPlaceName.value = ''
@@ -651,13 +759,25 @@ watch(
     // 个人客户仅支持个人结算；企业客户默认企业主体，可手动切换个人
     createForm.settlementType = selectedCustomerIsPerson.value ? 'PERSONAL' : 'ENTERPRISE'
     loadMyPlaces()
+    loadContacts()
   }
 )
 
-/** 选择车辆自动带出吊车吨位（车辆档案吨位，可手动覆盖） */
-function onVehicleChange(id: number) {
-  const vehicle = vehicles.value.find((v) => v.id === id)
-  if (vehicle?.tonnage) createForm.craneTonnage = vehicle.tonnage
+/** 企业客户联系人：默认选中默认联系人，个人客户不展示联系人选择 */
+async function loadContacts() {
+  createForm.contactId = undefined
+  contacts.value = []
+  if (!createForm.customerId || selectedCustomer.value?.type !== 'COMPANY') return
+  contactsLoading.value = true
+  try {
+    contacts.value = await listContacts(createForm.customerId)
+    const preferred = contacts.value.find((c) => c.isDefault === 1) ?? contacts.value[0]
+    if (preferred) createForm.contactId = preferred.id
+  } catch {
+    contacts.value = []
+  } finally {
+    contactsLoading.value = false
+  }
 }
 
 /** 备注常用项：点选追加、再点移除（与转工单弹窗一致） */
@@ -731,7 +851,7 @@ async function submitCreate() {
   if (!createForm.planStartAt) return ElMessage.warning('请选择计划开始时间')
   if (!createForm.address.trim()) return ElMessage.warning('请填写施工地址')
   if (createForm.longitude == null || createForm.latitude == null) return ElMessage.warning('请填写经纬度')
-  if (!createForm.craneTonnage) return ElMessage.warning('请填写吊车吨位')
+  if (!createForm.craneTonnage && createForm.vehicleType === 'CRANE') return ElMessage.warning('请填写吊车吨位')
   if (needConfirmPast.value && !createForm.confirmPast) {
     ElMessage.warning('计划时间早于当前时间，请勾选二次确认')
     return
@@ -739,12 +859,14 @@ async function submitCreate() {
   creating.value = true
   try {
     await createWorkOrder({
-      // 任务名称选填：不填由后端按「客户名·吊车吨位·司机姓名」自动生成
+      // 任务名称选填：不填由后端按「客户名·吨位/车型·司机姓名」自动生成
       taskName: createForm.taskName.trim() || undefined,
       source: 'DIRECT',
       customerId: createForm.customerId,
+      contactId: createForm.contactId,
       staffId: createForm.staffId,
       vehicleId: createForm.vehicleId,
+      vehicleType: createForm.vehicleType,
       planStartAt: createForm.planStartAt,
       address: createForm.address.trim(),
       longitude: createForm.longitude,
@@ -752,7 +874,7 @@ async function submitCreate() {
       // 货物名称/数量选填：仅在有值时提交
       ...(createForm.cargoName.trim() ? { cargoName: createForm.cargoName.trim() } : {}),
       cargoWeightTon: createForm.cargoWeightTon,
-      craneTonnage: createForm.craneTonnage,
+      craneTonnage: createForm.vehicleType === 'CRANE' ? createForm.craneTonnage : undefined,
       estimatedDays: createForm.estimatedDays,
       settlementType: createForm.settlementType,
       remark: createForm.remark.trim() || undefined,
@@ -772,11 +894,24 @@ async function submitCreate() {
 <style scoped>
 .unit { margin-left: 8px; color: var(--sub); }
 .plan-start { width: 100%; }
-.quick-dates { margin-top: 4px; display: flex; gap: 0; }
-.quick-dates .el-button + .el-button { margin-left: 8px; }
 .select-hint { text-align: center; color: var(--sub, #909399); font-size: 13px; padding: 14px 0; margin: 0; }
 .place-row { display: flex; gap: 8px; width: 100%; }
-.quick-heights { display: flex; align-items: center; gap: 8px; margin-top: 6px; width: 100%; }
+.quick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 6px; margin-top: 6px; width: 100%; }
+.quick-dates-grid { grid-template-columns: repeat(3, 60px); justify-content: start; }
+.quick-grid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.quick-grid :deep(.el-check-tag) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 30px;
+  margin: 0;
+  padding: 0 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.tonnage-label { display: block; margin-top: 6px; }
 .quick-label { color: var(--sub); font-size: 12px; }
 .remark-block { width: 100%; }
 .remark-chips { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }

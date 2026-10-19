@@ -41,6 +41,10 @@ public class AuthInterceptor implements HandlerInterceptor {
         } catch (Exception e) {
             return reject(response, new BizException(ErrorCode.TOKEN_INVALID));
         }
+        // 绑定凭据不可当作业务访问令牌使用
+        if (jwtUtil.isBindTicket(claims)) {
+            return reject(response, new BizException(ErrorCode.TOKEN_INVALID));
+        }
         Long userId = Long.valueOf(claims.getSubject());
         // 强制下线校验：令牌签发时间早于 force_logout_at 即失效（10004）
         TokenUserChecker checker = userChecker.getIfAvailable();

@@ -23,6 +23,12 @@
         <el-table-column label="岗位" width="90">
           <template #default="{ row }">{{ POSITION_LABEL[row.position] || row.position }}</template>
         </el-table-column>
+        <el-table-column label="角色" width="110">
+          <template #default="{ row }">
+            <el-tag v-if="row.adminRole" type="danger" effect="plain" size="small">管理员</el-tag>
+            <span v-else class="muted">普通</span>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="90">
           <template #default="{ row }">
             <status-tag kind="staff" :status="row.status" />
@@ -81,6 +87,10 @@
             <el-radio value="EMPLOYEE">员工</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item label="管理员权限">
+          <el-switch v-model="form.adminRole" />
+          <span class="form-tip">开启后可登录移动办公台；司机/员工可一人多角色，登录后选择身份</span>
+        </el-form-item>
         <el-form-item label="驾驶证类型">
           <el-input v-model="form.licenseType" maxlength="16" placeholder="如 A2、B2（司机建议填写）" />
         </el-form-item>
@@ -100,7 +110,7 @@
           <el-checkbox v-model="form.createAccount">同时创建登录账号（司机角色，待绑定状态）</el-checkbox>
         </el-form-item>
         <el-form-item
-          v-if="!editing && form.createAccount"
+          v-if="(!editing && form.createAccount) || (form.adminRole && !editing?.userId)"
           label="初始密码"
           prop="initialPassword"
         >
@@ -156,6 +166,7 @@ const form = reactive({
   specialCertNo: '',
   hireDate: '',
   createAccount: true,
+  adminRole: false,
   initialPassword: '',
   remark: ''
 })
@@ -220,6 +231,7 @@ function openForm(row?: Staff) {
   form.specialCertNo = row?.specialCertNo ?? ''
   form.hireDate = row?.hireDate ?? ''
   form.createAccount = true
+  form.adminRole = row?.adminRole === true
   form.initialPassword = ''
   form.remark = row?.remark ?? ''
   formVisible.value = true
@@ -238,8 +250,9 @@ async function submit() {
     specialCertNo: form.specialCertNo.trim() || undefined,
     hireDate: form.hireDate || undefined,
     createAccount: form.createAccount,
+    adminRole: form.adminRole,
     initialPassword:
-      !editing.value && form.createAccount && form.initialPassword
+      (form.createAccount || form.adminRole) && form.initialPassword
         ? form.initialPassword
         : undefined,
     remark: form.remark.trim() || undefined
@@ -280,3 +293,15 @@ async function onDelete(row: Staff) {
   }
 }
 </script>
+
+<style scoped>
+.muted {
+  color: #94a3b8;
+  font-size: 12px;
+}
+.form-tip {
+  margin-left: 10px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+</style>

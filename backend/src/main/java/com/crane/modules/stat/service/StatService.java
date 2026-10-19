@@ -212,6 +212,8 @@ public class StatService {
             point.setVehicleId(order.getVehicleId());
             Vehicle vehicle = order.getVehicleId() != null ? vehicleById.get(order.getVehicleId()) : null;
             point.setPlateNo(vehicle != null ? vehicle.getPlateNo() : "");
+            point.setVehicleType(vehicle != null ? vehicle.getType() : order.getVehicleType());
+            point.setVehicleSpec(vehicleSpecLabel(vehicle));
             point.setStaffName(order.getStaffId() != null ? staffNames.getOrDefault(order.getStaffId(), "") : "");
             point.setOrderNo(order.getOrderNo());
             point.setStatus(order.getStatus());
@@ -407,7 +409,36 @@ public class StatService {
             minutes += minutesBetween(markAt, now);
         }
         stat.setExternalOccupyMinutesToday(minutes);
+
+        // 车辆种类分布：按 type 分组统计台数
+        QueryWrapper<Vehicle> typeQw = new QueryWrapper<>();
+        typeQw.select("type", "COUNT(*) AS cnt").groupBy("type");
+        Map<String, Integer> typeCounts = new HashMap<>();
+        for (Map<String, Object> row : vehicleMapper.selectMaps(typeQw)) {
+            Object type = row.get("type");
+            if (type != null) {
+                typeCounts.put(String.valueOf(type), (int) num(row.get("cnt")));
+            }
+        }
+        stat.setTypeCounts(typeCounts);
         return stat;
+    }
+
+    /** 车辆规格展示：吊车「25吨」/ 举升车「举升20米」/ 其他按种类名 */
+    private String vehicleSpecLabel(Vehicle vehicle) {
+        if (vehicle == null) {
+            return "";
+        }
+        String type = vehicle.getType() == null ? "CRANE" : vehicle.getType();
+        return switch (type) {
+            case "CRANE" -> vehicle.getTonnage() != null
+                    ? vehicle.getTonnage().stripTrailingZeros().toPlainString() + "吨" : "吊车";
+            case "LIFT" -> vehicle.getLiftHeight() != null
+                    ? "举升" + vehicle.getLiftHeight().stripTrailingZeros().toPlainString() + "米" : "举升车";
+            case "SEMI_TRAILER" -> "板车";
+            case "HEAVY_TRAILER" -> "大件托盘车";
+            default -> type;
+        };
     }
 
     private StaffStat buildStaffStat() {

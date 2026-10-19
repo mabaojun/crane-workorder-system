@@ -392,6 +392,51 @@ print("YES" if {"VEHICLE_INSURANCE_EXPIRING","VEHICLE_INSPECTION_EXPIRING"} <= t
 if [ "$CERT_OK" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  报警含车险临期+审车临期($CERT_PLATE)"; else FAIL=$((FAIL+1)); echo "FAIL  证照报警缺失 plate=$CERT_PLATE"; fi
 req "删除证照测试车(清理)" DELETE /staff/vehicles/$CERT_VID "$ADMIN" ""
 
+echo "== 21. 附件上传 / 鉴权下载 / 工单照片聚合（第十三轮追加）=="
+PHOTO_FILE="/tmp/e2e-photo-$TS.png"
+python3 - "$PHOTO_FILE" <<'PY'
+import base64, sys
+# 1x1 PNG 像素，用于上传与下载比对
+open(sys.argv[1], 'wb').write(base64.b64decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='))
+PY
+UPLOAD_JSON=$(curl -s -X POST "$BASE/files/upload" -H "Authorization: Bearer $ADMIN" -H 'X-Client: admin' -F "file=@$PHOTO_FILE;filename=E2E-photo-$TS.png")
+UPLOAD_CODE=$(echo "$UPLOAD_JSON" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("code"))')
+FURL=$(echo "$UPLOAD_JSON" | python3 -c 'import sys,json;print(json.load(sys.stdin)["data"]["url"])' 2>/dev/null || echo "")
+FID=$(echo "$UPLOAD_JSON" | python3 -c 'import sys,json;print(json.load(sys.stdin)["data"]["id"])' 2>/dev/null || echo "")
+FNAME=$(echo "$UPLOAD_JSON" | python3 -c 'import sys,json;print(json.load(sys.stdin)["data"]["fileName"])' 2>/dev/null || echo "")
+if [ "$UPLOAD_CODE" = "0" ] && [ -n "$FURL" ] && [ "$FNAME" = "E2E-photo-$TS.png" ]; then PASS=$((PASS+1)); echo "PASS  附件上传成功并返回文件名/下载地址"; else FAIL=$((FAIL+1)); echo "FAIL  附件上传 code=$UPLOAD_CODE resp=$UPLOAD_JSON"; fi
+DL_CODE=$(curl -s -o /tmp/e2e-photo-dl.png -w '%{http_code}' "http://127.0.0.1:7777$FURL" -H "Authorization: Bearer $ADMIN")
+DL_SAME=$(python3 -c '
+import os,sys
+print("YES" if os.path.getsize("/tmp/e2e-photo-dl.png")==os.path.getsize("'"$PHOTO_FILE"'") else "NO")
+')
+if [ "$DL_CODE" = "200" ] && [ "$DL_SAME" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  鉴权下载附件内容一致"; else FAIL=$((FAIL+1)); echo "FAIL  附件下载 http=$DL_CODE same=$DL_SAME"; fi
+NOAUTH_CODE=$(curl -s "http://127.0.0.1:7777$FURL" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("code"))' 2>/dev/null || echo 9999)
+if [ "$NOAUTH_CODE" = "10001" ]; then PASS=$((PASS+1)); echo "PASS  未登录下载被拒 10001"; else FAIL=$((FAIL+1)); echo "FAIL  未登录下载 code=$NOAUTH_CODE"; fi
+# 客户提报带图片 → 转工单不填货物重量（选填）→ 签到带照片 → 工单照片聚合
+req "客户提报带图片需求单" POST /demand/orders "$CONTACT_TOKEN" "{\"source\":\"CUSTOMER_MP\",\"contactName\":\"E2E联系人甲\",\"contactPhone\":\"$CONTACT_PHONE\",\"address\":\"照片验证点位$TS\",\"longitude\":117.12,\"latitude\":36.71,\"description\":\"附件链路验证\",\"craneTonnage\":25,\"imageUrls\":[\"$FURL\"],\"expectedStartAt\":\"2027-01-07T09:00:00+08:00\"}"
+D3=$(jq_get data id)
+req "复核照片需求单" POST /demand/orders/$D3/review "$ADMIN" '{"approve":true,"reviewRemark":"复核通过"}'
+req "转工单(货物重量不填)" POST /demand/orders/$D3/convert "$ADMIN" "{\"staffId\":$SID2,\"vehicleId\":$WVID,\"planStartAt\":\"2027-01-07T09:00:00+08:00\",\"craneTonnage\":25,\"remark\":\"E2E照片验证\"}"
+O3=$(jq_get data convertedOrderId)
+CARGOW=$(~/crane-tools/bin/docker exec crane-mysql-dev mysql --default-character-set=utf8mb4 -ucrane -pcrane123 crane_workorder -N -e "SELECT IFNULL(CAST(cargo_weight AS CHAR),'NULL') FROM biz_work_order WHERE id=$O3;" 2>/dev/null | tr -d ' \n')
+if [ "$CARGOW" = "NULL" ]; then PASS=$((PASS+1)); echo "PASS  转工单货物重量选填(落库为空)"; else FAIL=$((FAIL+1)); echo "FAIL  转工单货物重量=$CARGOW 期望 NULL"; fi
+req "照片验证单司机接单" POST /dispatch/orders/$O3/accept "$DRIVER2" '{}'
+req "照片验证单签到(带照片)" POST /attendance/check-in "$DRIVER2" "{\"orderId\":$O3,\"longitude\":117.12,\"latitude\":36.71,\"photoUrls\":[\"$FURL\"]}"
+req "查询工单照片聚合" GET /files/order/$O3 "$ADMIN" ""
+PHOTO_OK=$(FNAME="E2E-photo-$TS.png" python3 -c '
+import json,os
+d=json.load(open("/tmp/e2e-last.json"))
+name=os.environ.get("FNAME","")
+items=d["data"]
+stages={i["stage"] for i in items}
+names={i["fileName"] for i in items}
+print("YES" if {"DEMAND","CHECK_IN"} <= stages and name in names else "NO")
+')
+if [ "$PHOTO_OK" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  工单照片聚合含需求图+签到照片且文件名正确"; else FAIL=$((FAIL+1)); echo "FAIL  工单照片聚合异常"; fi
+req "照片验证单完成(清理)" POST /attendance/task-end "$DRIVER2" "{\"orderId\":$O3,\"longitude\":117.12,\"latitude\":36.71}"
+
 echo "=============================="
 echo "E2E 结果：PASS=$PASS FAIL=$FAIL"
 exit $FAIL

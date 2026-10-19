@@ -153,71 +153,84 @@ async function onLogout() {
 .page {
   min-height: 100vh;
   background: var(--bg);
-  padding: 16px;
+  padding: 16px 16px calc(96px + env(safe-area-inset-bottom));
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 .user-head {
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 16px;
+  gap: 14px;
+  background: linear-gradient(135deg, #0b1f3a 0%, #123a6b 62%, #0e7490 100%);
+  border: 1px solid rgba(103, 232, 249, 0.18);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 22px rgba(11, 31, 58, 0.2);
+  padding: 18px;
 }
 .avatar {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background: var(--brand);
-  color: #fff;
-  font-size: 18px;
+  background: rgba(165, 243, 252, 0.16);
+  border: 1px solid rgba(103, 232, 249, 0.55);
+  color: #a5f3fc;
+  font-size: 22px;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: none;
 }
 .meta {
   flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
 .name {
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
 }
 .phone {
   font-size: 13px;
-  color: var(--sub);
+  color: rgba(255, 255, 255, 0.7);
   font-variant-numeric: tabular-nums;
 }
 .role {
   font-size: 12px;
-  color: var(--brand);
-  background: var(--brand-weak);
-  border-radius: 4px;
-  padding: 2px 8px;
+  font-weight: 600;
+  color: #0b1f3a;
+  background: #a5f3fc;
+  border-radius: 999px;
+  padding: 3px 10px;
 }
 .row {
   display: flex;
   gap: 8px;
-  font-size: 14px;
-  margin-bottom: 8px;
+  font-size: 15px;
+  margin-bottom: 9px;
 }
 .k {
   color: var(--sub);
+  font-size: 14px;
   flex: none;
-  width: 64px;
+  width: 72px;
 }
 .logout {
-  height: 48px;
-  line-height: 48px;
+  width: 100%;
+  display: block;
+  height: 50px;
+  line-height: 50px;
   border-radius: var(--radius);
   background: #fff;
   color: var(--danger);
   font-size: 17px;
+  font-weight: 600;
   border: 1px solid var(--danger);
   box-sizing: border-box;
 }
@@ -225,14 +238,14 @@ async function onLogout() {
   border: none;
 }
 .hint {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--sub);
   margin-top: 6px;
 }
 .vehicle-item {
   border-top: 1px solid var(--line);
-  padding-top: 12px;
-  margin-top: 12px;
+  padding-top: 14px;
+  margin-top: 14px;
 }
 .vehicle-item:first-of-type {
   border-top: none;
@@ -245,18 +258,19 @@ async function onLogout() {
   gap: 8px;
 }
 .plate {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
 }
 .spec {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--sub);
 }
 .status {
   margin-left: auto;
-  font-size: 12px;
-  border-radius: 4px;
-  padding: 2px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 2px 10px;
 }
 .st-idle {
   color: var(--success, #07c160);
@@ -275,24 +289,25 @@ async function onLogout() {
   background: rgba(144, 147, 153, 0.12);
 }
 .vehicle-model {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--sub);
   margin-top: 4px;
 }
 .vehicle-actions {
   display: flex;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 .st-btn {
   flex: 1;
-  min-height: 44px;
-  line-height: 44px;
-  font-size: 14px;
+  min-height: 46px;
+  line-height: 46px;
+  font-size: 15px;
+  font-weight: 600;
   border-radius: var(--radius);
   background: var(--panel);
   border: 1px solid var(--line);
-  color: var(--text, #333);
+  color: var(--txt);
   padding: 0;
   box-sizing: border-box;
 }

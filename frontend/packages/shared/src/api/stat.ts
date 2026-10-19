@@ -54,6 +54,8 @@ export interface StatDashboardVehicle {
   disabled: number
   externalOccupyVehicles: number
   externalOccupyMinutesToday: number
+  /** 车辆种类分布：CRANE/LIFT/SEMI_TRAILER/HEAVY_TRAILER → 台数 */
+  typeCounts?: Record<string, number>
 }
 
 export interface StatDashboardStaff {
@@ -110,6 +112,10 @@ export interface StatAlarms {
 export interface VehicleMapPoint {
   vehicleId: number
   plateNo: string
+  /** 用车种类：CRANE / LIFT / SEMI_TRAILER / HEAVY_TRAILER */
+  vehicleType?: string | null
+  /** 车辆规格展示：25吨 / 举升20米 / 板车 / 大件托盘车 */
+  vehicleSpec?: string | null
   staffName: string | null
   orderNo: string | null
   status: string
@@ -133,6 +139,73 @@ export interface StaffPerformanceItem {
   completionRate: number
 }
 
+/** 工作台状态看板：工单视角 */
+export interface StatusBoardOrder {
+  id: number
+  orderNo: string
+  taskName: string
+  customerId: number | null
+  customerName: string | null
+  staffId: number | null
+  staffName: string | null
+  vehicleId: number | null
+  vehiclePlateNo: string | null
+  vehicleType: string | null
+  tonnage: number | null
+  liftHeight: number | null
+  status: string
+  address: string
+  expectedStartAt: string | null
+  acceptedAt: string | null
+  startedAt: string | null
+  completedAt: string | null
+  cancelledAt: string | null
+  durationMinutes: number | null
+  ongoing: boolean
+}
+
+/** 最新签到位置 */
+export interface StatusBoardCheckIn {
+  lng: number | null
+  latitude: number | null
+  checkedAt: string | null
+  distanceMeters: number | null
+}
+
+/** 人员视角 */
+export interface StatusBoardStaff {
+  staffId: number
+  name: string
+  phone: string
+  position: string
+  status: string
+  currentOrder: StatusBoardOrder | null
+  totalMinutes: number
+  orders: StatusBoardOrder[]
+}
+
+/** 车辆视角 */
+export interface StatusBoardVehicle {
+  vehicleId: number
+  plateNo: string
+  type: string
+  tonnage: number | null
+  liftHeight: number | null
+  status: string
+  currentOrderId: number | null
+  currentOrder: StatusBoardOrder | null
+  latestCheckIn: StatusBoardCheckIn | null
+  orders: StatusBoardOrder[]
+}
+
+export interface StatusBoard {
+  date: string
+  totalOrders: number
+  staff: StatusBoardStaff[]
+  vehicles: StatusBoardVehicle[]
+  orders: StatusBoardOrder[]
+}
+
 /** 驾驶舱聚合指标（60s 刷新） */
 export function fetchStatDashboard() {
   return request<StatDashboard>('/stat/dashboard')
@@ -151,4 +224,9 @@ export function fetchStatVehicleMap() {
 /** 人效排名（页面加载 + 每日 1 次） */
 export function fetchStaffPerformance(period: 'WEEK' | 'MONTH' = 'MONTH') {
   return request<StaffPerformanceItem[]>('/stat/performance/staff', { query: { period } })
+}
+
+/** 工作台状态看板：按日期聚合人员 / 车辆 / 工单 */
+export function fetchStatusBoard(date?: string) {
+  return request<StatusBoard>('/stat/status-board', { query: { date } })
 }

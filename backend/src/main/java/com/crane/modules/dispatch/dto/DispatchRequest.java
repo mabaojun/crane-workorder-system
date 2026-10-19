@@ -18,6 +18,9 @@ public class DispatchRequest {
     @NotNull(message = "vehicleId 必填")
     private Long vehicleId;
 
+    /** 用车种类，选填；提供时须与车辆种类一致 */
+    private String vehicleType;
+
     /** 约定服务时间，提供时回写工单预计开始时间 */
     private LocalDateTime planStartAt;
 

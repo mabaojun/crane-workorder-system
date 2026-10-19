@@ -5,6 +5,7 @@ import com.crane.modules.auth.dto.BindPhoneRequest;
 import com.crane.modules.auth.dto.LoginResponse;
 import com.crane.modules.auth.dto.MeResponse;
 import com.crane.modules.auth.dto.PasswordLoginRequest;
+import com.crane.modules.auth.dto.SelectRoleRequest;
 import com.crane.modules.auth.dto.SmsCodeRequest;
 import com.crane.modules.auth.dto.SmsCodeResponse;
 import com.crane.modules.auth.dto.SmsLoginRequest;
@@ -53,16 +54,22 @@ public class AuthController {
         return ApiResult.ok(authService.smsLogin(req));
     }
 
-    /** API-AUTH-001 微信授权登录（MVP 通道未配置，返回 10006） */
+    /** API-AUTH-001 微信授权登录：code 换 openid，已绑定直登，未绑定返回 bindTicket */
     @PostMapping("/wechat-login")
     public ApiResult<LoginResponse> wechatLogin(@Valid @RequestBody WechatLoginRequest req) {
         return ApiResult.ok(authService.wechatLogin(req));
     }
 
-    /** API-AUTH-002 绑定手机号并激活账号（MVP 仅支持已登录 Bearer 凭据） */
+    /** API-AUTH-002 绑定手机号并激活账号：支持 Bind 凭据（微信授权未绑定）或已登录 Bearer 凭据 */
     @PostMapping("/bind-phone")
     public ApiResult<LoginResponse> bindPhone(@Valid @RequestBody BindPhoneRequest req,
                                               HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bind ")) {
+            io.jsonwebtoken.Claims claims = authService.resolveBindClaims(header.substring(5).trim());
+            return ApiResult.ok(authService.bindPhoneByTicket(
+                    claims.get("openId", String.class), claims.get("unionId", String.class), req));
+        }
         Long userId = authService.resolveUserId(request, true);
         return ApiResult.ok(authService.bindPhone(userId, req));
     }
@@ -79,7 +86,16 @@ public class AuthController {
     /** API-AUTH-006 当前用户与权限码 */
     @GetMapping("/me")
     public ApiResult<MeResponse> me(HttpServletRequest request) {
+        io.jsonwebtoken.Claims claims = authService.resolveClaims(request, true);
+        Long userId = Long.valueOf(claims.getSubject());
+        return ApiResult.ok(authService.me(userId, claims.get("role", String.class)));
+    }
+
+    /** API-AUTH-007 多角色账号选择本次进入身份：按所选角色重新签发令牌 */
+    @PostMapping("/select-role")
+    public ApiResult<LoginResponse> selectRole(@Valid @RequestBody SelectRoleRequest req,
+                                               HttpServletRequest request) {
         Long userId = authService.resolveUserId(request, true);
-        return ApiResult.ok(authService.me(userId));
+        return ApiResult.ok(authService.selectRole(userId, req.getRole()));
     }
 }

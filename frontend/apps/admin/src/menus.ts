@@ -13,7 +13,7 @@ export const MENU_CONFIG: (MenuItem & { adminOnly?: boolean })[] = [
   { key: 'dashboard', title: '工作台', path: '/dashboard/cockpit' },
   { key: 'demand', title: '需求单', path: '/demand/list', adminOnly: true },
   { key: 'workorder', title: '工单管理', path: '/workorder/list', adminOnly: true },
-  { key: 'dispatch', title: '派单中心', path: '/dispatch/pending', adminOnly: true },
+  { key: 'dispatch', title: '异常工单', path: '/dispatch/pending', adminOnly: true },
   {
     key: 'archive',
     title: '档案管理',

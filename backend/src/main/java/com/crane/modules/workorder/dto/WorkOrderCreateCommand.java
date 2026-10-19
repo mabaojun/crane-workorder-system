@@ -34,6 +34,9 @@ public class WorkOrderCreateCommand {
     /** 施工车辆 */
     private Long vehicleId;
 
+    /** 用车种类：CRANE 吊车 / LIFT 举升车 / SEMI_TRAILER 板车（半挂）/ HEAVY_TRAILER 大件托盘车 */
+    private String vehicleType;
+
     /** 施工地点详细地址 */
     private String address;
 

@@ -77,14 +77,15 @@
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="司机">{{ order.staffName || '-' }}{{ order.staffPhone ? `（${order.staffPhone}）` : '' }}</el-descriptions-item>
-        <el-descriptions-item label="车辆">{{ order.vehiclePlateNo || '-' }}{{ order.vehicleTonnage ? `｜${order.vehicleTonnage}吨` : '' }}</el-descriptions-item>
+        <el-descriptions-item label="用车种类">{{ VEHICLE_TYPE_LABEL[order.vehicleType || 'CRANE'] }}</el-descriptions-item>
+        <el-descriptions-item label="车辆">{{ order.vehiclePlateNo || '-' }}{{ order.vehicleType === 'LIFT' && order.vehicleLiftHeight ? `｜举升${order.vehicleLiftHeight}米` : order.vehicleTonnage ? `｜${order.vehicleTonnage}吨` : '' }}</el-descriptions-item>
         <el-descriptions-item label="计划开始">{{ fmtTime(order.expectedStartAt) }}</el-descriptions-item>
         <el-descriptions-item label="施工地址" :span="2">{{ order.address || '-' }}</el-descriptions-item>
         <el-descriptions-item label="经纬度">{{ order.longitude ?? '-' }}, {{ order.latitude ?? '-' }}</el-descriptions-item>
         <el-descriptions-item label="货物名称">{{ order.cargoName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="货物数量">{{ order.cargoQuantity ?? '-' }}</el-descriptions-item>
         <el-descriptions-item label="货物重量">{{ order.cargoWeight != null ? `${order.cargoWeight} 吨` : '-' }}</el-descriptions-item>
-        <el-descriptions-item label="吊车吨位">{{ order.craneTonnage != null ? `${order.craneTonnage} 吨` : '-' }}</el-descriptions-item>
+        <el-descriptions-item v-if="!order.vehicleType || order.vehicleType === 'CRANE'" label="吊车吨位">{{ order.craneTonnage != null ? `${order.craneTonnage} 吨` : '-' }}</el-descriptions-item>
         <el-descriptions-item label="接单时间">{{ fmtTime(order.acceptedAt) }}</el-descriptions-item>
         <el-descriptions-item label="开工时间">{{ fmtTime(order.startedAt) }}</el-descriptions-item>
         <el-descriptions-item label="完成时间">{{ fmtTime(order.completedAt) }}</el-descriptions-item>
@@ -92,6 +93,23 @@
         <el-descriptions-item label="接单截止">{{ fmtTime(order.acceptDeadlineAt) }}</el-descriptions-item>
         <el-descriptions-item label="备注">{{ order.remark || '无' }}</el-descriptions-item>
       </el-descriptions>
+    </el-card>
+
+    <!-- 现场照片 / 附件：图片点击弹窗预览，其余文件确认后下载 -->
+    <el-card shadow="never" class="page-card">
+      <template #header>现场照片 / 附件</template>
+      <el-table v-loading="photosLoading" :data="photos" border size="small">
+        <el-table-column label="阶段" prop="stageLabel" width="140" />
+        <el-table-column label="文件名" min-width="240">
+          <template #default="{ row }">
+            <attachment-link :url="row.url" :name="row.fileName || '附件'" />
+          </template>
+        </el-table-column>
+        <el-table-column label="时间" width="160">
+          <template #default="{ row }">{{ fmtTime(row.time) }}</template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="!photosLoading && !photos.length" description="暂无照片" :image-size="60" />
     </el-card>
 
     <el-card shadow="never" class="page-card">
@@ -176,7 +194,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { WORK_ORDER_STATUS_LABEL } from '@crane/shared'
+import { WORK_ORDER_STATUS_LABEL, VEHICLE_TYPE_LABEL } from '@crane/shared'
 import {
   getWorkOrder,
   changeWorkOrderStatus,
@@ -186,6 +204,7 @@ import {
   type WorkOrderStatusLog
 } from '@crane/shared/api/workorder'
 import { dispatchOrder } from '@crane/shared/api/dispatch'
+import { orderPhotos, type OrderPhoto } from '@crane/shared/api/file'
 import {
   pageExceptions,
   replyException,
@@ -193,6 +212,7 @@ import {
 } from '@crane/shared/api/exception'
 import { fmtTime } from '../../utils/format'
 import { EXCEPTION_TYPE_LABEL, INSTRUCTION_LABEL, ORDER_SOURCE_LABEL } from '../../utils/tags'
+import AttachmentLink from '../../components/AttachmentLink.vue'
 import DispatchDialog from '../../components/DispatchDialog.vue'
 import WorkOrderEditDialog from '../../components/WorkOrderEditDialog.vue'
 import ExceptionReplyDialog from '../../components/ExceptionReplyDialog.vue'
@@ -207,6 +227,8 @@ const order = ref<WorkOrder | null>(null)
 const logs = ref<WorkOrderStatusLog[]>([])
 const exceptions = ref<ExceptionRecord[]>([])
 const exceptionLoading = ref(false)
+const photos = ref<OrderPhoto[]>([])
+const photosLoading = ref(false)
 
 const dispatchVisible = ref(false)
 const editVisible = ref(false)
@@ -231,11 +253,24 @@ async function loadAll() {
     order.value = await getWorkOrder(orderId)
     const logPage = await getWorkOrderStatusLogs(orderId)
     logs.value = logPage.list
+    loadPhotos()
     if (order.value.status === 'SUSPENDED') await loadExceptions()
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : '工单详情加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+/** 工单图片聚合：需求提报图 + 签到/签退/任务结束照片 + 异常配图 */
+async function loadPhotos() {
+  photosLoading.value = true
+  try {
+    photos.value = await orderPhotos(orderId)
+  } catch {
+    photos.value = []
+  } finally {
+    photosLoading.value = false
   }
 }
 

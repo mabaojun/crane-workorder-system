@@ -10,6 +10,10 @@ RUN mvn -q package -DskipTests
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app
+# HEALTHCHECK 使用 curl；JRE 基础镜像默认不含
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/target/crane-backend.jar app.jar
 # 时区与容器内临时目录
 ENV TZ=Asia/Shanghai JAVA_OPTS="-Xms256m -Xmx512m"

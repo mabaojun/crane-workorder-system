@@ -12,8 +12,11 @@ public class MeResponse {
 
     private Long userId;
 
-    /** 角色码：ADMIN / DRIVER / CUSTOMER */
+    /** 角色码：ADMIN / DRIVER / CUSTOMER（当前令牌所选身份） */
     private String role;
+
+    /** 账号可选身份列表（一人多角色时供小程序切换身份） */
+    private List<RoleOption> availableRoles;
 
     /** 用户昵称，取 sys_user.nick_name */
     private String name;

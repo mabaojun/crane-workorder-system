@@ -23,10 +23,10 @@
         <el-table-column label="型号" prop="model" min-width="140">
           <template #default="{ row }">{{ row.model || '-' }}</template>
         </el-table-column>
-        <el-table-column label="类型" width="90">
+        <el-table-column label="类型" width="130">
           <template #default="{ row }">
-            <el-tag :type="row.type === 'LIFT' ? 'warning' : 'primary'" effect="plain">
-              {{ row.type === 'LIFT' ? '举升车' : '吊车' }}
+            <el-tag :type="row.type === 'LIFT' ? 'warning' : row.type === 'CRANE' ? 'primary' : 'success'" effect="plain">
+              {{ VEHICLE_TYPE_LABEL[row.type] || '吊车' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -113,19 +113,18 @@
         <el-form-item label="车辆型号">
           <el-input v-model="form.model" maxlength="64" placeholder="如 中联 25K5" />
         </el-form-item>
-        <el-form-item label="车辆类型" prop="type">
-          <el-radio-group v-model="form.type">
-            <el-radio-button value="CRANE">吊车</el-radio-button>
-            <el-radio-button value="LIFT">举升车</el-radio-button>
-          </el-radio-group>
+        <el-form-item label="车辆种类" prop="type">
+          <el-select v-model="form.type" style="width: 100%">
+            <el-option v-for="opt in VEHICLE_TYPE_OPTIONS" :key="opt.value" :value="opt.value" :label="opt.label" />
+          </el-select>
         </el-form-item>
-        <el-form-item v-if="form.type === 'CRANE'" label="吊车吨位" prop="tonnage">
+        <el-form-item v-if="form.type === 'CRANE'" label="吊车吨位">
           <el-input-number v-model="form.tonnage" :min="1" :precision="1" controls-position="right" style="width: 200px" />
-          <span class="unit">吨</span>
+          <span class="unit">吨（选填）</span>
         </el-form-item>
-        <el-form-item v-else label="举升高度" prop="liftHeight">
+        <el-form-item v-else-if="form.type === 'LIFT'" label="举升高度">
           <el-input-number v-model="form.liftHeight" :min="1" :precision="1" controls-position="right" style="width: 200px" />
-          <span class="unit">米</span>
+          <span class="unit">米（选填）</span>
           <div class="quick-heights">
             <span class="quick-label">常用：</span>
             <el-check-tag
@@ -192,7 +191,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { VEHICLE_STATUS_LABEL } from '@crane/shared'
+import { VEHICLE_STATUS_LABEL, VEHICLE_TYPE_LABEL, VEHICLE_TYPE_OPTIONS } from '@crane/shared'
 import {
   pageVehicles,
   createVehicle,
@@ -291,21 +290,7 @@ function isCertExpiring(date: string): boolean {
 }
 
 const rules: FormRules = {
-  plateNo: [{ required: true, message: '请填写车牌号', trigger: 'blur' }],
-  tonnage: [{
-    validator: (_r, _v, cb) => {
-      if (form.type === 'CRANE' && form.tonnage == null) cb(new Error('请填写吨位'))
-      else cb()
-    },
-    trigger: 'change'
-  }],
-  liftHeight: [{
-    validator: (_r, _v, cb) => {
-      if (form.type === 'LIFT' && form.liftHeight == null) cb(new Error('请填写举升高度'))
-      else cb()
-    },
-    trigger: 'change'
-  }]
+  plateNo: [{ required: true, message: '请填写车牌号', trigger: 'blur' }]
 }
 
 onMounted(async () => {
@@ -361,7 +346,7 @@ function openForm(row?: Vehicle) {
   editing.value = row ?? null
   form.plateNo = row?.plateNo ?? ''
   form.model = row?.model ?? ''
-  form.type = row?.type === 'LIFT' ? 'LIFT' : 'CRANE'
+  form.type = row?.type || 'CRANE'
   form.tonnage = row?.tonnage ?? undefined
   form.liftHeight = row?.liftHeight ?? undefined
   form.vin = row?.vin ?? ''

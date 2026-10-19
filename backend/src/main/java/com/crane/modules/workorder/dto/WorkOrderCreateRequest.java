@@ -29,6 +29,9 @@ public class WorkOrderCreateRequest {
     @NotNull(message = "vehicleId 必填")
     private Long vehicleId;
 
+    /** 用车种类：缺省按所选车辆种类，选择时须与车辆种类一致 */
+    private String vehicleType;
+
     @NotNull(message = "staffId 必填")
     private Long staffId;
 
@@ -57,7 +60,7 @@ public class WorkOrderCreateRequest {
     @DecimalMin(value = "0.01", message = "cargoWeightTon 须大于 0")
     private BigDecimal cargoWeightTon;
 
-    @NotNull(message = "craneTonnage 必填")
+    /** 吊车吨位，仅用车种类为 CRANE 时必填 */
     private BigDecimal craneTonnage;
 
     /** 预计使用时长（天），选填，快捷 0.5/1/1.5/2 天或自定义，仅备注提示 */

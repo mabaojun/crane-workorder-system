@@ -18,6 +18,21 @@ export function getOrderDetail(id: number | string) {
   return request<WorkOrder>(`/work-order/orders/${id}`)
 }
 
+/** 工单图片聚合项 */
+export interface OrderPhoto {
+  /** DEMAND / CHECK_IN / DAILY_CHECKOUT / TASK_END / EXCEPTION */
+  stage: string
+  stageLabel: string
+  fileName: string
+  url: string
+  time: string | null
+}
+
+/** 工单图片聚合（客户提报图 + 打卡照片 + 异常配图） */
+export function listOrderPhotos(id: number | string) {
+  return request<OrderPhoto[]>(`/files/order/${id}`)
+}
+
 export function submitReview(id: number | string, body: { score: number; content?: string }) {
   return request<void>(`/work-order/orders/${id}/review`, { method: 'POST', body })
 }
@@ -54,8 +69,9 @@ export function checkIn(body: {
 
 export function dailyCheckout(body: {
   orderId: number | string
-  longitude: number
-  latitude: number
+  // 定位强制开关关闭（测试阶段）时允许为空
+  longitude: number | null
+  latitude: number | null
   photoUrls?: string[]
   isLeftSite?: boolean
   isReturned?: boolean
@@ -65,9 +81,11 @@ export function dailyCheckout(body: {
 
 export function taskEnd(body: {
   orderId: number | string
-  longitude: number
-  latitude: number
-  photoUrls: string[]
+  // 定位强制开关关闭（测试阶段）时允许为空
+  longitude: number | null
+  latitude: number | null
+  /** 现场照片（强制开关开启时必传），无照片时可不传 */
+  photoUrls?: string[]
 }) {
   return request<Record<string, unknown>>('/attendance/task-end', { method: 'POST', body })
 }
@@ -98,7 +116,9 @@ export function createDemandOrder(body: {
   description?: string
   imageUrls?: string[]
   cargoWeight?: number
-  /** 设备吨位（点选常用档位或直接输入），选填 */
+  /** 用车种类：CRANE 吊车 / LIFT 举升车 / SEMI_TRAILER 板车（半挂）/ HEAVY_TRAILER 大件托盘车 */
+  vehicleType?: string
+  /** 设备吨位（点选常用档位或直接输入），仅吊车类型填写 */
   craneTonnage?: number
   /** 预计使用时长（天），选填，仅备注提示 */
   estimatedDays?: number

@@ -54,6 +54,10 @@ public class Staff {
     /** 绑定的登录账号 sys_user.id */
     private Long userId;
 
+    /** 是否具有管理员角色（由绑定账号的角色集合计算，不落库） */
+    @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+    private Boolean adminRole;
+
     private String remark;
 
     private LocalDateTime createdAt;

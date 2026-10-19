@@ -23,6 +23,8 @@ export interface PrecheckRequest {
 export interface DispatchRequest {
   staffId: number
   vehicleId: number
+  /** 用车种类，须与车辆种类一致；缺省按车辆种类 */
+  vehicleType?: string
   planStartAt?: string
   /** 计划时间早于当前时的二次确认 */
   confirmPast?: boolean

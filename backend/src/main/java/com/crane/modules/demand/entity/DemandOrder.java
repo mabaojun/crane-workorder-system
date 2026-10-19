@@ -56,6 +56,9 @@ public class DemandOrder {
     /** 意向车辆 */
     private Long intendedVehicleId;
 
+    /** 用车种类：CRANE 吊车 / LIFT 举升车 / SEMI_TRAILER 板车（半挂）/ HEAVY_TRAILER 大件托盘车 */
+    private String vehicleType;
+
     /** 吊车吨位需求（需管理员复核） */
     private BigDecimal craneTonnage;
 

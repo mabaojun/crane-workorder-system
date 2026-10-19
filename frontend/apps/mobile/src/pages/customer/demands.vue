@@ -87,42 +87,44 @@ function reSubmit(d: DemandOrder) {
 }
 .content {
   flex: 1;
-  padding: 12px 16px 88px;
+  padding: 14px 16px calc(96px + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 .list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 .card {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  padding: 12px 16px;
+  padding: 15px 18px;
 }
 .head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 .no {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--sub);
   font-variant-numeric: tabular-nums;
 }
 .row {
   display: flex;
   gap: 8px;
-  font-size: 13px;
-  margin-bottom: 4px;
+  font-size: 15px;
+  margin-bottom: 6px;
+  line-height: 1.55;
 }
 .k {
   color: var(--sub);
+  font-size: 14px;
   flex: none;
-  width: 64px;
+  width: 70px;
 }
 .addr {
   overflow: hidden;
@@ -134,38 +136,39 @@ function reSubmit(d: DemandOrder) {
 .reject {
   background: #fef2f2;
   border-radius: var(--radius);
-  padding: 8px 10px;
-  font-size: 13px;
+  padding: 10px 12px;
+  font-size: 14px;
   color: var(--danger);
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin: 8px 0 4px;
+  margin: 10px 0 4px;
 }
 .foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 .time {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--sub);
 }
 .resubmit {
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--brand);
-  padding: 0 14px;
+  padding: 0 16px;
   min-height: 44px;
   display: flex;
   align-items: center;
   border: 1px solid var(--brand);
-  border-radius: var(--radius);
+  border-radius: 999px;
 }
 .loading {
   text-align: center;
   color: var(--sub);
-  font-size: 13px;
-  padding: 12px 0;
+  font-size: 14px;
+  padding: 14px 0;
 }
 </style>

@@ -1,14 +1,18 @@
-// 认证域接口：验证码 / 短信直登 / 当前用户 / 微信登录占位
+// 认证域接口：验证码 / 短信直登 / 微信授权登录与手机号绑定 / 当前用户
 import { request } from '@crane/shared/api/client'
-import type { MeInfo } from '../types'
+import type { MeInfo, RoleOption } from '../types'
 
 export interface LoginResult {
   tokenType: string
   accessToken: string
   expiresIn: number
   role: string
+  /** 账号可选身份（一人多角色时登录后选择） */
+  availableRoles?: RoleOption[]
   permissions?: string[]
   bound: boolean
+  /** 微信登录未绑定手机号时返回的短时效绑定凭据 */
+  bindTicket?: string
 }
 
 export interface SmsCodeResult {
@@ -18,10 +22,13 @@ export interface SmsCodeResult {
   debugCode?: string
 }
 
-export function sendSmsCode(phone: string) {
+/** 验证码场景：LOGIN 登录 / BIND_PHONE 微信授权后绑定手机号 */
+export type SmsScene = 'LOGIN' | 'BIND_PHONE'
+
+export function sendSmsCode(phone: string, scene: SmsScene = 'LOGIN') {
   return request<SmsCodeResult>('/auth/sms-code', {
     method: 'POST',
-    body: { phone, scene: 'LOGIN' }
+    body: { phone, scene }
   })
 }
 
@@ -44,18 +51,34 @@ export function fetchMe() {
   return request<MeInfo>('/auth/me')
 }
 
+/** 多角色账号选择本次进入身份，返回使用新角色签发的令牌 */
+export function selectRole(role: string) {
+  return request<LoginResult>('/auth/select-role', {
+    method: 'POST',
+    body: { role }
+  })
+}
+
 export function logout() {
   return request<void>('/auth/logout', { method: 'POST' })
 }
 
 /**
- * 微信授权登录（仅小程序通道调用）。
- * TODO(二期): 调 uni.login 拿 code，POST /auth/wechat-login { code, phone?, smsCode? }，
- * 未绑定手机号时按 03 契约走绑定流程。MVP 后端未配置微信通道返回 10006。
+ * 微信授权登录（仅小程序通道调用）：前端先用 uni.login 取 code。
+ * 已绑定账号直接返回令牌；未绑定返回 bindTicket，需继续调用 bindPhone 绑定预留手机号。
  */
-export function wechatLogin(code: string) {
+export function wechatLogin(code: string, client = 'mp') {
   return request<LoginResult>('/auth/wechat-login', {
     method: 'POST',
-    body: { code }
+    body: { code, client }
+  })
+}
+
+/** 绑定手机号：携带 bindTicket 时走微信绑定通道（Authorization: Bind <ticket>） */
+export function bindPhone(phone: string, smsCode: string, bindTicket?: string) {
+  return request<LoginResult>('/auth/bind-phone', {
+    method: 'POST',
+    body: { phone, smsCode },
+    headers: bindTicket ? { Authorization: `Bind ${bindTicket}` } : undefined
   })
 }

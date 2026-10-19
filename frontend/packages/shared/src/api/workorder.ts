@@ -1,5 +1,5 @@
 // 工单域接口封装（03 §2 API-WO-001~008）
-import { request } from './client'
+import { download, request } from './client'
 import type { PageData } from '../index'
 
 /** 工单详情 / 列表聚合出参，字段与后端 WorkOrderDetailResponse 一致 */
@@ -18,7 +18,11 @@ export interface WorkOrder {
   staffPhone: string | null
   vehicleId: number | null
   vehiclePlateNo: string | null
+  /** 用车种类：CRANE / LIFT / SEMI_TRAILER / HEAVY_TRAILER */
+  vehicleType: string | null
   vehicleTonnage: number | null
+  /** 举升高度（米），仅举升车有值 */
+  vehicleLiftHeight: number | null
   address: string
   longitude: number | null
   latitude: number | null
@@ -74,6 +78,8 @@ export interface WorkOrderCreateRequest {
   contactId?: number
   staffId: number
   vehicleId: number
+  /** 用车种类，须与所选车辆种类一致；缺省按车辆种类 */
+  vehicleType?: string
   planStartAt: string
   address: string
   longitude: number
@@ -84,7 +90,8 @@ export interface WorkOrderCreateRequest {
   cargoQty?: number
   /** 选填：货物重量（吨） */
   cargoWeightTon?: number
-  craneTonnage: number
+  /** 吊车吨位，仅用车种类为 CRANE 时必填 */
+  craneTonnage?: number
   /** 预计使用时长（天），选填，快捷 0.5/1/1.5/2 或自定义，仅备注提示 */
   estimatedDays?: number
   /** 结算主体：ENTERPRISE 企业客户主体（管理员选客户名称）/ PERSONAL 个人结算 */
@@ -196,4 +203,9 @@ export function getWorkOrderStatusLogs(id: number | string, pageNum = 1, pageSiz
     `/work-order/orders/${id}/status-logs`,
     { query: { pageNum, pageSize } }
   )
+}
+
+/** 工作台工单运行明细 Excel 导出（仅管理员，日期格式 YYYY-MM-DD） */
+export function downloadWorkOrderExport(startDate: string, endDate: string) {
+  return download('/work-order/orders/export', { query: { startDate, endDate } })
 }

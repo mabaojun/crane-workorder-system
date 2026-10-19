@@ -1,4 +1,10 @@
 {
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^uni-(.*)": "@dcloudio/uni-ui/lib/uni-$1/uni-$1.vue"
+    }
+  },
   "pages": [
     {
       "path": "pages/login/index",
@@ -17,7 +23,7 @@
       "path": "pages/driver/index",
       "style": {
         "navigationBarTitleText": "我的工单",
-        "navigationBarBackgroundColor": "#1d4ed8",
+        "navigationBarBackgroundColor": "#0b1f3a",
         "navigationBarTextStyle": "white"
       }
     },
@@ -25,7 +31,7 @@
       "path": "pages/driver/order-detail",
       "style": {
         "navigationBarTitleText": "工单操作",
-        "navigationBarBackgroundColor": "#1d4ed8",
+        "navigationBarBackgroundColor": "#0b1f3a",
         "navigationBarTextStyle": "white"
       }
     },
@@ -33,7 +39,7 @@
       "path": "pages/driver/orders",
       "style": {
         "navigationBarTitleText": "工单列表",
-        "navigationBarBackgroundColor": "#1d4ed8",
+        "navigationBarBackgroundColor": "#0b1f3a",
         "navigationBarTextStyle": "white"
       }
     },
@@ -41,7 +47,7 @@
       "path": "pages/driver/profile",
       "style": {
         "navigationBarTitleText": "我的",
-        "navigationBarBackgroundColor": "#1d4ed8",
+        "navigationBarBackgroundColor": "#0b1f3a",
         "navigationBarTextStyle": "white"
       }
     },
@@ -49,7 +55,7 @@
       "path": "pages/customer/index",
       "style": {
         "navigationBarTitleText": "我的工单",
-        "navigationBarBackgroundColor": "#1d4ed8",
+        "navigationBarBackgroundColor": "#0b1f3a",
         "navigationBarTextStyle": "white"
       }
     },
@@ -75,7 +81,79 @@
       "path": "pages/customer/profile",
       "style": {
         "navigationBarTitleText": "我的",
-        "navigationBarBackgroundColor": "#1d4ed8",
+        "navigationBarBackgroundColor": "#0b1f3a",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/admin/index",
+      "style": {
+        "navigationBarTitleText": "移动办公台",
+        "navigationBarBackgroundColor": "#0b1f3a",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/admin/demands",
+      "style": {
+        "navigationBarTitleText": "需求审批",
+        "navigationBarBackgroundColor": "#0b1f3a",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/admin/demand-detail",
+      "style": {
+        "navigationBarTitleText": "需求详情",
+        "navigationBarBackgroundColor": "#0b1f3a",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/admin/exceptions",
+      "style": {
+        "navigationBarTitleText": "异常审批",
+        "navigationBarBackgroundColor": "#0b1f3a",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/admin/orders",
+      "style": {
+        "navigationBarTitleText": "工单管理",
+        "navigationBarBackgroundColor": "#0b1f3a",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/admin/order-detail",
+      "style": {
+        "navigationBarTitleText": "工单详情",
+        "navigationBarBackgroundColor": "#0b1f3a",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/admin/order-create",
+      "style": {
+        "navigationBarTitleText": "新建工单",
+        "navigationBarBackgroundColor": "#0b1f3a",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/admin/voice-create",
+      "style": {
+        "navigationBarTitleText": "一句话下工单",
+        "navigationBarBackgroundColor": "#0b1f3a",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/admin/profile",
+      "style": {
+        "navigationBarTitleText": "我的",
+        "navigationBarBackgroundColor": "#0b1f3a",
         "navigationBarTextStyle": "white"
       }
     }
@@ -83,7 +161,7 @@
   "globalStyle": {
     "navigationBarTextStyle": "white",
     "navigationBarTitleText": "济南诚重吊装",
-    "navigationBarBackgroundColor": "#1d4ed8",
-    "backgroundColor": "#f5f7fa"
+    "navigationBarBackgroundColor": "#0b1f3a",
+    "backgroundColor": "#f2f6fc"
   }
 }

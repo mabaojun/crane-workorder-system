@@ -63,19 +63,35 @@ class VehicleServiceTest {
     }
 
     @Test
-    void 举升车缺举升高度应抛出20001() {
+    void 举升车可只填种类创建_属性均非必填() {
+        mockCreatePass();
         VehicleUpsertRequest req = liftRequest();
         req.setLiftHeight(null);
-        BizException e = assertThrows(BizException.class, () -> vehicleService.create(req, 1L));
-        assertEquals(20001, e.getCode());
+        Vehicle vehicle = vehicleService.create(req, 1L);
+        assertEquals("LIFT", vehicle.getType());
+        assertNull(vehicle.getLiftHeight());
     }
 
     @Test
-    void 吊车缺吨位应抛出20001() {
+    void 吊车可只填种类创建_吨位选填() {
+        mockCreatePass();
         VehicleUpsertRequest req = craneRequest();
         req.setTonnage(null);
-        BizException e = assertThrows(BizException.class, () -> vehicleService.create(req, 1L));
-        assertEquals(20001, e.getCode());
+        Vehicle vehicle = vehicleService.create(req, 1L);
+        assertEquals("CRANE", vehicle.getType());
+        assertNull(vehicle.getTonnage());
+    }
+
+    @Test
+    void 板车可只填种类创建_无专属属性() {
+        mockCreatePass();
+        VehicleUpsertRequest req = new VehicleUpsertRequest();
+        req.setPlateNo("鲁B77777");
+        req.setType("SEMI_TRAILER");
+        Vehicle vehicle = vehicleService.create(req, 1L);
+        assertEquals("SEMI_TRAILER", vehicle.getType());
+        assertNull(vehicle.getTonnage());
+        assertNull(vehicle.getLiftHeight());
     }
 
     @Test

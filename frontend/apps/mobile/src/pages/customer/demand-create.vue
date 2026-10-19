@@ -11,7 +11,9 @@ import MapPicker from '../../components/MapPicker.vue'
 import type { MapPickResult } from '../../components/MapPicker.vue'
 import RoleTabbar from '../../components/RoleTabbar.vue'
 import { useAuthStore } from '../../stores/auth'
-import { chooseImages, getLocation, toastError, toastOk } from '../../utils'
+import { chooseImages, getLocation, toastError, toastOk, uploadLocalFile } from '../../utils'
+import { DATE_QUICKS, DAYS_PRESETS, TONNAGE_PRESETS, dateByOffset } from '../../utils/order-presets'
+import { VEHICLE_TYPE_OPTIONS, isCraneType } from '@crane/shared'
 
 const auth = useAuthStore()
 
@@ -21,15 +23,16 @@ const address = ref('')
 const coords = ref<{ longitude: number; latitude: number } | null>(null)
 const locating = ref(false)
 const description = ref('')
+/** 用车种类：客户必选，默认吊车 */
+const vehicleType = ref('CRANE')
+const isCraneVehicle = computed(() => isCraneType(vehicleType.value))
 const cargoWeight = ref('')
 const craneTonnage = ref('')
 const estimatedDays = ref('')
-/** 设备吨位常用档位：点选快捷，也可直接输入其他吨位 */
-const TONNAGE_PRESETS = [8, 16, 25, 50, 70, 80, 100, 110, 130, 150, 200, 300]
-/** 预计使用时长常用档位（天）：点选快捷，也可直接输入（0.5 步进），仅备注提示 */
-const DAYS_PRESETS = [0.5, 1, 1.5, 2, 3]
 const expectDate = ref('')
 const expectTime = ref('')
+/** 期望开始时间预选项：7 点 / 7 点半 / 13 点 / 13 点半 */
+const TIME_PRESETS = ['07:00', '07:30', '13:00', '13:30']
 const photos = ref<string[]>([])
 const parentDemandId = ref<number | undefined>(undefined)
 /** 结算主体：企业联系人默认按所属企业结算，可手动切换为个人用车 */
@@ -59,12 +62,7 @@ function pickPlace(p: MyPlace) {
 
 /** 期望日期快捷：今天 / 明天 / 后天 */
 function setQuickDate(offset: number) {
-  const d = new Date()
-  d.setDate(d.getDate() + offset)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  expectDate.value = `${y}-${m}-${day}`
+  expectDate.value = dateByOffset(offset)
 }
 
 /** 需求描述常用项：点选追加、再点移除（与后台转工单备注一致） */
@@ -161,9 +159,14 @@ async function submit() {
     return
   }
   try {
+    // 现场照片先上传到文件服务，提交需求单时只携带可鉴权下载的地址
+    let imageUrls: string[] | undefined
+    if (photos.value.length) {
+      uni.showLoading({ title: '上传照片中' })
+      imageUrls = await Promise.all(photos.value.map(uploadLocalFile))
+    }
     uni.showLoading({ title: '提交中' })
     const expectedStartAt = expectDate.value && expectTime.value ? `${expectDate.value}T${expectTime.value}:00` : undefined
-    // TODO(二期): 对接文件上传，photos 目前仅本地预览
     await createDemandOrder({
       source: 'CUSTOMER_MP',
       contactName: contactName.value.trim(),
@@ -172,10 +175,11 @@ async function submit() {
       longitude: submitLng,
       latitude: submitLat,
       description: description.value.trim() || undefined,
-      imageUrls: photos.value.length ? ['mock://local'] : undefined,
+      imageUrls,
+      vehicleType: vehicleType.value,
       cargoWeight: cargoWeight.value ? Number(cargoWeight.value) : undefined,
-      // 设备吨位：点选常用档位或直接输入
-      craneTonnage: craneTonnage.value ? Number(craneTonnage.value) : undefined,
+      // 设备吨位：仅吊车类型需要，点选常用档位或直接输入
+      craneTonnage: isCraneVehicle.value && craneTonnage.value ? Number(craneTonnage.value) : undefined,
       // 预计使用时长：点选常用档位或直接输入，仅备注提示不作换算
       estimatedDays: estimatedDays.value ? Number(estimatedDays.value) : undefined,
       // 企业联系人默认按所属企业结算，可切换个人用车；个人客户由后端强制个人主体
@@ -237,13 +241,25 @@ async function submit() {
             @tap="toggleDescPreset(t)"
           >{{ t }}</view>
         </view>
-        <textarea v-model="description" class="textarea" placeholder="吊装任务内容、现场条件等" :maxlength="500" />
+        <textarea v-model="description" class="textarea" placeholder="用车任务内容、现场条件等" :maxlength="500" />
+      </view>
+      <view class="field">
+        <text class="label">用车种类</text>
+        <view class="type-chips">
+          <view
+            v-for="opt in VEHICLE_TYPE_OPTIONS"
+            :key="opt.value"
+            class="type-chip"
+            :class="{ active: vehicleType === opt.value }"
+            @tap="vehicleType = opt.value"
+          >{{ opt.label }}</view>
+        </view>
       </view>
       <view class="field">
         <text class="label">货物重量(吨)</text>
         <input v-model="cargoWeight" class="input" type="digit" placeholder="选填，如 8" placeholder-class="ph" />
       </view>
-      <view class="field">
+      <view v-if="isCraneVehicle" class="field">
         <text class="label">设备吨位(吨)</text>
         <input v-model="craneTonnage" class="input" type="digit" placeholder="点选下方常用吨位，或直接输入" placeholder-class="ph" />
         <view class="tonnage-chips">
@@ -277,9 +293,13 @@ async function submit() {
             <view class="picker-value">{{ expectDate || '选择日期' }}</view>
           </picker>
           <view class="quick-row">
-            <view class="quick" @tap="setQuickDate(0)">今天</view>
-            <view class="quick" @tap="setQuickDate(1)">明天</view>
-            <view class="quick" @tap="setQuickDate(2)">后天</view>
+            <view
+              v-for="q in DATE_QUICKS"
+              :key="q.label"
+              class="quick"
+              :class="{ active: expectDate === dateByOffset(q.offset) }"
+              @tap="setQuickDate(q.offset)"
+            >{{ q.label }}</view>
           </view>
           <text class="field-hint">点击日期框可自选任意日期</text>
         </view>
@@ -288,9 +308,14 @@ async function submit() {
           <picker mode="time" :value="expectTime" @change="(e: any) => (expectTime = e.detail.value)">
             <view class="picker-value">{{ expectTime || '选择时间' }}</view>
           </picker>
-          <view class="quick-row">
-            <view class="quick" @tap="expectTime = '07:00'">上午 7:00</view>
-            <view class="quick" @tap="expectTime = '13:00'">下午 1:00</view>
+          <view class="time-chips">
+            <view
+              v-for="t in TIME_PRESETS"
+              :key="t"
+              class="time-chip"
+              :class="{ active: expectTime === t }"
+              @tap="expectTime = t"
+            >{{ t }}</view>
           </view>
           <text class="field-hint">点击时间框可自选任意时间</text>
         </view>
@@ -339,23 +364,24 @@ async function submit() {
 .page {
   min-height: 100vh;
   background: var(--bg);
-  padding: 16px 16px 96px;
+  padding: 16px 16px calc(100px + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 .form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 .field {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 10px 16px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 15px;
+  font-size: 16px;
 }
 .field.col {
   flex-direction: column;
@@ -365,8 +391,8 @@ async function submit() {
 .label {
   flex: none;
   color: var(--sub);
-  font-size: 13px;
-  width: 96px;
+  font-size: 14px;
+  width: 112px;
 }
 .field.col .label {
   width: auto;
@@ -382,16 +408,17 @@ async function submit() {
   gap: 8px;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 10px 16px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 12px 16px;
 }
 .half .label {
   width: auto;
 }
 .input {
   flex: 1;
-  font-size: 15px;
-  min-height: 24px;
+  font-size: 16px;
+  min-height: 32px;
 }
 .ph {
   color: var(--sub);
@@ -399,13 +426,18 @@ async function submit() {
 .textarea {
   width: 100%;
   box-sizing: border-box;
-  min-height: 88px;
-  font-size: 14px;
+  min-height: 96px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f8fafc;
+  font-size: 15px;
 }
 .locate-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 .place-list {
   background: var(--bg);
@@ -414,11 +446,11 @@ async function submit() {
   overflow: hidden;
 }
 .place-item {
-  min-height: 44px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   padding: 0 12px;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--txt);
   border-bottom: 1px solid var(--line);
 }
@@ -430,11 +462,19 @@ async function submit() {
   color: var(--brand);
 }
 .locate {
-  font-size: 13px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--brand);
+  background: #fff;
 }
 .located {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--success);
 }
 .quick-row {
@@ -443,13 +483,13 @@ async function submit() {
 }
 .quick {
   flex: 1;
-  min-height: 32px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--txt);
   background: var(--bg);
 }
@@ -458,8 +498,38 @@ async function submit() {
   color: var(--brand);
   background: var(--brand-weak);
 }
+.quick.active {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: var(--brand-weak);
+  font-weight: 600;
+}
+.time-chips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+.time-chip {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--txt);
+  background: var(--bg);
+  font-variant-numeric: tabular-nums;
+}
+.time-chip.active {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: var(--brand-weak);
+  font-weight: 600;
+}
 .field-hint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--sub);
 }
 .tonnage-chips {
@@ -469,14 +539,14 @@ async function submit() {
   margin-top: 10px;
 }
 .tonnage-chip {
-  min-width: 52px;
-  min-height: 32px;
+  min-width: 56px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--txt);
   background: var(--bg);
 }
@@ -487,7 +557,7 @@ async function submit() {
   font-weight: 600;
 }
 .hint-line {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--sub);
   margin-top: 6px;
 }
@@ -497,10 +567,13 @@ async function submit() {
   gap: 8px;
 }
 .desc-chip {
-  padding: 6px 16px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 18px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--txt);
   background: var(--bg);
 }
@@ -510,18 +583,43 @@ async function submit() {
   background: var(--brand-weak);
   font-weight: 600;
 }
-.picker-value {
-  font-size: 15px;
+.type-chips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.type-chip {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 14px;
   color: var(--txt);
-  min-height: 24px;
+  background: var(--bg);
+}
+.type-chip.active {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: var(--brand-weak);
+  font-weight: 600;
+}
+.picker-value {
+  font-size: 16px;
+  color: var(--txt);
+  min-height: 32px;
+  display: flex;
+  align-items: center;
 }
 .photo-row {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 .photo {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--bg);
@@ -536,17 +634,18 @@ async function submit() {
   justify-content: center;
   border: 1px dashed var(--line);
   color: var(--sub);
-  font-size: 13px;
+  font-size: 14px;
 }
 .submit {
   margin-top: 8px;
-  height: 48px;
-  line-height: 48px;
+  height: 52px;
+  line-height: 52px;
   border-radius: var(--radius);
-  background: var(--brand);
+  background: linear-gradient(135deg, #1a6bff, #0b4fd6);
   color: #fff;
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(26, 107, 255, 0.22);
 }
 .submit::after {
   border: none;

@@ -42,6 +42,33 @@ export interface AiDiagnose {
   recentStatuses: string[]
 }
 
+/** 一句话下工单解析结果 */
+export interface VoiceOrderParseResult {
+  rawText: string
+  /** CREATE_ORDER 新建工单 / DEMAND_CONVERT 需求转工单 */
+  intent: string
+  /** LLM 大模型 / RULE 本地规则 */
+  parseMode: string
+  demandId: number | null
+  demandNo: string | null
+  customerId: number | null
+  customerName: string | null
+  staffId: number | null
+  staffName: string | null
+  vehicleId: number | null
+  plateNo: string | null
+  address: string | null
+  longitude: number | null
+  latitude: number | null
+  planStartAt: string | null
+  craneTonnage: number | null
+  cargoWeight: number | null
+  cargoName: string | null
+  remark: string | null
+  missingFields: string[]
+  warnings: string[]
+}
+
 /** 手动生成今日 AI 日报（失败时后端落 FAILED 记录并抛出原因） */
 export function generateAiReport() {
   return request<AiGenerateResult>('/ai/reports/generate', { method: 'POST' })
@@ -55,4 +82,12 @@ export function getLatestAiReport() {
 /** AI 连通性诊断（接口校验报告数据源） */
 export function diagnoseAi() {
   return request<AiDiagnose>('/ai/diagnose')
+}
+
+/** 一句话下工单：自然语言拆解并与客户/司机/车辆/需求单匹配 */
+export function parseOrderByText(text: string) {
+  return request<VoiceOrderParseResult>('/ai/parse-order', {
+    method: 'POST',
+    body: { text }
+  })
 }

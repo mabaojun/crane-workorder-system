@@ -9,6 +9,7 @@ import com.crane.modules.auth.dto.BindPhoneRequest;
 import com.crane.modules.auth.dto.LoginResponse;
 import com.crane.modules.auth.dto.MeResponse;
 import com.crane.modules.auth.dto.PasswordLoginRequest;
+import com.crane.modules.auth.dto.RoleOption;
 import com.crane.modules.auth.dto.SmsCodeRequest;
 import com.crane.modules.auth.dto.SmsCodeResponse;
 import com.crane.modules.auth.dto.SmsLoginRequest;
@@ -55,6 +56,13 @@ public class AuthService {
     /** 角色 id 固定映射（sys_role 种子数据）：1=ADMIN、2=DRIVER、3=CUSTOMER */
     private static final Map<Long, String> ROLE_CODE_BY_ID = Map.of(1L, "ADMIN", 2L, "DRIVER", 3L, "CUSTOMER");
 
+    /** 角色码 → 角色 id（与种子数据一致） */
+    private static final Map<String, Long> ROLE_ID_BY_CODE = Map.of("ADMIN", 1L, "DRIVER", 2L, "CUSTOMER", 3L);
+
+    /** 角色展示名，供小程序登录后选择身份 */
+    private static final Map<String, String> ROLE_NAME_BY_CODE =
+            Map.of("ADMIN", "管理员", "DRIVER", "司机", "CUSTOMER", "客户");
+
     /** 角色对应的数据范围 */
     private static final Map<String, String> DATA_SCOPE_BY_ROLE =
             Map.of("ADMIN", "ALL", "DRIVER", "SELF_STAFF", "CUSTOMER", "SELF_CUSTOMER");
@@ -82,6 +90,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final TokenUserChecker tokenUserChecker;
     private final SystemConfigService systemConfigService;
+    private final WechatService wechatService;
 
     /** 是否为模拟短信通道（MVP 未接真实通道），为 true 时响应中返回 debugCode 供联调 */
     @Value("${crane.sms.mock:true}")
@@ -113,7 +122,17 @@ public class AuthService {
         update.setId(user.getId());
         update.setLastLoginAt(LocalDateTime.now());
         sysUserMapper.updateById(update);
-        return issueToken(user);
+        // 后台 / 大屏登录：多角色账号（如司机兼管理员）直接以管理员身份进入
+        return issueToken(user, loginRole(user, clientType));
+    }
+
+    /** 按客户端确定登录身份：admin / screen 且账号具备管理员角色时优先 ADMIN，其余端用主角色 */
+    private String loginRole(SysUser user, String clientType) {
+        String client = clientType == null ? "" : clientType.trim().toLowerCase();
+        if (("admin".equals(client) || "screen".equals(client)) && roleCodes(user).contains("ADMIN")) {
+            return "ADMIN";
+        }
+        return roleCode(user.getRoleId());
     }
 
     /** 密码登录开关校验：仅豁免 admin / screen 两端 */
@@ -126,6 +145,23 @@ public class AuthService {
                 .getOrDefault(KEY_PASSWORD_LOGIN_ENABLED, "true").trim())) {
             throw new BizException(ErrorCode.PASSWORD_LOGIN_DISABLED);
         }
+    }
+
+    /**
+     * 多角色账号选择本次进入身份（API-AUTH-007）：校验目标角色在账号角色集合内后重新签发令牌。
+     * 小程序登录统一用本人账号，登录后按所选身份进入司机端 / 客户端 / 管理端。
+     */
+    public LoginResponse selectRole(Long userId, String roleCode) {
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null) {
+            throw new BizException(ErrorCode.NOT_FOUND);
+        }
+        checkStatusEnabled(user);
+        String target = roleCode == null ? "" : roleCode.trim().toUpperCase();
+        if (!roleCodes(user).contains(target)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "账号未开通该角色");
+        }
+        return issueToken(user, target);
     }
 
     /** 发送短信验证码（API-AUTH-003）：60 秒内同手机号同场景限发一次，MVP 记 MOCK 发送结果 */
@@ -174,9 +210,51 @@ public class AuthService {
         return issueToken(user);
     }
 
-    /** 微信授权登录（API-AUTH-001）：MVP 未配置微信凭据，通道暂不开放，结构预留 */
+    /**
+     * 微信授权登录（API-AUTH-001）：code 换 openid / unionid 后匹配账号。
+     * 已绑定且账号有效直接签发令牌；未绑定返回短时效 bindTicket，客户端据此完成手机号绑定。
+     */
     public LoginResponse wechatLogin(WechatLoginRequest req) {
-        throw new BizException(ErrorCode.WECHAT_CODE_INVALID, "微信登录通道未配置");
+        WechatService.Session session = wechatService.code2Session(req.getCode());
+        SysUser user = findByWechat(session.openId(), session.unionId());
+        if (user == null || STATUS_PENDING_BIND.equals(user.getStatus())) {
+            // 未匹配账号或账号尚未激活：返回绑定凭据，绑定预留手机号后再签发令牌
+            LoginResponse resp = new LoginResponse();
+            resp.setTokenType("Bearer");
+            resp.setBound(false);
+            resp.setBindTicket(jwtUtil.createBindTicket(session.openId(), session.unionId()));
+            return resp;
+        }
+        checkStatusEnabled(user);
+        // 首次以 unionid 匹配到账号时补写 openid，后续按 openid 直登
+        SysUser update = new SysUser();
+        update.setId(user.getId());
+        update.setLastLoginAt(LocalDateTime.now());
+        if (user.getOpenId() == null || user.getOpenId().isBlank()) {
+            update.setOpenId(session.openId());
+        }
+        if ((user.getUnionId() == null || user.getUnionId().isBlank())
+                && session.unionId() != null && !session.unionId().isBlank()) {
+            update.setUnionId(session.unionId());
+        }
+        sysUserMapper.updateById(update);
+        // 含 unionid 匹配到的账号：把本次 openid 回填到内存对象，保持返回口径一致
+        user.setOpenId(user.getOpenId() == null || user.getOpenId().isBlank()
+                ? session.openId() : user.getOpenId());
+        return issueToken(user, loginRole(user, req.getClient()));
+    }
+
+    /** 按 openid 匹配账号，未命中时回退 unionid（绑定开放平台后可用） */
+    private SysUser findByWechat(String openId, String unionId) {
+        SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getOpenId, openId)
+                .last("LIMIT 1"));
+        if (user == null && unionId != null && !unionId.isBlank()) {
+            user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+                    .eq(SysUser::getUnionId, unionId)
+                    .last("LIMIT 1"));
+        }
+        return user;
     }
 
     /** 绑定手机号并激活账号（API-AUTH-002）：须匹配员工档案或客户预留手机号 */
@@ -216,6 +294,71 @@ public class AuthService {
         return issueToken(user);
     }
 
+    /**
+     * 微信绑定通道（API-AUTH-002，Authorization: Bind &lt;bindTicket&gt;）：
+     * 以微信 openid 写入管理员预设账号并激活，手机号须与员工档案 / 客户预留手机号匹配。
+     */
+    public LoginResponse bindPhoneByTicket(String openId, String unionId, BindPhoneRequest req) {
+        verifySmsCode(req.getPhone(), SCENE_BIND_PHONE, req.getSmsCode());
+        SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getPhone, req.getPhone()));
+        if (user == null) {
+            throw new BizException(ErrorCode.ACCOUNT_NOT_OPENED);
+        }
+        checkStatusEnabled(user);
+        // 该手机号已绑定其他微信 openid 时拒绝
+        if (user.getOpenId() != null && !user.getOpenId().isBlank()
+                && !user.getOpenId().equals(openId)) {
+            throw new BizException(ErrorCode.PHONE_ALREADY_BOUND);
+        }
+        // 手机号须匹配员工档案 / 客户预留手机号；管理员账号无业务档案，凭预留手机号即可绑定
+        Long staffId = queryBizId("biz_staff", req.getPhone());
+        Long customerId = queryBizId("biz_customer", req.getPhone());
+        if (staffId == null && customerId == null && !roleCodes(user).contains("ADMIN")) {
+            throw new BizException(ErrorCode.ACCOUNT_NOT_OPENED);
+        }
+        SysUser update = new SysUser();
+        update.setId(user.getId());
+        update.setOpenId(openId);
+        if (unionId != null && !unionId.isBlank()) {
+            update.setUnionId(unionId);
+        }
+        update.setStaffId(staffId);
+        update.setCustomerId(customerId);
+        update.setStatus(STATUS_ACTIVE);
+        update.setBoundAt(LocalDateTime.now());
+        update.setLastLoginAt(LocalDateTime.now());
+        try {
+            sysUserMapper.updateById(update);
+        } catch (DuplicateKeyException e) {
+            // openid / unionid 唯一键冲突（并发绑定）时按手机号已绑定处理
+            throw new BizException(ErrorCode.PHONE_ALREADY_BOUND);
+        }
+        user.setOpenId(openId);
+        user.setStaffId(staffId);
+        user.setCustomerId(customerId);
+        user.setStatus(STATUS_ACTIVE);
+        return issueToken(user);
+    }
+
+    /** 解析绑定凭据（Bind Ticket），非法、过期或类型不符均视为令牌无效 */
+    public Claims resolveBindClaims(String bindTicket) {
+        Claims claims;
+        try {
+            claims = jwtUtil.parse(bindTicket);
+        } catch (Exception e) {
+            throw new BizException(ErrorCode.TOKEN_INVALID);
+        }
+        if (!jwtUtil.isBindTicket(claims)) {
+            throw new BizException(ErrorCode.TOKEN_INVALID);
+        }
+        String openId = claims.get("openId", String.class);
+        if (openId == null || openId.isBlank()) {
+            throw new BizException(ErrorCode.TOKEN_INVALID);
+        }
+        return claims;
+    }
+
     /** 登出：更新强制下线时间戳使旧令牌失效；重复登出幂等成功 */
     public void logout(Long userId) {
         SysUser update = new SysUser();
@@ -224,16 +367,20 @@ public class AuthService {
         sysUserMapper.updateById(update);
     }
 
-    /** 当前用户信息（API-AUTH-006） */
-    public MeResponse me(Long userId) {
+    /** 当前用户信息（API-AUTH-006）；roleOverride 为令牌所选身份，为空时回退主角色 */
+    public MeResponse me(Long userId, String roleOverride) {
         SysUser user = sysUserMapper.selectById(userId);
         if (user == null) {
             throw new BizException(ErrorCode.NOT_FOUND);
         }
-        String role = roleCode(user.getRoleId());
+        List<String> roles = roleCodes(user);
+        String role = roleOverride != null && roles.contains(roleOverride)
+                ? roleOverride
+                : roleCode(user.getRoleId());
         MeResponse resp = new MeResponse();
         resp.setUserId(user.getId());
         resp.setRole(role);
+        resp.setAvailableRoles(availableRoles(roles));
         resp.setName(user.getNickName());
         resp.setPhone(user.getPhone());
         resp.setStaffId(user.getStaffId());
@@ -250,7 +397,7 @@ public class AuthService {
             }
         }
         resp.setDataScope(DATA_SCOPE_BY_ROLE.get(role));
-        resp.setPermissions(permissionMapper.selectPermissionCodes(user.getRoleId()));
+        resp.setPermissions(permissionMapper.selectPermissionCodes(ROLE_ID_BY_CODE.get(role)));
         return resp;
     }
 
@@ -261,6 +408,12 @@ public class AuthService {
      * @param checkForceLogout 是否校验强制下线；logout 场景传 false 以保证重复登出幂等成功
      */
     public Long resolveUserId(HttpServletRequest request, boolean checkForceLogout) {
+        Claims claims = resolveClaims(request, checkForceLogout);
+        return Long.valueOf(claims.getSubject());
+    }
+
+    /** 解析并校验令牌，返回 Claims（含 role 声明），供 /auth/me 识别当前所选身份 */
+    public Claims resolveClaims(HttpServletRequest request, boolean checkForceLogout) {
         String header = request.getHeader("Authorization");
         if (header == null || !header.startsWith("Bearer ")) {
             throw new BizException(ErrorCode.UNAUTHORIZED);
@@ -271,6 +424,10 @@ public class AuthService {
         } catch (Exception e) {
             throw new BizException(ErrorCode.TOKEN_INVALID);
         }
+        // 绑定凭据不可当作业务访问令牌使用
+        if (jwtUtil.isBindTicket(claims)) {
+            throw new BizException(ErrorCode.TOKEN_INVALID);
+        }
         Long userId = Long.valueOf(claims.getSubject());
         if (checkForceLogout) {
             Long forceLogoutAt = tokenUserChecker.forceLogoutAt(userId);
@@ -279,7 +436,7 @@ public class AuthService {
                 throw new BizException(ErrorCode.TOKEN_REVOKED);
             }
         }
-        return userId;
+        return claims;
     }
 
     /** 校验最新未使用验证码，通过则置 used_at 防重复使用 */
@@ -310,17 +467,57 @@ public class AuthService {
         }
     }
 
-    /** 组装登录响应：签发 JWT 并附带角色、权限码 */
+    /** 组装登录响应：按主角色签发 JWT，并附带账号全部可选身份与对应权限码 */
     private LoginResponse issueToken(SysUser user) {
-        String role = roleCode(user.getRoleId());
+        return issueToken(user, roleCode(user.getRoleId()));
+    }
+
+    /** 按指定角色签发令牌（多角色账号登录后选择身份时使用） */
+    private LoginResponse issueToken(SysUser user, String role) {
         LoginResponse resp = new LoginResponse();
         resp.setTokenType("Bearer");
         resp.setAccessToken(jwtUtil.createToken(user.getId(), role));
         resp.setExpiresIn(expireHours * 3600);
         resp.setRole(role);
-        resp.setPermissions(permissionMapper.selectPermissionCodes(user.getRoleId()));
+        resp.setAvailableRoles(availableRoles(roleCodes(user)));
+        resp.setPermissions(permissionMapper.selectPermissionCodes(ROLE_ID_BY_CODE.get(role)));
         resp.setBound(STATUS_ACTIVE.equals(user.getStatus()));
         return resp;
+    }
+
+    /**
+     * 账号角色集合：主角色 + additional_role_ids 附加角色，按管理员 / 司机 / 客户顺序输出。
+     * 一人多角色场景（如司机兼管理员）用于小程序登录后的身份选择。
+     */
+    private List<String> roleCodes(SysUser user) {
+        Set<String> codes = new java.util.LinkedHashSet<>();
+        codes.add(roleCode(user.getRoleId()));
+        if (user.getAdditionalRoleIds() != null) {
+            for (String part : user.getAdditionalRoleIds().split(",")) {
+                if (part.isBlank()) {
+                    continue;
+                }
+                try {
+                    codes.add(roleCode(Long.valueOf(part.trim())));
+                } catch (NumberFormatException ignored) {
+                    // 脏数据跳过，不影响主角色登录
+                }
+            }
+        }
+        List<String> ordered = new java.util.ArrayList<>();
+        for (String code : List.of("ADMIN", "DRIVER", "CUSTOMER")) {
+            if (codes.contains(code)) {
+                ordered.add(code);
+            }
+        }
+        return ordered;
+    }
+
+    /** 角色码集合转前端可选项（code + 中文名） */
+    private List<RoleOption> availableRoles(List<String> roles) {
+        return roles.stream()
+                .map(code -> new RoleOption(code, ROLE_NAME_BY_CODE.getOrDefault(code, code)))
+                .toList();
     }
 
     /** 经 JdbcTemplate 查员工 / 客户档案主键，避免跨模块依赖业务实体 */

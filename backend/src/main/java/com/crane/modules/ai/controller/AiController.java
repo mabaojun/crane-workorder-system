@@ -7,10 +7,15 @@ import com.crane.common.result.ApiResult;
 import com.crane.modules.ai.dto.AiDtos.DiagnoseVO;
 import com.crane.modules.ai.dto.AiDtos.GenerateReportVO;
 import com.crane.modules.ai.dto.AiDtos.LatestReportVO;
+import com.crane.modules.ai.dto.AiOrderParseDtos.ParseRequest;
+import com.crane.modules.ai.dto.AiOrderParseDtos.ParseResultVO;
+import com.crane.modules.ai.service.AiOrderParseService;
 import com.crane.modules.ai.service.AiReportService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,6 +30,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class AiController {
 
     private final AiReportService aiReportService;
+    private final AiOrderParseService aiOrderParseService;
+
+    /** 一句话下工单：自然语言 → 结构化字段 + 数据库匹配（大模型优先，失败降级本地规则） */
+    @PostMapping("/parse-order")
+    public ApiResult<ParseResultVO> parseOrder(@Valid @RequestBody ParseRequest request) {
+        requireAdmin();
+        return ApiResult.ok(aiOrderParseService.parse(request.getText()));
+    }
 
     /** 手动生成今日 AI 日报（工作台 / 大屏触发按钮）；失败落 FAILED 记录并返回失败原因 */
     @PostMapping("/reports/generate")

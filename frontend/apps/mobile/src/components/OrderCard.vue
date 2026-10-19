@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 工单卡片：司机/客户共用，字段按需展示
-// 状态差异化视觉：六态专属背景填充+左侧状态色条，1 秒识别工单状态（11-前端设计手册语义色）
+// 科技简约卡片：大号状态胶囊 + 左侧状态色条 + 图标化字段对齐，1 秒识别工单状态
 import { computed } from 'vue'
 import StatusTag from './StatusTag.vue'
 import { fmtDateTime } from '../utils'
@@ -58,143 +58,165 @@ const tone = computed(() => TONE[status.value] ?? '')
     <view class="head">
       <text class="order-no">{{ order.orderNo }}</text>
       <StatusTag
+        size="lg"
         :status="status"
         :label="statusKey === 'customerVisibleStatus' ? order.customerVisibleStatusLabel : undefined"
       />
-      <view class="chev" />
     </view>
-    <view class="title">{{ order.taskName || '吊装任务' }}</view>
+
+    <view class="title-line">
+      <text class="title">{{ order.taskName || '吊装任务' }}</text>
+      <uni-icons type="right" size="18" color="#9db0c9" />
+    </view>
+
     <view class="rows">
-      <view v-if="order.customerName" class="row"><text class="k">客户</text><text>{{ order.customerName }}</text></view>
-      <view v-if="order.staffName" class="row"><text class="k">司机</text><text>{{ order.staffName }}{{ order.vehiclePlateNo ? ' / ' + order.vehiclePlateNo : '' }}</text></view>
+      <view v-if="order.customerName" class="row">
+        <view class="k"><uni-icons type="person" size="15" color="#7b8ca6" /><text>客户</text></view>
+        <text class="v">{{ order.customerName }}</text>
+      </view>
+      <view v-if="order.staffName" class="row">
+        <view class="k"><uni-icons type="staff" size="15" color="#7b8ca6" /><text>司机</text></view>
+        <text class="v">{{ order.staffName }}{{ order.vehiclePlateNo ? ' · ' + order.vehiclePlateNo : '' }}</text>
+      </view>
       <view class="row">
-        <text class="k">地点</text>
-        <text class="addr">{{ order.address || '-' }}</text>
+        <view class="k"><uni-icons type="location" size="15" color="#7b8ca6" /><text>地点</text></view>
+        <text class="v addr">{{ order.address || '-' }}</text>
         <view
           v-if="showNav && order.longitude != null && order.latitude != null"
           class="nav-btn"
           @tap.stop="$emit('navigate')"
-        >一键导航</view>
+        >
+          <uni-icons type="navigate" size="13" color="#1a6bff" />
+          <text>导航</text>
+        </view>
       </view>
-      <view v-if="order.expectedStartAt" class="row"><text class="k">计划</text><text>{{ fmtDateTime(order.expectedStartAt) }}</text></view>
+      <view v-if="order.expectedStartAt" class="row">
+        <view class="k"><uni-icons type="calendar" size="15" color="#7b8ca6" /><text>计划</text></view>
+        <text class="v">{{ fmtDateTime(order.expectedStartAt) }}</text>
+      </view>
     </view>
   </view>
 </template>
 
 <style scoped>
 .order-card {
+  --tone: #94a3b8;
+  --tint: #ffffff;
   position: relative;
   overflow: hidden;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 12px 16px 12px 20px;
+  padding: 16px 18px 15px 22px;
+  border-radius: 16px;
+  border: 1px solid #e4ecf7;
+  background: linear-gradient(140deg, #ffffff 0%, var(--tint) 100%);
+  box-shadow: 0 4px 16px rgba(15, 31, 61, 0.055);
 }
-/* 左侧状态色条 */
+/* 左侧状态色条：弱化面积、保留状态识别 */
 .order-card::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 0;
-  bottom: 0;
+  top: 14px;
+  bottom: 14px;
   width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--tone);
 }
-/* 待办：琥珀 */
-.order-card.t-pending {
-  background: linear-gradient(135deg, #fffbeb, #fef3c7);
-  border-color: #fcd34d;
-}
-.order-card.t-pending::before { background: #d97706; }
-/* 待执行：明黄 */
-.order-card.t-arrive {
-  background: linear-gradient(135deg, #fefce8, #fef9c3);
-  border-color: #fde047;
-}
-.order-card.t-arrive::before { background: #ca8a04; }
-/* 进行中：品牌蓝（最醒目） */
-.order-card.t-progress {
-  background: linear-gradient(135deg, #eff6ff, #dbeafe);
-  border-color: #93c5fd;
-}
-.order-card.t-progress::before { background: #1d4ed8; }
-/* 暂停：红 */
-.order-card.t-suspend {
-  background: linear-gradient(135deg, #fef2f2, #fee2e2);
-  border-color: #fca5a5;
-}
-.order-card.t-suspend::before { background: #dc2626; }
+/* 待接单：琥珀 */
+.order-card.t-pending { --tone: #f59e0b; --tint: #fffaef; }
+/* 待到场：天青 */
+.order-card.t-arrive { --tone: #0ea5e9; --tint: #f1f9ff; }
+/* 进行中：科技蓝（最醒目） */
+.order-card.t-progress { --tone: #1a6bff; --tint: #eef5ff; }
+/* 受阻：红 */
+.order-card.t-suspend { --tone: #ef4444; --tint: #fff5f5; }
 /* 已完成：绿 */
-.order-card.t-done {
-  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
-  border-color: #86efac;
-}
-.order-card.t-done::before { background: #16a34a; }
+.order-card.t-done { --tone: #10b981; --tint: #f0fdf8; }
 /* 已取消：灰 */
-.order-card.t-cancel {
-  background: #f9fafb;
-  border-color: #e5e7eb;
+.order-card.t-cancel { --tone: #94a3b8; --tint: #f8fafc; }
+.order-card:active {
+  border-color: #bcd4f7;
 }
-.order-card.t-cancel::before { background: #9ca3af; }
 .order-card.highlight {
-  border-color: var(--brand);
+  border-color: rgba(26, 107, 255, 0.45);
+  box-shadow: 0 8px 24px rgba(26, 107, 255, 0.13);
 }
+
+/* 头部：工单号与状态分列两端 */
 .head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
 }
 .order-no {
   flex: 1;
-  font-size: 13px;
-  color: var(--sub);
+  min-width: 0;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  color: #8496b0;
   font-variant-numeric: tabular-nums;
 }
-/* 可点击箭头 */
-.chev {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-top: 2px solid var(--sub);
-  border-right: 2px solid var(--sub);
-  transform: rotate(45deg);
-  opacity: 0.6;
+.title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 9px 0 12px;
 }
 .title {
-  font-size: 17px;
-  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.35;
   color: var(--txt);
-  margin: 4px 0 8px;
 }
 .rows {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 9px;
+  padding-top: 11px;
+  border-top: 1px dashed #e6eef9;
 }
 .row {
   display: flex;
-  gap: 8px;
-  font-size: 13px;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 15px;
+  line-height: 1.5;
   color: var(--txt);
 }
 .k {
-  color: var(--sub);
   flex: none;
+  width: 58px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: #7b8ca6;
+  line-height: 23px;
+}
+.v {
+  flex: 1;
+  min-width: 0;
 }
 .addr {
-  overflow: hidden;
-  text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .nav-btn {
   flex: none;
-  margin-left: auto;
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(26, 107, 255, 0.08);
   color: var(--brand);
-  border: 1px solid var(--brand);
-  border-radius: var(--radius);
-  padding: 2px 8px;
+  font-size: 13px;
+  font-weight: 600;
 }
 </style>

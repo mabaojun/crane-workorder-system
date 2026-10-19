@@ -33,6 +33,9 @@ public class SysUser {
 
     private Long roleId;
 
+    /** 附加角色 id 列表，逗号分隔（一人多角色，如司机兼管理员）；主角色仍由 roleId 表达 */
+    private String additionalRoleIds;
+
     private Long staffId;
 
     private Long customerId;

@@ -147,10 +147,21 @@ public class DispatchService {
             if (newVehicle == null) {
                 throw new BizException(ErrorCode.NOT_FOUND, "车辆不存在");
             }
+            if (request.getVehicleType() != null && !request.getVehicleType().isBlank()
+                    && !request.getVehicleType().equals(newVehicle.getType())) {
+                throw new BizException(ErrorCode.PARAM_INVALID, "用车种类与所选车辆不一致");
+            }
         }
 
         order.setStaffId(request.getStaffId());
         order.setVehicleId(request.getVehicleId());
+        // 派单/改派同步用车种类；改到非吊车时清空吊车吨位
+        if (vehicleChanged && newVehicle != null) {
+            order.setVehicleType(newVehicle.getType());
+            if (!"CRANE".equals(newVehicle.getType())) {
+                order.setCraneTonnage(null);
+            }
+        }
         if (request.getPlanStartAt() != null) {
             order.setExpectedStartAt(request.getPlanStartAt());
         }

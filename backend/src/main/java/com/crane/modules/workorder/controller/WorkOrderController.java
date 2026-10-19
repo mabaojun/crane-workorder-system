@@ -13,10 +13,13 @@ import com.crane.modules.workorder.dto.WorkOrderUpdateRequest;
 import com.crane.modules.workorder.entity.CustomerReview;
 import com.crane.modules.workorder.entity.WorkOrder;
 import com.crane.modules.workorder.entity.WorkOrderStatusLog;
+import com.crane.modules.workorder.service.WorkOrderExportService;
 import com.crane.modules.workorder.service.WorkOrderService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,6 +29,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Map;
 
@@ -39,6 +45,28 @@ import java.util.Map;
 public class WorkOrderController {
 
     private final WorkOrderService workOrderService;
+    private final WorkOrderExportService workOrderExportService;
+
+    /**
+     * 工单运行明细 Excel 导出（仅管理员）。
+     * 按实际开始时间 → 计划开始时间 → 创建时间归期，默认当月；生成工单、签到签退、
+     * 每日签退、异常记录、状态流转五个工作表。
+     */
+    @GetMapping("/orders/export")
+    public void exportOrders(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            HttpServletResponse response) throws IOException {
+        requireAdmin();
+        WorkOrderExportService.ExportFile file = workOrderExportService.export(startDate, endDate);
+        String encodedName = URLEncoder.encode(file.fileName(), StandardCharsets.UTF_8).replace("+", "%20");
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedName);
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+        response.setContentLength(file.content().length);
+        response.getOutputStream().write(file.content());
+        response.flushBuffer();
+    }
 
     /** API-WO-001 创建工单（仅管理员，权限码 workorder:create） */
     @PostMapping("/orders")

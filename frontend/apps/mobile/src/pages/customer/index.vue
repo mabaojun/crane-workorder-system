@@ -87,30 +87,33 @@ function goDetail(o: WorkOrder) {
 }
 .content {
   flex: 1;
-  padding: 12px 16px 88px;
+  padding: 14px 16px calc(96px + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 .group-title {
-  font-size: 13px;
-  color: var(--sub);
-  margin: 8px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--txt);
+  margin: 10px 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 .toggle .arrow {
   color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
 }
 .list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 8px;
+  gap: 14px;
+  margin-bottom: 10px;
 }
 .loading {
   text-align: center;
   color: var(--sub);
-  font-size: 13px;
-  padding: 12px 0;
+  font-size: 14px;
+  padding: 14px 0;
 }
 </style>

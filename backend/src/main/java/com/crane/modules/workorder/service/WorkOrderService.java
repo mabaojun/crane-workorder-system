@@ -7,7 +7,11 @@ import com.crane.common.exception.BizException;
 import com.crane.common.exception.ErrorCode;
 import com.crane.common.result.PageResult;
 import com.crane.modules.customer.entity.Customer;
+import com.crane.modules.customer.entity.CustomerContact;
+import com.crane.modules.customer.mapper.CustomerContactMapper;
 import com.crane.modules.customer.mapper.CustomerMapper;
+import com.crane.modules.demand.entity.DemandOrder;
+import com.crane.modules.demand.mapper.DemandOrderMapper;
 import com.crane.modules.dispatch.dto.CheckItem;
 import com.crane.modules.dispatch.service.DispatchCheckService;
 import com.crane.modules.exception.service.ExceptionService;
@@ -73,6 +77,16 @@ public class WorkOrderService {
     private static final String STAFF_AWAY = "AWAY";
     private static final String STAFF_RESIGNED = "RESIGNED";
 
+    /** 用车种类合法取值与中文标签 */
+    private static final Set<String> VEHICLE_TYPES =
+            Set.of("CRANE", "LIFT", "SEMI_TRAILER", "HEAVY_TRAILER");
+    private static final Map<String, String> VEHICLE_TYPE_LABELS = Map.of(
+            "CRANE", "吊车",
+            "LIFT", "举升车",
+            "SEMI_TRAILER", "板车",
+            "HEAVY_TRAILER", "大件托盘车"
+    );
+
     /** 客户可见状态中文标签（02 §3.3.6） */
     private static final Map<String, String> VISIBLE_STATUS_LABELS = Map.of(
             "DISPATCHED", "已派单",
@@ -92,6 +106,8 @@ public class WorkOrderService {
     private final VehicleBindingMapper vehicleBindingMapper;
     private final VehicleStatusLogMapper vehicleStatusLogMapper;
     private final CustomerMapper customerMapper;
+    private final CustomerContactMapper customerContactMapper;
+    private final DemandOrderMapper demandOrderMapper;
     private final SystemConfigService systemConfigService;
     private final WorkOrderStateMachine stateMachine;
     private final NotifyService notifyService;
@@ -111,6 +127,7 @@ public class WorkOrderService {
         command.setContactId(request.getContactId());
         command.setStaffId(request.getStaffId());
         command.setVehicleId(request.getVehicleId());
+        command.setVehicleType(request.getVehicleType());
         command.setAddress(request.getAddress());
         command.setLongitude(request.getLongitude());
         command.setLatitude(request.getLatitude());
@@ -145,6 +162,13 @@ public class WorkOrderService {
         if (customer == null) {
             throw new BizException(ErrorCode.CUSTOMER_NOT_FOUND);
         }
+        // 指定联系人时必须属于所选客户，避免把联系人挂到其他企业
+        if (command.getContactId() != null) {
+            CustomerContact contact = customerContactMapper.selectById(command.getContactId());
+            if (contact == null || !command.getCustomerId().equals(contact.getCustomerId())) {
+                throw new BizException(ErrorCode.PARAM_INVALID, "联系人不属于所选客户");
+            }
+        }
         // 司机必须存在且非离岗 / 离职
         Staff staff = staffMapper.selectById(command.getStaffId());
         if (staff == null) {
@@ -171,11 +195,24 @@ public class WorkOrderService {
         if (command.getPlanStartAt().isBefore(LocalDateTime.now())) {
             throw new BizException(ErrorCode.PAST_START_TIME);
         }
+        // 用车种类：未指定按车辆档案种类兜底；指定时必须与车辆种类一致
+        String vehicleType = command.getVehicleType() == null || command.getVehicleType().isBlank()
+                ? vehicle.getType() : command.getVehicleType();
+        if (!VEHICLE_TYPES.contains(vehicleType)) {
+            throw new BizException(ErrorCode.ENUM_INVALID, "用车种类取值非法");
+        }
+        if (vehicle.getType() != null && !vehicleType.equals(vehicle.getType())) {
+            throw new BizException(ErrorCode.PARAM_INVALID, "用车种类与所选车辆不一致");
+        }
+        // 吊车必须填写吨位；其余种类不保留吊车吨位
+        if ("CRANE".equals(vehicleType) && command.getCraneTonnage() == null) {
+            throw new BizException(ErrorCode.PARAM_MISSING, "吊车吨位必填");
+        }
 
         WorkOrder order = new WorkOrder();
-        // 任务名称选填：不填时按「客户名·吊车吨位·司机姓名」自动生成
+        // 任务名称选填：不填时按「客户名·吊车吨位 / 用车种类·司机姓名」自动生成
         if (command.getTaskName() == null || command.getTaskName().isBlank()) {
-            order.setName(autoTaskName(customer, staff, command.getCraneTonnage()));
+            order.setName(autoTaskName(customer, staff, command.getCraneTonnage(), vehicleType));
         } else {
             order.setName(command.getTaskName().trim());
         }
@@ -185,13 +222,14 @@ public class WorkOrderService {
         order.setContactId(command.getContactId());
         order.setStaffId(command.getStaffId());
         order.setVehicleId(command.getVehicleId());
+        order.setVehicleType(vehicleType);
         order.setAddress(command.getAddress());
         order.setLongitude(command.getLongitude());
         order.setLatitude(command.getLatitude());
         order.setCargoName(command.getCargoName());
         order.setCargoQuantity(command.getCargoQuantity());
         order.setCargoWeight(command.getCargoWeightTon());
-        order.setCraneTonnage(command.getCraneTonnage());
+        order.setCraneTonnage("CRANE".equals(vehicleType) ? command.getCraneTonnage() : null);
         order.setEstimatedDays(command.getEstimatedDays());
         applySettlement(order, customer, command.getSettlementType());
         order.setExpectedStartAt(command.getPlanStartAt());
@@ -261,12 +299,17 @@ public class WorkOrderService {
     }
 
     /**
-     * 任务名称自动生成：客户名 + 吊车吨位 + 司机姓名（如「济南钢铁·25吨·张三」）。
+     * 任务名称自动生成：吊车为「客户名·25吨·司机姓名」；
+     * 其余用车种类为「客户名·举升车/板车/大件托盘车·司机姓名」。
      */
-    private String autoTaskName(Customer customer, Staff staff, java.math.BigDecimal craneTonnage) {
+    private String autoTaskName(Customer customer, Staff staff, java.math.BigDecimal craneTonnage, String vehicleType) {
         StringBuilder sb = new StringBuilder(customer.getName() == null ? "客户" : customer.getName());
-        if (craneTonnage != null) {
-            sb.append('·').append(craneTonnage.stripTrailingZeros().toPlainString()).append("吨");
+        if ("CRANE".equals(vehicleType)) {
+            if (craneTonnage != null) {
+                sb.append('·').append(craneTonnage.stripTrailingZeros().toPlainString()).append("吨");
+            }
+        } else {
+            sb.append('·').append(VEHICLE_TYPE_LABELS.getOrDefault(vehicleType, "用车"));
         }
         if (staff != null && staff.getName() != null) {
             sb.append('·').append(staff.getName());
@@ -477,14 +520,18 @@ public class WorkOrderService {
         }
     }
 
-    private record Refs(Map<Long, Customer> customers, Map<Long, Staff> staffs, Map<Long, Vehicle> vehicles) {
+    private record Refs(Map<Long, Customer> customers, Map<Long, Staff> staffs, Map<Long, Vehicle> vehicles,
+                        Map<Long, CustomerContact> contacts, Map<Long, DemandOrder> demands,
+                        Map<Long, CustomerContact> defaultContacts) {
     }
 
-    /** 批量加载客户 / 司机 / 车辆档案，避免列表逐行回表 */
+    /** 批量加载客户 / 司机 / 车辆 / 联系人 / 来源需求单，避免列表逐行回表 */
     private Refs batchLoadRefs(List<WorkOrder> orders) {
         Set<Long> customerIds = new HashSet<>();
         Set<Long> staffIds = new HashSet<>();
         Set<Long> vehicleIds = new HashSet<>();
+        Set<Long> contactIds = new HashSet<>();
+        Set<Long> demandIds = new HashSet<>();
         for (WorkOrder o : orders) {
             if (o.getCustomerId() != null) {
                 customerIds.add(o.getCustomerId());
@@ -498,6 +545,12 @@ public class WorkOrderService {
             if (o.getVehicleId() != null) {
                 vehicleIds.add(o.getVehicleId());
             }
+            if (o.getContactId() != null) {
+                contactIds.add(o.getContactId());
+            }
+            if (o.getDemandId() != null) {
+                demandIds.add(o.getDemandId());
+            }
         }
         Map<Long, Customer> customers = customerIds.isEmpty() ? Map.of()
                 : customerMapper.selectBatchIds(customerIds).stream()
@@ -508,7 +561,19 @@ public class WorkOrderService {
         Map<Long, Vehicle> vehicles = vehicleIds.isEmpty() ? Map.of()
                 : vehicleMapper.selectBatchIds(vehicleIds).stream()
                 .collect(Collectors.toMap(Vehicle::getId, Function.identity()));
-        return new Refs(customers, staffs, vehicles);
+        Map<Long, CustomerContact> contacts = contactIds.isEmpty() ? Map.of()
+                : customerContactMapper.selectBatchIds(contactIds).stream()
+                .collect(Collectors.toMap(CustomerContact::getId, Function.identity()));
+        Map<Long, DemandOrder> demands = demandIds.isEmpty() ? Map.of()
+                : demandOrderMapper.selectBatchIds(demandIds).stream()
+                .collect(Collectors.toMap(DemandOrder::getId, Function.identity()));
+        // 直建工单未指定联系人时回退客户默认联系人，保证司机端可联系到需求方
+        Map<Long, CustomerContact> defaultContacts = customerIds.isEmpty() ? Map.of()
+                : customerContactMapper.selectList(new LambdaQueryWrapper<CustomerContact>()
+                        .in(CustomerContact::getCustomerId, customerIds)
+                        .eq(CustomerContact::getIsDefault, 1)).stream()
+                .collect(Collectors.toMap(CustomerContact::getCustomerId, Function.identity(), (a, b) -> a));
+        return new Refs(customers, staffs, vehicles, contacts, demands, defaultContacts);
     }
 
     private WorkOrderDetailResponse toDetailResponse(WorkOrder order, Refs refs) {
@@ -522,6 +587,28 @@ public class WorkOrderService {
         Customer customer = order.getCustomerId() == null ? null : refs.customers().get(order.getCustomerId());
         resp.setCustomerName(customer == null ? null : customer.getName());
         resp.setContactId(order.getContactId());
+        // 联系人优先取需求单提报快照（客户下单时填写），直建工单回退到关联客户联系人
+        if (order.getDemandId() != null) {
+            DemandOrder demand = refs.demands().get(order.getDemandId());
+            if (demand != null) {
+                resp.setContactName(demand.getContactName());
+                resp.setContactPhone(demand.getContactPhone());
+            }
+        }
+        if (resp.getContactName() == null && resp.getContactPhone() == null && order.getContactId() != null) {
+            CustomerContact contact = refs.contacts().get(order.getContactId());
+            if (contact != null) {
+                resp.setContactName(contact.getName());
+                resp.setContactPhone(contact.getPhone());
+            }
+        }
+        if (resp.getContactName() == null && resp.getContactPhone() == null && order.getCustomerId() != null) {
+            CustomerContact defaultContact = refs.defaultContacts().get(order.getCustomerId());
+            if (defaultContact != null) {
+                resp.setContactName(defaultContact.getName());
+                resp.setContactPhone(defaultContact.getPhone());
+            }
+        }
         resp.setStaffId(order.getStaffId());
         Staff staff = order.getStaffId() == null ? null : refs.staffs().get(order.getStaffId());
         if (staff != null) {
@@ -533,6 +620,10 @@ public class WorkOrderService {
         if (vehicle != null) {
             resp.setVehiclePlateNo(vehicle.getPlateNo());
             resp.setVehicleTonnage(vehicle.getTonnage());
+            resp.setVehicleLiftHeight(vehicle.getLiftHeight());
+            resp.setVehicleType(order.getVehicleType() != null ? order.getVehicleType() : vehicle.getType());
+        } else {
+            resp.setVehicleType(order.getVehicleType());
         }
         resp.setAddress(order.getAddress());
         resp.setLongitude(order.getLongitude());
@@ -615,6 +706,12 @@ public class WorkOrderService {
         }
         if (vehicleChanged) {
             order.setVehicleId(request.getVehicleId());
+            // 改派车辆同步用车种类；非吊车清空吊车吨位
+            String newType = newVehicle.getType() != null ? newVehicle.getType() : order.getVehicleType();
+            order.setVehicleType(newType);
+            if (!"CRANE".equals(newType)) {
+                order.setCraneTonnage(null);
+            }
         }
         if (request.getPlanStartAt() != null) {
             order.setExpectedStartAt(request.getPlanStartAt());
@@ -625,7 +722,8 @@ public class WorkOrderService {
         if (request.getTaskName() != null && !request.getTaskName().isBlank()) {
             order.setName(request.getTaskName());
         }
-        if (request.getCraneTonnage() != null) {
+        if (request.getCraneTonnage() != null
+                && ("CRANE".equals(order.getVehicleType()) || order.getVehicleType() == null)) {
             order.setCraneTonnage(request.getCraneTonnage());
         }
         if (request.getEstimatedDays() != null) {

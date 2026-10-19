@@ -39,17 +39,17 @@ const emit = defineEmits<{ (e: 'close'): void }>()
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
+  padding: 16px;
   border-bottom: 1px solid var(--line);
 }
 .title {
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
 }
 .close {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--sub);
-  padding: 2px 4px;
+  padding: 4px 6px;
 }
 .body {
   padding: 16px;

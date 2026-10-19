@@ -1,6 +1,8 @@
 package com.crane.modules.workorder.service;
 
+import com.crane.modules.customer.mapper.CustomerContactMapper;
 import com.crane.modules.customer.mapper.CustomerMapper;
+import com.crane.modules.demand.mapper.DemandOrderMapper;
 import com.crane.modules.exception.service.ExceptionService;
 import com.crane.modules.notify.service.NotifyService;
 import com.crane.modules.place.service.CommonPlaceService;
@@ -56,6 +58,10 @@ class WorkOrderAcceptDeadlineTest {
     @Mock
     private CustomerMapper customerMapper;
     @Mock
+    private CustomerContactMapper customerContactMapper;
+    @Mock
+    private DemandOrderMapper demandOrderMapper;
+    @Mock
     private SystemConfigService systemConfigService;
     @Mock
     private WorkOrderStateMachine stateMachine;
@@ -74,8 +80,8 @@ class WorkOrderAcceptDeadlineTest {
     void setUp() {
         workOrderService = new WorkOrderService(workOrderMapper, statusLogMapper, customerReviewMapper,
                 workHourStatMapper, staffMapper, vehicleMapper, vehicleBindingMapper, vehicleStatusLogMapper,
-                customerMapper, systemConfigService, stateMachine, notifyService, exceptionService,
-                commonPlaceService, dispatchCheckService);
+                customerMapper, customerContactMapper, demandOrderMapper, systemConfigService, stateMachine,
+                notifyService, exceptionService, commonPlaceService, dispatchCheckService);
     }
 
     private void stubConfig(int leadMinutes, int afterOffMinutes) {

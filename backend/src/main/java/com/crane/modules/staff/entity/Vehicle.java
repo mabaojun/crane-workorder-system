@@ -25,13 +25,13 @@ public class Vehicle {
 
     private String model;
 
-    /** 车辆类型：CRANE 吊车 / LIFT 举升车，缺省 CRANE */
+    /** 车辆种类：CRANE 吊车 / LIFT 举升车 / SEMI_TRAILER 板车（半挂）/ HEAVY_TRAILER 大件托盘车 */
     private String type;
 
-    /** 吊车吨位（吨），type=CRANE 时维护 */
+    /** 吊车吨位（吨），type=CRANE 时可选维护 */
     private BigDecimal tonnage;
 
-    /** 举升高度（米），type=LIFT 时维护 */
+    /** 举升高度（米），type=LIFT 时可选维护 */
     private BigDecimal liftHeight;
 
     /** 默认司机（固定归属），一人多车表现为多行共用同一值 */

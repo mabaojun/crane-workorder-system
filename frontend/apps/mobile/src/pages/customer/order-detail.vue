@@ -7,7 +7,8 @@ import EmptyState from '../../components/EmptyState.vue'
 import SectionCard from '../../components/SectionCard.vue'
 import { getOrderDetail, listExceptionReports, submitReview } from '../../api/modules/biz'
 import type { ExceptionRecord, WorkOrder } from '../../api/types'
-import { fmtDateTime, toastError, toastOk } from '../../utils'
+import { VEHICLE_TYPE_LABEL } from '@crane/shared'
+import { fmtDateTime, fmtTimeWithDayHint, toastError, toastOk } from '../../utils'
 
 const STEPS = ['已派单', '已接单', '进行中', '已完成']
 const STEP_INDEX: Record<string, number> = {
@@ -55,6 +56,16 @@ onLoad((opts) => {
 onShow(() => {
   if (orderId.value) load()
 })
+
+/** 拨打执行司机电话 */
+function callDriver() {
+  const phone = order.value?.staffPhone
+  if (!phone) {
+    uni.showToast({ title: '暂无司机电话', icon: 'none' })
+    return
+  }
+  uni.makePhoneCall({ phoneNumber: phone })
+}
 
 async function submit() {
   if (!score.value) {
@@ -113,12 +124,23 @@ const EXC_STATUS: Record<string, string> = {
         </view>
         <view class="title">{{ order.taskName || '吊装任务' }}</view>
         <view class="row"><text class="k">施工地址</text><text>{{ order.address || '-' }}</text></view>
-        <view class="row"><text class="k">计划开始</text><text>{{ fmtDateTime(order.expectedStartAt) }}</text></view>
-        <view class="row"><text class="k">司机</text><text>{{ order.staffName || '-' }}</text></view>
+        <view class="row"><text class="k">计划开始</text><text>{{ fmtTimeWithDayHint(order.expectedStartAt) }}</text></view>
+        <view class="row link-row" @tap="callDriver">
+          <text class="k">司机</text>
+          <text>{{ order.staffName || '-' }}</text>
+          <text v-if="order.staffPhone" class="tel">拨打</text>
+        </view>
+        <view class="row"><text class="k">用车种类</text><text>{{ VEHICLE_TYPE_LABEL[order.vehicleType || 'CRANE'] }}</text></view>
         <view class="row"><text class="k">车牌</text><text>{{ order.vehiclePlateNo || '-' }}</text></view>
-        <view class="row"><text class="k">货物</text><text>{{ order.cargoName || '-' }}{{ order.cargoWeight ? ' / ' + order.cargoWeight + ' 吨' : '' }}</text></view>
+        <view v-if="!order.vehicleType || order.vehicleType === 'CRANE'" class="row"><text class="k">吊车吨位</text><text>{{ order.craneTonnage ? order.craneTonnage + ' 吨' : '-' }}</text></view>
+        <view class="row"><text class="k">货物名称</text><text>{{ order.cargoName || '-' }}</text></view>
+        <view class="row"><text class="k">货物重量</text><text>{{ order.cargoWeight ? order.cargoWeight + ' 吨' : '-' }}</text></view>
         <view v-if="order.estimatedDays" class="row"><text class="k">预计使用</text><text>{{ order.estimatedDays }} 天</text></view>
         <view class="row"><text class="k">完成时间</text><text>{{ fmtDateTime(order.completedAt) }}</text></view>
+        <view v-if="order.remark" class="remark-block">
+          <text class="remark-label">下单备注</text>
+          <text class="remark-text">{{ order.remark }}</text>
+        </view>
       </SectionCard>
 
       <!-- 异常公开卡 -->
@@ -162,19 +184,20 @@ const EXC_STATUS: Record<string, string> = {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 .loading {
   text-align: center;
   color: var(--sub);
-  font-size: 13px;
+  font-size: 14px;
   padding: 32px 0;
 }
 .steps {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 16px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 18px 16px;
   display: flex;
 }
 .step {
@@ -183,8 +206,8 @@ const EXC_STATUS: Record<string, string> = {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
+  gap: 5px;
+  font-size: 13px;
   color: var(--sub);
 }
 .step .dot {
@@ -218,8 +241,8 @@ const EXC_STATUS: Record<string, string> = {
   background: #f3f4f6;
   color: var(--sub);
   border-radius: var(--radius);
-  padding: 12px 16px;
-  font-size: 14px;
+  padding: 14px 16px;
+  font-size: 15px;
 }
 .head {
   display: flex;
@@ -227,25 +250,60 @@ const EXC_STATUS: Record<string, string> = {
   justify-content: space-between;
 }
 .no {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--sub);
   font-variant-numeric: tabular-nums;
 }
 .title {
-  font-size: 17px;
-  font-weight: 600;
-  margin: 4px 0 8px;
+  font-size: 19px;
+  font-weight: 700;
+  margin: 5px 0 10px;
+  line-height: 1.4;
 }
 .row {
   display: flex;
   gap: 8px;
-  font-size: 14px;
-  margin-bottom: 6px;
+  font-size: 15px;
+  margin-bottom: 8px;
+  line-height: 1.55;
 }
 .k {
   color: var(--sub);
   flex: none;
-  width: 64px;
+  width: 70px;
+  font-size: 14px;
+}
+.link-row .tel {
+  margin-left: auto;
+  color: var(--brand);
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid var(--brand);
+  border-radius: 999px;
+  padding: 2px 14px;
+  min-height: 32px;
+  line-height: 32px;
+}
+.remark-block {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-left: 4px solid #e6a23c;
+  background: rgba(230, 162, 60, 0.12);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.remark-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #a86a1f;
+}
+.remark-text {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #1f2937;
+  word-break: break-all;
 }
 .exc {
   border-bottom: 1px solid var(--line);
@@ -306,21 +364,25 @@ const EXC_STATUS: Record<string, string> = {
 .textarea {
   width: 100%;
   box-sizing: border-box;
-  min-height: 80px;
+  min-height: 96px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 10px;
-  font-size: 14px;
+  padding: 12px;
+  font-size: 15px;
+  background: #f8fafc;
 }
 .submit {
+  width: 100%;
+  display: block;
   margin-top: 12px;
-  height: 44px;
-  line-height: 44px;
+  height: 50px;
+  line-height: 50px;
   border-radius: var(--radius);
-  background: var(--brand);
+  background: linear-gradient(135deg, #1a6bff, #0b4fd6);
   color: #fff;
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(26, 107, 255, 0.2);
 }
 .submit::after {
   border: none;

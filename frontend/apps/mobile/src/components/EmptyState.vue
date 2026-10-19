@@ -4,9 +4,7 @@ defineProps<{ text?: string; hint?: string }>()
 
 <template>
   <view class="empty">
-    <view class="icon" aria-hidden="true">
-      <view class="box" />
-    </view>
+    <uni-icons type="folder-add" :size="46" color="#a8c2e4" />
     <text class="text">{{ text || '暂无数据' }}</text>
     <text v-if="hint" class="hint">{{ hint }}</text>
   </view>
@@ -17,22 +15,16 @@ defineProps<{ text?: string; hint?: string }>()
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 48px 16px;
-  gap: 8px;
-}
-.box {
-  width: 40px;
-  height: 28px;
-  border: 2px solid var(--line);
-  border-radius: 4px;
-  background: var(--panel);
+  padding: 56px 16px;
+  gap: 10px;
 }
 .text {
-  color: var(--sub);
-  font-size: 14px;
+  color: var(--txt);
+  font-size: 16px;
+  font-weight: 600;
 }
 .hint {
   color: var(--sub);
-  font-size: 12px;
+  font-size: 13px;
 }
 </style>

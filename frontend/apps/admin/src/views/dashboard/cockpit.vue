@@ -33,9 +33,45 @@
         <el-icon class="quick-icon" :style="{ color: nav.color, background: nav.bg }">
           <component :is="nav.icon" />
         </el-icon>
-        <span class="quick-title">{{ nav.title }}</span>
+        <div class="quick-text">
+          <span class="quick-title">{{ nav.title }}</span>
+          <span class="quick-desc">{{ nav.desc }}</span>
+        </div>
       </div>
     </div>
+
+    <!-- 工单运行明细导出：财务 / 人事对账与工时统计 -->
+    <el-card v-if="isAdmin()" shadow="never" class="page-card export-card">
+      <template #header>
+        <div class="card-head">
+          <span class="card-title">工单运行明细导出</span>
+          <span class="card-sub">工单明细、签到签退、每日签退、异常记录、状态流转五个工作表</span>
+        </div>
+      </template>
+      <div class="export-body">
+        <el-radio-group v-model="exportPreset" size="small" @change="applyExportPreset">
+          <el-radio-button value="THIS_MONTH">本月</el-radio-button>
+          <el-radio-button value="LAST_MONTH">上月</el-radio-button>
+        </el-radio-group>
+        <el-date-picker
+          v-model="exportRange"
+          type="daterange"
+          value-format="YYYY-MM-DD"
+          range-separator="至"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+          :clearable="false"
+          @change="exportPreset = ''"
+        />
+        <el-button type="primary" :loading="exporting" @click="onExport">
+          <el-icon v-if="!exporting" class="btn-icon"><Download /></el-icon>
+          导出 Excel
+        </el-button>
+      </div>
+      <p class="export-hint">
+        按「实际开始时间 → 计划开始时间 → 创建时间」归期；单次最长 366 天，工单明细包含客户、车辆、司机、时间节点、工时、异常与评价等字段。
+      </p>
+    </el-card>
 
     <!-- 核心处置区：需求单处置置顶 -->
     <el-card shadow="never" class="page-card core-card">
@@ -174,11 +210,11 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  Tickets, View, RefreshLeft, WarningFilled, DataBoard, List, Van, User,
-  Setting, Location, Clock, CircleCheck, Loading, VideoPause, Odometer,
+  Tickets, View, RefreshLeft, WarningFilled, DataBoard, Van, User,
+  Clock, CircleCheck, Loading, VideoPause, Download,
   MagicStick, Document
 } from '@element-plus/icons-vue'
-import { pageWorkOrders, type WorkOrder } from '@crane/shared/api/workorder'
+import { downloadWorkOrderExport, pageWorkOrders, type WorkOrder } from '@crane/shared/api/workorder'
 import { WORK_ORDER_STATUS_LABEL } from '@crane/shared'
 import { pageDemands } from '@crane/shared/api/demand'
 import { pageExceptions } from '@crane/shared/api/exception'
@@ -210,16 +246,32 @@ const cards = ref([
   { status: 'COMPLETED', label: '已完成', color: 'var(--success)', bg: 'rgba(103,194,58,.12)', icon: CircleCheck, total: 0 }
 ])
 
-const quickNavs = computed(() => [
-  { title: '需求单处置', icon: Tickets, color: '#409eff', bg: 'rgba(64,158,255,.12)', path: '/demand/list' },
-  { title: '工单管理', icon: List, color: '#67c23a', bg: 'rgba(103,194,58,.12)', path: '/workorder/list' },
-  { title: '派单中心', icon: Odometer, color: '#e6a23c', bg: 'rgba(230,162,60,.12)', path: '/dispatch/pending' },
-  { title: '员工档案', icon: User, color: '#909399', bg: 'rgba(144,147,153,.12)', path: '/staff/list' },
-  { title: '车辆档案', icon: Van, color: '#7c6af2', bg: 'rgba(124,106,242,.12)', path: '/staff/vehicle-list' },
-  { title: '客户档案', icon: User, color: '#f56c6c', bg: 'rgba(245,108,108,.12)', path: '/customer/list' },
-  { title: '常用施工地点', icon: Location, color: '#13c2c2', bg: 'rgba(19,194,194,.12)', path: '/system/place-list' },
-  { title: '系统配置', icon: Setting, color: '#6b7db3', bg: 'rgba(107,125,179,.12)', path: '/system/config' }
-])
+const quickNavs = [
+  {
+    title: '人员状态',
+    desc: '谁在干什么活、用什么车、持续多久',
+    icon: User,
+    color: '#409eff',
+    bg: 'rgba(64,158,255,.12)',
+    path: '/dashboard/staff-status'
+  },
+  {
+    title: '车辆状态',
+    desc: '车辆在干什么活、最新签到位置',
+    icon: Van,
+    color: '#13c2c2',
+    bg: 'rgba(19,194,194,.12)',
+    path: '/dashboard/vehicle-status'
+  },
+  {
+    title: '订单状态',
+    desc: '按时间轴查看工单持续与进展',
+    icon: Clock,
+    color: '#e6a23c',
+    bg: 'rgba(230,162,60,.12)',
+    path: '/dashboard/order-status'
+  }
+]
 
 const demandPending = ref(0)
 const demandReviewing = ref(0)
@@ -240,6 +292,92 @@ const aiDialogVisible = ref(false)
 const aiGenerating = ref(false)
 const aiReport = ref<AiReport | null>(null)
 const aiLatestExists = ref(false)
+
+// 工单运行明细导出：默认当月，支持快捷切换本月 / 上月与自定义区间
+const exportPreset = ref('THIS_MONTH')
+const exportRange = ref<[string, string] | null>(null)
+const exporting = ref(false)
+
+function formatDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** 本月 / 上月：均为完整自然月，包含计划在月末执行的工单 */
+function monthRange(offset: number): [string, string] {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+  const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0)
+  return [formatDate(start), formatDate(end)]
+}
+
+function applyExportPreset(value: string) {
+  exportRange.value = value === 'LAST_MONTH' ? monthRange(-1) : monthRange(0)
+}
+
+applyExportPreset('THIS_MONTH')
+
+async function onExport() {
+  const range = exportRange.value
+  if (!range || range.length !== 2) {
+    ElMessage.warning('请选择导出时间区间')
+    return
+  }
+  if (range[0] > range[1]) {
+    ElMessage.warning('开始日期不能晚于结束日期')
+    return
+  }
+  exporting.value = true
+  try {
+    const res = await downloadWorkOrderExport(range[0], range[1])
+    if (!res.ok) {
+      let message = `导出失败（HTTP ${res.status}）`
+      try {
+        const data = await res.json()
+        if (data?.message) message = data.message
+      } catch {
+        // 非 JSON 错误响应保持默认提示
+      }
+      throw new Error(message)
+    }
+    // 后端异常统一返回 HTTP 200 + JSON 信封；必须校验 Content-Type，
+    // 避免把 {"code":20002,...} 错误响应当成 xlsx 文件下载
+    const contentType = res.headers.get('Content-Type') || ''
+    if (!contentType.includes('spreadsheetml.sheet')) {
+      let message = '导出失败，请确认后端已升级到支持明细导出的版本'
+      try {
+        const data = await res.json()
+        if (data?.message) {
+          message = data.message + (data.code ? `（错误码 ${data.code}）` : '')
+        }
+      } catch {
+        // 非 JSON 响应保持默认提示
+      }
+      throw new Error(message)
+    }
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition') || ''
+    const matched = /filename\*=UTF-8''([^;]+)/i.exec(disposition)
+    const filename = matched
+      ? decodeURIComponent(matched[1])
+      : `工单运行明细_${range[0]}_${range[1]}.xlsx`
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    ElMessage.success(`已导出 ${range[0]} 至 ${range[1]} 工单运行明细`)
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '导出失败，请稍后重试')
+  } finally {
+    exporting.value = false
+  }
+}
 
 async function onGenerateAiReport() {
   aiGenerating.value = true
@@ -430,28 +568,36 @@ function goOrderDetail(id: number) {
   border-radius: 8px;
 }
 
+/* 工单运行明细导出 */
+.export-card { border-top: 2px solid var(--success, #67c23a); }
+.export-body { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.export-hint { margin: 10px 0 0; font-size: 12px; color: var(--sub, #909399); line-height: 1.6; }
+
 /* 快捷入口 */
 .quick-nav {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 10px;
-  padding: 16px 8px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 12px;
   background: #fff;
   border-radius: 12px;
   border: 1px solid var(--line, #e4e7ed);
 }
 .quick-item {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 10px 4px;
+  gap: 14px;
+  padding: 16px;
   border-radius: 10px;
+  border: 1px solid var(--line, #e4e7ed);
   cursor: pointer;
-  transition: background .2s;
+  transition: border-color .2s, background .2s;
   min-height: 44px;
 }
-.quick-item:hover { background: var(--fill-light, #f5f7fa); }
+.quick-item:hover {
+  background: rgba(64, 158, 255, .04);
+  border-color: var(--brand, #409eff);
+}
 .quick-icon {
   width: 44px;
   height: 44px;
@@ -460,8 +606,16 @@ function goOrderDetail(id: number) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: none;
 }
-.quick-title { font-size: 13px; color: var(--txt, #303133); }
+.quick-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.quick-title { font-size: 15px; font-weight: 600; color: var(--txt, #303133); }
+.quick-desc { font-size: 12px; color: var(--sub, #909399); }
 
 /* 卡片头 */
 .card-head { display: flex; align-items: center; gap: 10px; }

@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 /**
  * 需求单转工单入参（管理端）。
- * 执行司机、车辆、计划开始时间、吨位、货重与备注均必填，复核后落工单。
+ * 执行司机、车辆、计划开始时间与吨位必填；货物重量选填（客户提报可未填），复核后落工单。
  */
 @Data
 public class DemandConvertRequest {
@@ -22,16 +22,20 @@ public class DemandConvertRequest {
     @NotNull(message = "施工车辆不能为空")
     private Long vehicleId;
 
+    /** 客户联系人（企业客户可改选具体联系人，缺省沿用需求单提报联系人） */
+    private Long contactId;
+
     /** 计划开始时间 */
     @NotNull(message = "计划开始时间不能为空")
     private LocalDateTime planStartAt;
 
-    /** 吊车吨位（吨），复核确认值 */
-    @NotNull(message = "吊车吨位不能为空")
+    /** 用车种类：缺省沿用需求单提报值，并与所选车辆种类校验一致 */
+    private String vehicleType;
+
+    /** 吊车吨位（吨），仅 CRANE 类型必填 */
     private BigDecimal craneTonnage;
 
-    /** 实际吊装货物重量（吨），复核确认值 */
-    @NotNull(message = "货物重量不能为空")
+    /** 实际吊装货物重量（吨），选填：客户提报未填时允许为空 */
     private BigDecimal cargoWeightTon;
 
     /** 预计使用时长（天），选填，缺省带入需求单客户自估值，仅备注提示 */

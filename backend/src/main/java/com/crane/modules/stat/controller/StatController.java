@@ -8,13 +8,17 @@ import com.crane.modules.stat.dto.StatDtos.AlarmListVO;
 import com.crane.modules.stat.dto.StatDtos.DashboardVO;
 import com.crane.modules.stat.dto.StatDtos.StaffPerformance;
 import com.crane.modules.stat.dto.StatDtos.VehicleMapVO;
+import com.crane.modules.stat.dto.StatusBoardDtos.BoardVO;
 import com.crane.modules.stat.service.StatService;
+import com.crane.modules.stat.service.StatusBoardService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -27,6 +31,7 @@ import java.util.List;
 public class StatController {
 
     private final StatService statService;
+    private final StatusBoardService statusBoardService;
 
     /** 驾驶舱总览：工单、趋势、异常、车辆、员工、客户需求与排名聚合 */
     @GetMapping("/dashboard")
@@ -54,6 +59,14 @@ public class StatController {
     public ApiResult<List<StaffPerformance>> staffPerformance(@RequestParam(required = false) String period) {
         requireAdmin();
         return ApiResult.ok(statService.staffPerformance(period));
+    }
+
+    /** 工作台状态看板：按日期聚合人员 / 车辆 / 工单三种视角 */
+    @GetMapping("/status-board")
+    public ApiResult<BoardVO> statusBoard(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        requireAdmin();
+        return ApiResult.ok(statusBoardService.board(date));
     }
 
     /** 统计域访问控制：未登录按 10001，非管理员按 10003 拒绝 */

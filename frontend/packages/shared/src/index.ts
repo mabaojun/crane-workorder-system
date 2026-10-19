@@ -42,6 +42,34 @@ export const VEHICLE_STATUS_LABEL: Record<string, string> = {
   DISABLED: '停用'
 }
 
+/** 用车/车辆种类（01 §6.3 扩展） */
+export const VEHICLE_TYPE = {
+  CRANE: 'CRANE',
+  LIFT: 'LIFT',
+  SEMI_TRAILER: 'SEMI_TRAILER',
+  HEAVY_TRAILER: 'HEAVY_TRAILER'
+} as const
+
+export const VEHICLE_TYPE_LABEL: Record<string, string> = {
+  CRANE: '吊车',
+  LIFT: '举升车',
+  SEMI_TRAILER: '板车（半挂）',
+  HEAVY_TRAILER: '大件托盘车'
+}
+
+/** 可选用车种类（客户下单、转工单、直建工单共用） */
+export const VEHICLE_TYPE_OPTIONS = [
+  { value: VEHICLE_TYPE.CRANE, label: VEHICLE_TYPE_LABEL.CRANE },
+  { value: VEHICLE_TYPE.LIFT, label: VEHICLE_TYPE_LABEL.LIFT },
+  { value: VEHICLE_TYPE.SEMI_TRAILER, label: VEHICLE_TYPE_LABEL.SEMI_TRAILER },
+  { value: VEHICLE_TYPE.HEAVY_TRAILER, label: VEHICLE_TYPE_LABEL.HEAVY_TRAILER }
+]
+
+/** 是否吊车类型（空值按历史数据视为吊车） */
+export function isCraneType(type?: string | null): boolean {
+  return !type || type === VEHICLE_TYPE.CRANE
+}
+
 export const ROLE_CODE = {
   ADMIN: 'ADMIN',
   DRIVER: 'DRIVER',

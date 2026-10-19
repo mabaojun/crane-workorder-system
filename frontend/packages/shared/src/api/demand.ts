@@ -19,6 +19,9 @@ export interface DemandOrder {
   /** JSON 数组字符串 */
   imageUrls: string | null
   intendedVehicleId: number | null
+  /** 用车种类：CRANE 吊车 / LIFT 举升车 / SEMI_TRAILER 板车（半挂）/ HEAVY_TRAILER 大件托盘车 */
+  vehicleType: string | null
+  /** 吊车吨位，仅 CRANE 类型有值 */
   craneTonnage: number | null
   cargoWeight: number | null
   /** 预计使用时长（天），客户自估仅备注提示 */
@@ -46,10 +49,16 @@ export interface DemandReviewRequest {
 export interface DemandConvertRequest {
   staffId: number
   vehicleId: number
+  /** 客户联系人：企业客户可改选该公司下具体联系人，缺省沿用需求单提报人 */
+  contactId?: number
   /** ISO：yyyy-MM-ddTHH:mm:ss */
   planStartAt: string
-  craneTonnage: number
-  cargoWeightTon: number
+  /** 用车种类，缺省沿用需求单提报值；须与所选车辆种类一致 */
+  vehicleType?: string
+  /** 吊车吨位，仅 CRANE 类型填 */
+  craneTonnage?: number
+  /** 实际吊装货物重量（吨），客户未提报时允许为空 */
+  cargoWeightTon?: number
   /** 预计使用时长（天），选填，缺省带入需求单客户自估值 */
   estimatedDays?: number
   /** 结算主体：ENTERPRISE 企业客户主体（可改选企业客户名）/ PERSONAL 个人结算 */

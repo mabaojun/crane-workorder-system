@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // 司机端工单专属操作页：所有司机端工单相关操作均在此页完成
 // 状态化操作：接单/拒单（待接单）、签到/退单（待到场）、异常/签退/终止（进行中）
-import { ref } from 'vue'
-import { onLoad, onShow } from '@dcloudio/uni-app'
+import { computed, ref } from 'vue'
+import { onHide, onLoad, onShow, onUnload } from '@dcloudio/uni-app'
 import StatusTag from '../../components/StatusTag.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import BottomSheet from '../../components/BottomSheet.vue'
@@ -12,19 +12,73 @@ import {
   createExceptionReport,
   dailyCheckout,
   getOrderDetail,
+  listOrderPhotos,
   rejectOrder,
   requestResume,
   taskEnd,
-  withdrawOrder
+  withdrawOrder,
+  type OrderPhoto
 } from '../../api/modules/biz'
 import type { WorkOrder } from '../../api/types'
-import { chooseImages, getLocation, toastError, toastOk } from '../../utils'
+import { VEHICLE_TYPE_LABEL } from '@crane/shared'
+import {
+  chooseImages,
+  fmtTimeWithDayHint,
+  getLocation,
+  isImageAttachment,
+  loadAttachmentPreviewUrl,
+  toastError,
+  toastOk,
+  uploadLocalFile
+} from '../../utils'
 import { openNavigation, navFromOrder } from '../../utils/navigation'
 import { ApiError, request } from '@crane/shared/api/client'
 
 const orderId = ref<number | string>('')
 const order = ref<WorkOrder | null>(null)
 const loading = ref(true)
+
+// 客户提报照片：附件形式展示，点击后弹窗预览
+const demandPhotos = ref<OrderPhoto[]>([])
+const previewVisible = ref(false)
+const previewLoading = ref(false)
+const previewUrl = ref('')
+
+// 接单倒计时：按秒刷新，超时提示报警
+const nowMs = ref(Date.now())
+let countdownTimer: ReturnType<typeof setInterval> | null = null
+const acceptRemainSec = computed(() => {
+  const deadline = order.value?.acceptDeadlineAt
+  if (!deadline) return null
+  const end = new Date(deadline).getTime()
+  if (Number.isNaN(end)) return null
+  return Math.max(0, Math.floor((end - nowMs.value) / 1000))
+})
+const acceptExpired = computed(() => acceptRemainSec.value === 0)
+const expectedStartText = computed(() => fmtTimeWithDayHint(order.value?.expectedStartAt, nowMs.value))
+
+function fmtCountdown(sec: number) {
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  const s = sec % 60
+  const mm = String(m).padStart(2, '0')
+  const ss = String(s).padStart(2, '0')
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
+}
+
+function startCountdown() {
+  stopCountdown()
+  nowMs.value = Date.now()
+  countdownTimer = setInterval(() => {
+    nowMs.value = Date.now()
+  }, 1000)
+}
+
+function stopCountdown() {
+  if (!countdownTimer) return
+  clearInterval(countdownTimer)
+  countdownTimer = null
+}
 
 // 打卡定位/照片强制开关（后台系统配置实时下发；测试阶段默认不强制）
 const locationRequired = ref(false)
@@ -41,10 +95,23 @@ async function loadAttendanceSwitches() {
 }
 loadAttendanceSwitches()
 
+/** 签退 / 结单定位：强制开关关闭时定位失败不阻断，按无定位提交 */
+async function optionalLocation(): Promise<{ longitude: number; latitude: number } | null> {
+  try {
+    return await getLocation()
+  } catch {
+    if (locationRequired.value) {
+      throw new Error('定位失败，请检查定位权限')
+    }
+    return null
+  }
+}
+
 async function load() {
   loading.value = true
   try {
     order.value = await getOrderDetail(orderId.value)
+    loadDemandPhotos()
   } catch (e) {
     toastError(e)
   } finally {
@@ -52,12 +119,52 @@ async function load() {
   }
 }
 
+/** 客户提报图片：仅取需求单阶段，附件形式展示 */
+async function loadDemandPhotos() {
+  try {
+    const photos = await listOrderPhotos(orderId.value)
+    demandPhotos.value = photos.filter((p) => p.stage === 'DEMAND')
+  } catch {
+    demandPhotos.value = []
+  }
+}
+
+/** 点击附件后弹窗预览图片 */
+async function onPreviewPhoto(photo: OrderPhoto) {
+  if (previewLoading.value) return
+  if (!isImageAttachment(photo.fileName || photo.url)) {
+    uni.showToast({ title: '该附件暂不支持预览', icon: 'none' })
+    return
+  }
+  previewLoading.value = true
+  try {
+    previewUrl.value = await loadAttachmentPreviewUrl(photo.url)
+    previewVisible.value = true
+  } catch (e) {
+    toastError(e)
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+function closePreview() {
+  previewVisible.value = false
+  previewUrl.value = ''
+}
+
 onLoad((opts) => {
   orderId.value = opts?.id ?? ''
 })
 
 onShow(() => {
+  startCountdown()
   if (orderId.value) load()
+})
+
+onHide(stopCountdown)
+onUnload(() => {
+  stopCountdown()
+  closePreview()
 })
 
 function needOrder(): WorkOrder {
@@ -76,9 +183,9 @@ function onNavigate() {
   openNavigation(target)
 }
 
-/** 拨打客户联系人电话 */
+/** 拨打需求单联系人电话 */
 function callContact() {
-  const phone = needOrder().staffPhone
+  const phone = needOrder().contactPhone
   if (!phone) {
     uni.showToast({ title: '暂无联系人电话', icon: 'none' })
     return
@@ -194,16 +301,21 @@ async function submitCheckin() {
     uni.showToast({ title: '尚未获取定位', icon: 'none' })
     return
   }
+  if (photoRequired.value && photos.value.length === 0) {
+    uni.showToast({ title: '请拍摄现场照片', icon: 'none' })
+    return
+  }
   try {
     uni.showLoading({ title: '签到中' })
-    // TODO(二期): 对接文件上传，将本地照片（photos，base64 预览）上传后回填 photoUrls；MVP 固定占位路径
+    // 现场照片先上传到文件服务，打卡记录只保存可鉴权下载的地址
+    const photoUrls = photos.value.length
+      ? await Promise.all(photos.value.map(uploadLocalFile))
+      : null
     await checkIn({
       orderId: o.id,
       longitude: coords.value?.longitude ?? null,
       latitude: coords.value?.latitude ?? null,
-      photoUrls: photos.value.length > 0 || photoRequired.value
-        ? ['/files/mock/checkin.jpg']
-        : null
+      photoUrls
     })
     uni.hideLoading()
     showCheckin.value = false
@@ -278,11 +390,11 @@ async function onCheckoutSubmit() {
   const o = needOrder()
   try {
     uni.showLoading({ title: '提交中' })
-    const loc = await getLocation()
+    const loc = await optionalLocation()
     await dailyCheckout({
       orderId: o.id,
-      longitude: loc.longitude,
-      latitude: loc.latitude,
+      longitude: loc?.longitude ?? null,
+      latitude: loc?.latitude ?? null,
       isLeftSite: isLeftSite.value,
       isReturned: isReturned.value
     })
@@ -322,13 +434,11 @@ function onTaskEnd() {
       if (!r.confirm) return
       try {
         uni.showLoading({ title: '提交中' })
-        const loc = await getLocation()
-        // TODO(二期): 对接文件上传；MVP 照片路径传占位
+        const loc = await optionalLocation()
         await taskEnd({
           orderId: o.id,
-          longitude: loc.longitude,
-          latitude: loc.latitude,
-          photoUrls: ['/files/mock/checkin.jpg']
+          longitude: loc?.longitude ?? null,
+          latitude: loc?.latitude ?? null
         })
         uni.hideLoading()
         toastOk('工单已终止')
@@ -358,9 +468,10 @@ function onTaskEnd() {
         <view class="row"><text class="k">客户</text><text>{{ order.customerName || '-' }}</text></view>
         <view class="row link-row" @tap="callContact">
           <text class="k">联系人</text>
-          <text>{{ order.staffName || '-' }}</text>
-          <text v-if="order.staffPhone" class="tel">拨打</text>
+          <text>{{ order.contactName || '-' }}</text>
+          <text v-if="order.contactPhone" class="tel">拨打</text>
         </view>
+        <view class="row"><text class="k">用车种类</text><text>{{ VEHICLE_TYPE_LABEL[order.vehicleType || 'CRANE'] }}</text></view>
         <view class="row"><text class="k">车牌</text><text>{{ order.vehiclePlateNo || '-' }}</text></view>
         <view class="row"><text class="k">地址</text><text>{{ order.address || '-' }}</text></view>
         <view class="row">
@@ -372,14 +483,47 @@ function onTaskEnd() {
           >一键导航</view>
           <text v-else class="sub-text">无位置坐标</text>
         </view>
-        <view class="row"><text class="k">计划开始</text><text>{{ order.expectedStartAt || '-' }}</text></view>
-        <view class="row"><text class="k">货物</text><text>{{ order.cargoName || '-' }}{{ order.cargoWeight ? ' / ' + order.cargoWeight + ' 吨' : '' }}</text></view>
+        <view class="row"><text class="k">计划开始</text><text>{{ expectedStartText }}</text></view>
+        <view v-if="!order.vehicleType || order.vehicleType === 'CRANE'" class="row"><text class="k">吊车吨位</text><text>{{ order.craneTonnage ? order.craneTonnage + ' 吨' : '-' }}</text></view>
+        <view class="row"><text class="k">货物名称</text><text>{{ order.cargoName || '-' }}</text></view>
+        <view class="row"><text class="k">货物重量</text><text>{{ order.cargoWeight ? order.cargoWeight + ' 吨' : '-' }}</text></view>
         <view v-if="order.estimatedDays" class="row"><text class="k">预计使用</text><text>{{ order.estimatedDays }} 天（备注提示）</text></view>
+        <view v-if="order.remark" class="remark-block">
+          <text class="remark-label">下单备注</text>
+          <text class="remark-text">{{ order.remark }}</text>
+        </view>
+      </view>
+
+      <!-- 客户提报照片：附件形式，点击弹窗预览 -->
+      <view v-if="demandPhotos.length" class="card">
+        <view class="section-title">客户提报照片</view>
+        <view
+          v-for="p in demandPhotos"
+          :key="p.url"
+          class="attach-row"
+          @tap="onPreviewPhoto(p)"
+        >
+          <text class="attach-tag">附件</text>
+          <text class="attach-name">{{ p.fileName || '图片' }}</text>
+          <text class="attach-action">{{ previewLoading ? '加载中' : '预览' }}</text>
+        </view>
       </view>
 
       <!-- 状态化操作区：核心操作高度 48px，全宽（≥44dp） -->
       <view class="card actions-card">
         <view class="actions-title">工单操作</view>
+        <view
+          v-if="order.status === 'PENDING_ACCEPT' && acceptRemainSec != null"
+          class="countdown"
+          :class="{ expired: acceptExpired }"
+        >
+          <text class="countdown-main">
+            {{ acceptExpired ? '已超出接单时限' : `接单倒计时 ${fmtCountdown(acceptRemainSec)}` }}
+          </text>
+          <text class="countdown-sub">
+            {{ acceptExpired ? '系统已触发接单超时报警，请立即接单' : '请在倒计时结束前接单，避免触发报警' }}
+          </text>
+        </view>
         <view class="actions">
           <template v-if="order.status === 'PENDING_ACCEPT'">
             <button class="btn primary" @tap="onAccept">接单</button>
@@ -502,6 +646,12 @@ function onTaskEnd() {
       </view>
       <button class="btn primary block" :disabled="locating" @tap="submitCheckin">确认签到</button>
     </BottomSheet>
+
+    <!-- 附件图片预览弹窗 -->
+    <view v-if="previewVisible" class="preview-mask" @tap="closePreview">
+      <image :src="previewUrl" mode="aspectFit" class="preview-image" @tap.stop />
+      <text class="preview-tip">点击任意位置关闭</text>
+    </view>
   </view>
 </template>
 
@@ -513,20 +663,20 @@ function onTaskEnd() {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 .loading {
   text-align: center;
   color: var(--sub);
-  font-size: 13px;
+  font-size: 14px;
   padding: 32px 0;
 }
 .card {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  padding: 14px 16px;
+  padding: 16px 18px;
 }
 .head {
   display: flex;
@@ -534,65 +684,180 @@ function onTaskEnd() {
   justify-content: space-between;
 }
 .no {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--sub);
   font-variant-numeric: tabular-nums;
 }
 .title {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 4px 0 10px;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 5px 0 12px;
+  line-height: 1.4;
 }
 .row {
   display: flex;
   gap: 8px;
-  font-size: 14px;
-  margin-bottom: 7px;
+  font-size: 15px;
+  margin-bottom: 8px;
   align-items: center;
 }
 .k {
   color: var(--sub);
+  font-size: 14px;
   flex: none;
-  width: 64px;
+  width: 70px;
 }
 .link-row .tel {
   margin-left: auto;
   color: var(--brand);
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 600;
   border: 1px solid var(--brand);
   border-radius: 999px;
-  padding: 2px 12px;
-  min-height: 26px;
-  line-height: 26px;
+  padding: 2px 14px;
+  min-height: 32px;
+  line-height: 32px;
 }
 .nav-link {
   color: var(--brand);
-  font-size: 14px;
-  min-height: 26px;
+  font-size: 15px;
+  font-weight: 600;
+  min-height: 32px;
   display: flex;
   align-items: center;
   text-decoration: underline;
 }
 .sub-text {
   color: var(--sub);
-  font-size: 13px;
+  font-size: 14px;
 }
 .actions-title {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
   margin-bottom: 12px;
+}
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.attach-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  border-bottom: 1px solid var(--line);
+}
+.attach-row:last-child {
+  border-bottom: none;
+}
+.attach-tag {
+  flex: none;
+  font-size: 13px;
+  color: var(--sub);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 7px;
+}
+.attach-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+}
+.attach-action {
+  flex: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brand);
+}
+.remark-block {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-left: 4px solid #e6a23c;
+  background: rgba(230, 162, 60, 0.12);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.remark-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #a86a1f;
+}
+.remark-text {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #1f2937;
+  word-break: break-all;
+}
+.countdown {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(230, 162, 60, 0.45);
+  background: rgba(230, 162, 60, 0.12);
+}
+.countdown-main {
+  font-size: 18px;
+  font-weight: 700;
+  color: #a86a1f;
+  font-variant-numeric: tabular-nums;
+}
+.countdown-sub {
+  font-size: 13px;
+  color: #a86a1f;
+}
+.countdown.expired {
+  border-color: rgba(220, 38, 38, 0.5);
+  background: rgba(220, 38, 38, 0.12);
+}
+.countdown.expired .countdown-main,
+.countdown.expired .countdown-sub {
+  color: #dc2626;
+}
+.preview-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.preview-image {
+  width: 100%;
+  height: 82vh;
+}
+.preview-tip {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
 }
 .actions {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+.actions .btn,
+.btn.block {
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
 .btn {
-  height: 48px;
-  line-height: 48px;
+  height: 50px;
+  line-height: 50px;
   border-radius: var(--radius);
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 700;
   border: none;
 }
 .btn::after {
@@ -602,8 +867,9 @@ function onTaskEnd() {
   margin-top: 16px;
 }
 .btn.primary {
-  background: var(--brand);
+  background: linear-gradient(135deg, #1a6bff, #0b4fd6);
   color: #fff;
+  box-shadow: 0 6px 16px rgba(26, 107, 255, 0.22);
 }
 .btn.danger {
   background: var(--danger);
@@ -630,7 +896,7 @@ function onTaskEnd() {
 .waiting {
   text-align: center;
   color: var(--sub);
-  font-size: 14px;
+  font-size: 15px;
   padding: 12px 0;
 }
 .opts {
@@ -640,10 +906,13 @@ function onTaskEnd() {
   margin-bottom: 12px;
 }
 .opt {
-  padding: 6px 14px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  font-size: 14px;
+  font-size: 15px;
   color: var(--txt);
   background: var(--panel);
 }
@@ -651,58 +920,64 @@ function onTaskEnd() {
   border-color: var(--brand);
   color: var(--brand);
   background: var(--brand-weak);
+  font-weight: 600;
 }
 .textarea {
   width: 100%;
   box-sizing: border-box;
-  min-height: 96px;
+  min-height: 100px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 10px;
-  font-size: 14px;
+  padding: 12px;
+  font-size: 15px;
+  background: #f8fafc;
 }
 .field-input {
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 10px;
-  font-size: 14px;
+  padding: 12px;
+  min-height: 46px;
+  font-size: 15px;
   margin-bottom: 12px;
+  background: #f8fafc;
 }
 .tip-line {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--sub);
   background: var(--brand-weak);
   border-radius: var(--radius);
-  padding: 8px 12px;
+  padding: 10px 12px;
   margin-bottom: 12px;
+  line-height: 1.6;
 }
 .switch-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--line);
 }
 .switch-label {
   display: flex;
   flex-direction: column;
-  font-size: 15px;
+  font-size: 16px;
 }
 .kv {
   display: flex;
   gap: 8px;
   align-items: center;
-  font-size: 14px;
-  margin-bottom: 6px;
+  font-size: 15px;
+  margin-bottom: 8px;
 }
 .kv .k {
   color: var(--sub);
   flex: none;
-  width: 64px;
+  width: 70px;
 }
 .link {
   color: var(--brand);
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 600;
 }
 .err {
   color: var(--danger);

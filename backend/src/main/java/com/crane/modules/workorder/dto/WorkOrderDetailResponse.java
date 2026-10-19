@@ -29,6 +29,12 @@ public class WorkOrderDetailResponse {
 
     private Long contactId;
 
+    /** 客户联系人姓名（需求单提报人快照优先，其次取关联联系人） */
+    private String contactName;
+
+    /** 客户联系人电话 */
+    private String contactPhone;
+
     private Long staffId;
 
     private String staffName;
@@ -39,7 +45,13 @@ public class WorkOrderDetailResponse {
 
     private String vehiclePlateNo;
 
+    /** 用车种类：CRANE / LIFT / SEMI_TRAILER / HEAVY_TRAILER */
+    private String vehicleType;
+
     private BigDecimal vehicleTonnage;
+
+    /** 举升高度（米），仅 LIFT 车辆有值 */
+    private BigDecimal vehicleLiftHeight;
 
     private String address;
 

@@ -78,7 +78,8 @@ CREATE TABLE IF NOT EXISTS sys_user (
     union_id        VARCHAR(64)  NULL COMMENT '微信 unionid，用于多端识别',
     nick_name       VARCHAR(64)  NULL COMMENT '微信昵称或系统展示名',
     avatar_url      VARCHAR(500) NULL COMMENT '头像资源路径',
-    role_id         BIGINT UNSIGNED NOT NULL COMMENT '所属角色，一个账号一个角色',
+    role_id         BIGINT UNSIGNED NOT NULL COMMENT '主角色，一个账号一个主角色',
+    additional_role_ids VARCHAR(64) NULL COMMENT '附加角色 id 列表，逗号分隔（一人多角色，如司机兼管理员）',
     staff_id        BIGINT UNSIGNED NULL COMMENT '员工账号绑定的员工档案',
     customer_id     BIGINT UNSIGNED NULL COMMENT '客户账号绑定的客户档案',
     contact_id      BIGINT UNSIGNED NULL COMMENT '客户联系人账号绑定的联系人（企业多联系人独立提报）',
@@ -186,6 +187,26 @@ CREATE TABLE IF NOT EXISTS sys_idempotency (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='幂等键表';
 
 -- ------------------------------------------------------------
+-- 7A. sys_file 文件元数据表（私有资源：需求图片/打卡照片/异常配图）
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sys_file (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    file_name    VARCHAR(255) NOT NULL COMMENT '原始文件名（下载时展示）',
+    stored_path  VARCHAR(500) NOT NULL COMMENT '相对上传目录的存储路径，如 2026/10/uuid.jpg',
+    content_type VARCHAR(128) NULL COMMENT 'MIME 类型',
+    size_bytes   BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '文件大小（字节）',
+    uploader_id  BIGINT UNSIGNED NULL COMMENT '上传人 sys_user.id',
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    created_by   BIGINT UNSIGNED NULL COMMENT '创建人',
+    updated_by   BIGINT UNSIGNED NULL COMMENT '更新人',
+    deleted      TINYINT(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+    PRIMARY KEY (id),
+    KEY idx_sf_uploader (uploader_id),
+    KEY idx_sf_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='文件元数据表';
+
+-- ------------------------------------------------------------
 -- 8. biz_staff 员工档案表（02 §3.3.1）
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS biz_staff (
@@ -277,9 +298,9 @@ CREATE TABLE IF NOT EXISTS biz_vehicle (
     id                     BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
     plate_no               VARCHAR(16)   NOT NULL COMMENT '车牌号',
     model                  VARCHAR(64)   NULL COMMENT '车辆型号',
-    type                   VARCHAR(16)   NOT NULL DEFAULT 'CRANE' COMMENT '车辆类型：CRANE 吊车/LIFT 举升车',
-    tonnage                DECIMAL(8,2)  NULL COMMENT '吊车吨位（吨），仅 CRANE 填写',
-    lift_height            DECIMAL(6,1)  NULL COMMENT '举升高度（米），仅 LIFT 填写，常用 20/30',
+    type                   VARCHAR(16)   NOT NULL DEFAULT 'CRANE' COMMENT '车辆种类：CRANE 吊车/LIFT 举升车/SEMI_TRAILER 板车（半挂）/HEAVY_TRAILER 大件托盘车',
+    tonnage                DECIMAL(8,2)  NULL COMMENT '吊车吨位（吨），仅 CRANE 填写，选填',
+    lift_height            DECIMAL(6,1)  NULL COMMENT '举升高度（米），仅 LIFT 填写，常用 20/30，选填',
     default_staff_id       BIGINT UNSIGNED NULL COMMENT '默认司机（固定归属），一人多车表现为多行共用同一值',
     status                 VARCHAR(16)   NOT NULL DEFAULT 'IDLE' COMMENT '车辆状态：IDLE 空闲/BUSY 忙碌（系统派单）/BUSY_THIRD 忙碌（第三方派单）/MAINTENANCE 维保/DISABLED 停用',
     current_order_id       BIGINT UNSIGNED NULL COMMENT '当前绑定的进行中工单',
@@ -320,7 +341,8 @@ CREATE TABLE IF NOT EXISTS biz_demand_order (
     description         TEXT         NULL COMMENT '需求描述',
     image_urls          JSON         NULL COMMENT '需求图片，私有资源路径数组',
     intended_vehicle_id BIGINT UNSIGNED NULL COMMENT '意向车辆',
-    crane_tonnage       DECIMAL(8,2) NULL COMMENT '吊车吨位需求（需管理员复核）',
+    vehicle_type        VARCHAR(16)  NOT NULL DEFAULT 'CRANE' COMMENT '用车种类：CRANE 吊车/LIFT 举升车/SEMI_TRAILER 板车（半挂）/HEAVY_TRAILER 大件托盘车',
+    crane_tonnage       DECIMAL(8,2) NULL COMMENT '吊车吨位需求（仅 CRANE，需管理员复核）',
     cargo_weight        DECIMAL(10,2) NULL COMMENT '被吊装货物重量（吨，需管理员复核）',
     estimated_days      DECIMAL(4,1) NULL COMMENT '预计使用时长（天），客户自估仅备注提示，不参与时间换算',
     settlement_type     VARCHAR(16)  NOT NULL DEFAULT 'ENTERPRISE' COMMENT '结算主体类型：ENTERPRISE 企业主体（默认，企业联系人提报时自动带出可切个人）/PERSONAL 个人主体',
@@ -359,6 +381,7 @@ CREATE TABLE IF NOT EXISTS biz_work_order (
     contact_id               BIGINT UNSIGNED NULL COMMENT '关联客户联系人 id',
     staff_id                 BIGINT UNSIGNED NOT NULL COMMENT '执行司机 id',
     vehicle_id               BIGINT UNSIGNED NOT NULL COMMENT '施工车辆 id',
+    vehicle_type             VARCHAR(16)   NOT NULL DEFAULT 'CRANE' COMMENT '用车种类：CRANE 吊车/LIFT 举升车/SEMI_TRAILER 板车（半挂）/HEAVY_TRAILER 大件托盘车',
     address                  VARCHAR(255)  NOT NULL COMMENT '施工地点详细地址',
     longitude                DECIMAL(10,7) NOT NULL COMMENT '高德点位经度',
     latitude                 DECIMAL(10,7) NOT NULL COMMENT '高德点位纬度',
@@ -1059,6 +1082,7 @@ INSERT INTO sys_config (config_key, config_value, value_type, group_name, descri
     ('attendance.overtime_range_meters',     '1000', 'INT',     'attendance', '加班签退有效范围（米）'),
     ('attendance.photo_max_size_mb',         '10',   'INT',     'attendance', '单张附件大小上限（MB）'),
     ('attendance.photo_max_long_edge_px',    '1920', 'INT',     'attendance', '单张长边压缩上限（px）'),
+    ('file.max_size_mb',                     '10',   'INT',     'file',       '通用附件上传单文件大小上限（MB）'),
     ('overtime.normal_off_time',             '18:00','STRING',  'overtime',   '正常下班时间节点'),
     ('order.accept_lead_minutes',           '120',  'INT',     'order',      '接单底线：约定开始前 N 分钟须完成接单，超时未接单报警'),
     ('order.after_off_accept_minutes',      '60',   'INT',     'order',      '下班后下单的接单确认时限（分钟）'),

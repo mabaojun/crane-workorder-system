@@ -22,13 +22,13 @@ public class VehicleUpsertRequest {
     @Size(max = 64, message = "车辆型号长度不能超过 64")
     private String model;
 
-    /** 车辆类型：CRANE 吊车 / LIFT 举升车，缺省 CRANE */
+    /** 车辆种类：CRANE 吊车 / LIFT 举升车 / SEMI_TRAILER 板车（半挂）/ HEAVY_TRAILER 大件托盘车，缺省 CRANE */
     private String type;
 
-    /** 吊车吨位（吨），type=CRANE 必填，由服务层校验 */
+    /** 吊车吨位（吨），type=CRANE 时选填 */
     private BigDecimal tonnage;
 
-    /** 举升高度（米），type=LIFT 必填，由服务层校验 */
+    /** 举升高度（米），type=LIFT 时选填 */
     private BigDecimal liftHeight;
 
     /** 默认司机，可空；提供时校验员工存在 */

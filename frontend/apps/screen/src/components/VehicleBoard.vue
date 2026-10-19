@@ -9,6 +9,11 @@
         <span class="v-label">{{ row.label }}</span>
         <span class="v-count num">{{ vehicle ? row.value : '--' }}</span>
       </div>
+      <div class="v-types">
+        <span v-for="t in typeRows" :key="t.label" class="v-type">
+          {{ t.label }} <b class="num">{{ t.value }}</b>
+        </span>
+      </div>
       <div class="v-external">
         <span class="v-ext-label">外部占用（第三方派单）</span>
         <span class="v-ext-value">
@@ -22,6 +27,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { VEHICLE_TYPE_LABEL } from '@crane/shared'
 import { statStore } from '../store/stat'
 import ScreenPanel from './ScreenPanel.vue'
 
@@ -34,6 +40,14 @@ const rows = computed(() => [
   { label: '维保', value: vehicle.value?.maintenance ?? 0, color: 'var(--amber)' },
   { label: '停用', value: vehicle.value?.disabled ?? 0, color: 'var(--red)' }
 ])
+
+/** 车辆种类分布：吊车 / 举升车 / 板车（半挂）/ 大件托盘车 */
+const typeRows = computed(() =>
+  ['CRANE', 'LIFT', 'SEMI_TRAILER', 'HEAVY_TRAILER'].map((type) => ({
+    label: VEHICLE_TYPE_LABEL[type],
+    value: vehicle.value?.typeCounts?.[type] ?? 0
+  }))
+)
 </script>
 
 <style scoped>
@@ -75,6 +89,22 @@ const rows = computed(() => [
   font-size: 20px;
   font-weight: 700;
   color: var(--cyan2);
+}
+
+.v-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 6px 10px;
+  border: 1px solid rgba(64, 156, 255, 0.18);
+  background: rgba(64, 156, 255, 0.06);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--sub);
+}
+.v-type b {
+  color: var(--txt);
+  font-size: 14px;
 }
 
 .v-external {

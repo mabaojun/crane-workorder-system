@@ -90,35 +90,35 @@ function goDetail(o: WorkOrder) {
 }
 .content {
   flex: 1;
-  padding: 12px 16px 88px;
+  padding: 14px 16px calc(96px + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 .list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 .legend {
   display: flex;
   justify-content: center;
   gap: 16px;
-  margin-top: 16px;
+  margin-top: 20px;
   flex-wrap: wrap;
 }
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 12px;
+  gap: 6px;
+  font-size: 13px;
   color: var(--sub);
 }
 .dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
 }
-.d-progress { background: #1d4ed8; }
+.d-progress { background: #1a6bff; }
 .d-pending { background: #d97706; }
-.d-arrive { background: #eab308; }
+.d-arrive { background: #ca8a04; }
 .d-suspend { background: #dc2626; }
 </style>

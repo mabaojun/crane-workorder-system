@@ -28,6 +28,24 @@ const router = createRouter({
           component: () => import('../views/dashboard/cockpit.vue')
         },
         {
+          path: 'dashboard/staff-status',
+          name: 'staff-status',
+          meta: { title: '人员状态', menu: 'dashboard', adminOnly: true },
+          component: () => import('../views/dashboard/staff-status.vue')
+        },
+        {
+          path: 'dashboard/vehicle-status',
+          name: 'vehicle-status',
+          meta: { title: '车辆状态', menu: 'dashboard', adminOnly: true },
+          component: () => import('../views/dashboard/vehicle-status.vue')
+        },
+        {
+          path: 'dashboard/order-status',
+          name: 'order-status',
+          meta: { title: '订单状态', menu: 'dashboard', adminOnly: true },
+          component: () => import('../views/dashboard/order-status.vue')
+        },
+        {
           path: 'demand/list',
           name: 'demand-list',
           meta: { title: '需求单', menu: 'demand', adminOnly: true },
@@ -48,7 +66,7 @@ const router = createRouter({
         {
           path: 'dispatch/pending',
           name: 'dispatch-pending',
-          meta: { title: '派单中心', menu: 'dispatch', adminOnly: true },
+          meta: { title: '异常工单', menu: 'dispatch', adminOnly: true },
           component: () => import('../views/dispatch/pending.vue')
         },
         {

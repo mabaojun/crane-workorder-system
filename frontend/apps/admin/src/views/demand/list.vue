@@ -21,8 +21,13 @@
         </el-table-column>
         <el-table-column label="联系人" prop="contactName" width="100" />
         <el-table-column label="电话" prop="contactPhone" width="130" />
+        <el-table-column label="用车种类" width="110">
+          <template #default="{ row }">{{ VEHICLE_TYPE_LABEL[row.vehicleType] || '吊车' }}</template>
+        </el-table-column>
         <el-table-column label="吨位" width="90" align="right">
-          <template #default="{ row }">{{ row.craneTonnage != null ? `${row.craneTonnage}吨` : '-' }}</template>
+          <template #default="{ row }">
+            {{ row.vehicleType === 'CRANE' && row.craneTonnage != null ? `${row.craneTonnage}吨` : '-' }}
+          </template>
         </el-table-column>
         <el-table-column label="期望时间" width="140">
           <template #default="{ row }">{{ fmtTime(row.expectedStartAt) }}</template>
@@ -94,13 +99,11 @@
         </el-descriptions-item>
         <el-descriptions-item label="需求描述">{{ detail.description || '无' }}</el-descriptions-item>
         <el-descriptions-item label="需求图片">
-          <template v-if="detailImages.length">
-            <div class="img-urls">{{ detailImages.join('；') }}</div>
-          </template>
-          <template v-else>无</template>
+          <file-links :urls="detailImages" empty-text="无" />
         </el-descriptions-item>
+        <el-descriptions-item label="用车种类">{{ VEHICLE_TYPE_LABEL[detail.vehicleType || 'CRANE'] }}</el-descriptions-item>
         <el-descriptions-item label="意向车辆">{{ detail.intendedVehicleId ?? '无' }}</el-descriptions-item>
-        <el-descriptions-item label="吊车吨位">{{ detail.craneTonnage != null ? `${detail.craneTonnage} 吨` : '未填' }}</el-descriptions-item>
+        <el-descriptions-item v-if="!detail.vehicleType || detail.vehicleType === 'CRANE'" label="吊车吨位">{{ detail.craneTonnage != null ? `${detail.craneTonnage} 吨` : '未填' }}</el-descriptions-item>
         <el-descriptions-item label="货物重量">{{ detail.cargoWeight != null ? `${detail.cargoWeight} 吨` : '未填' }}</el-descriptions-item>
         <el-descriptions-item label="预计使用时长">{{ detail.estimatedDays != null ? `${detail.estimatedDays} 天` : '未填' }}</el-descriptions-item>
         <el-descriptions-item label="期望开始">{{ fmtTime(detail.expectedStartAt) }}</el-descriptions-item>
@@ -153,7 +156,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { DEMAND_ORDER_STATUS_LABEL } from '@crane/shared'
+import { DEMAND_ORDER_STATUS_LABEL, VEHICLE_TYPE_LABEL } from '@crane/shared'
 import {
   pageDemands,
   reviewDemand,
@@ -164,6 +167,7 @@ import { pageCustomers, type Customer } from '@crane/shared/api/customer'
 import { DEMAND_SOURCE_LABEL } from '../../utils/tags'
 import { fmtTime, parseImageUrls } from '../../utils/format'
 import DispatchDialog from '../../components/DispatchDialog.vue'
+import FileLinks from '../../components/FileLinks.vue'
 import StatusTag from '../../components/StatusTag.vue'
 
 const route = useRoute()
@@ -194,6 +198,8 @@ const convertVisible = ref(false)
 const convertTarget = ref<DemandOrder | null>(null)
 const convertPrefill = ref<{
   planStartAt?: string
+  /** 用车种类：带入需求单值，管理员可在转工单时改选 */
+  vehicleType?: string
   craneTonnage?: number
   cargoWeightTon?: number
   /** 预计使用时长（天），客户自估值带入可编辑 */
@@ -207,6 +213,9 @@ const convertPrefill = ref<{
   settlementType?: string
   settlementCustomerName?: string
   settlementCustomerIsPerson?: boolean
+  /** 需求单所属客户与提报联系人，用于转工单时带出企业联系人列表 */
+  customerId?: number
+  contactId?: number
 }>({})
 
 /** 客户档案缓存：用于展示结算主体企业名称与判断个人客户 */
@@ -302,6 +311,7 @@ function openConvert(row: DemandOrder) {
   convertTarget.value = row
   convertPrefill.value = {
     planStartAt: row.expectedStartAt || undefined,
+    vehicleType: row.vehicleType || 'CRANE',
     craneTonnage: row.craneTonnage ?? undefined,
     cargoWeightTon: row.cargoWeight ?? undefined,
     estimatedDays: row.estimatedDays ?? undefined,
@@ -314,7 +324,9 @@ function openConvert(row: DemandOrder) {
     // 结算主体默认沿用需求单归属，管理员可在弹窗内改选企业主体或个人
     settlementType: row.settlementType || 'ENTERPRISE',
     settlementCustomerName: customerOf(row.customerId)?.name,
-    settlementCustomerIsPerson: customerOf(row.customerId)?.type === 'PERSON'
+    settlementCustomerIsPerson: customerOf(row.customerId)?.type === 'PERSON',
+    customerId: row.customerId ?? undefined,
+    contactId: row.contactId ?? undefined
   }
   convertVisible.value = true
 }
@@ -322,19 +334,24 @@ function openConvert(row: DemandOrder) {
 async function submitConvert(payload: {
   staffId: number
   vehicleId: number
+  vehicleType?: string
   planStartAt: string
   craneTonnage?: number
   cargoWeightTon?: number
   estimatedDays?: number
   settlementType?: string
+  contactId?: number
   remark: string
+  confirmPast: boolean
 }) {
   if (!convertTarget.value) return
   await convertDemand(convertTarget.value.id, {
     staffId: payload.staffId,
     vehicleId: payload.vehicleId,
+    vehicleType: payload.vehicleType,
+    contactId: payload.contactId,
     planStartAt: payload.planStartAt,
-    craneTonnage: payload.craneTonnage as number,
+    craneTonnage: payload.craneTonnage,
     cargoWeightTon: payload.cargoWeightTon as number,
     estimatedDays: payload.estimatedDays,
     settlementType: payload.settlementType,

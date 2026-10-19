@@ -5,11 +5,19 @@ export interface WorkOrder {
   taskName: string
   customerId: number
   customerName?: string
+  /** 需求单提报联系人（客户下单时填写） */
+  contactName?: string
+  /** 需求单提报联系电话 */
+  contactPhone?: string
   staffId?: number
   staffName?: string
   staffPhone?: string
   vehicleId?: number
   vehiclePlateNo?: string
+  /** 用车种类：CRANE / LIFT / SEMI_TRAILER / HEAVY_TRAILER */
+  vehicleType?: string
+  vehicleTonnage?: number
+  vehicleLiftHeight?: number
   address: string
   longitude?: number
   latitude?: number
@@ -20,8 +28,12 @@ export interface WorkOrder {
   estimatedDays?: number
   expectedStartAt?: string
   acceptedAt?: string
+  /** 接单截止时间（超时触发报警） */
+  acceptDeadlineAt?: string
   startedAt?: string
   completedAt?: string
+  /** 下单备注 */
+  remark?: string
   status: string
   customerVisibleStatus: string
   customerVisibleStatusLabel: string
@@ -38,6 +50,8 @@ export interface DemandOrder {
   longitude?: number
   latitude?: number
   description?: string
+  /** 用车种类：CRANE 吊车 / LIFT 举升车 / SEMI_TRAILER 板车（半挂）/ HEAVY_TRAILER 大件托盘车 */
+  vehicleType?: string
   craneTonnage?: number
   cargoWeight?: number
   /** 预计使用时长（天），客户自估仅备注提示 */
@@ -62,9 +76,18 @@ export interface ExceptionRecord {
   repliedAt?: string
 }
 
+/** 登录账号可选身份 */
+export interface RoleOption {
+  /** ADMIN / DRIVER / CUSTOMER */
+  code: string
+  name: string
+}
+
 export interface MeInfo {
   userId: number
   role: string
+  /** 账号可选身份（一人多角色时登录后选择） */
+  availableRoles?: RoleOption[]
   name: string
   phone: string
   staffId?: number

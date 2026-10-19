@@ -14,14 +14,15 @@ defineProps<{ title?: string }>()
 .section-card {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  padding: 12px 16px;
+  padding: 16px 18px;
 }
 .title {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
   color: var(--txt);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  letter-spacing: 0.2px;
 }
 </style>

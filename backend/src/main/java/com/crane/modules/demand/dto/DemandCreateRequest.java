@@ -51,7 +51,10 @@ public class DemandCreateRequest {
     /** 意向车辆 */
     private Long intendedVehicleId;
 
-    /** 吊车吨位需求（吨） */
+    /** 用车种类：CRANE 吊车 / LIFT 举升车 / SEMI_TRAILER 板车（半挂）/ HEAVY_TRAILER 大件托盘车，缺省 CRANE */
+    private String vehicleType;
+
+    /** 吊车吨位需求（吨），仅 CRANE 类型填写 */
     private BigDecimal craneTonnage;
 
     /** 被吊装货物重量（吨） */

@@ -22,3 +22,5 @@ data/
 # 部署密钥不入库
 docker/deploy/.env
 docker/deploy/dist-release/
+# 本地 API Key 默认配置：随发布包分发，但不提交到 Git
+docker/mysql/init/02-local-defaults.sql

@@ -1,0 +1,11 @@
+# 发布镜像：直接使用本地 Maven 产出的 jar，避免在 Apple Silicon 上为 linux/amd64 执行 RUN 指令
+# 仅 COPY，不执行任何 RUN，可在任意宿主架构上交叉构建目标架构镜像
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY target/crane-backend.jar app.jar
+ENV TZ=Asia/Shanghai JAVA_OPTS="-Xms256m -Xmx512m"
+EXPOSE 7777
+# 基础镜像无 curl，用 bash 的 /dev/tcp 探测端口（Spring Boot 监听即视为就绪）
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
+  CMD ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/7777"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

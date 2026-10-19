@@ -4,7 +4,6 @@
     :title="`修改工单（${order.orderNo}）`"
     width="680px"
     :close-on-click-modal="false"
-    @open="onOpen"
     @update:model-value="(v: boolean) => emit('update:visible', v)"
   >
     <el-form :model="form" label-width="100px">
@@ -81,7 +80,7 @@
             <div class="tip">默认优先展示空闲车辆与当前车辆，改派由管理员自行判断</div>
           </el-form-item>
         </el-col>
-        <el-col :span="12">
+        <el-col v-if="currentVehicleType === 'CRANE'" :span="12">
           <el-form-item label="吊车吨位">
             <el-input-number v-model="form.craneTonnage" :min="0.1" :precision="1" controls-position="right" style="width: 100%" />
             <span class="unit">吨</span>
@@ -152,12 +151,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { updateOrder, type WorkOrder, type WorkOrderUpdateRequest } from '@crane/shared/api/workorder'
 import { pageStaffs, pageVehicles, vehicleSpecLabel, type Staff, type Vehicle } from '@crane/shared/api/staff'
 import { ApiError } from '@crane/shared/api/client'
-import { VEHICLE_STATUS_LABEL } from '@crane/shared'
+import { VEHICLE_STATUS_LABEL, isCraneType } from '@crane/shared'
 import type { AmapPickResult } from '@crane/shared/api/map'
 import dayjs from 'dayjs'
 import AMapPicker from './AMapPicker.vue'
@@ -224,6 +223,22 @@ const selectableVehicles = computed(() =>
   vehicleOptions.value.filter((v) => v.status !== 'DISABLED')
 )
 
+/** 当前所选车辆的用车种类：未改派时沿用原工单种类 */
+const currentVehicleType = computed(() => {
+  const selected = vehicleOptions.value.find((v) => v.id === form.vehicleId)
+  return selected?.type || props.order.vehicleType || 'CRANE'
+})
+
+/** 改派到非吊车时清空吨位，避免残留吊车专属配置 */
+watch(
+  () => form.vehicleId,
+  () => {
+    if (!isCraneType(currentVehicleType.value)) {
+      form.craneTonnage = undefined
+    }
+  }
+)
+
 const needConfirmPast = computed(() =>
   !!form.planStartAt && dayjs(form.planStartAt).isBefore(dayjs())
 )
@@ -262,6 +277,18 @@ function onOpen() {
   confirmPastNeeded.value = false
   loadOptions()
 }
+
+/**
+ * 打开即初始化：父组件先赋值 order 再置 visible=true，组件可能以「已打开」状态首次挂载，
+ * 此时 el-dialog 的 open 事件不会触发。改为监听 visible，保证首次打开也回填字段并加载司机/车辆。
+ */
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible) onOpen()
+  },
+  { immediate: true }
+)
 
 async function loadOptions() {
   optionsLoading.value = true
@@ -313,7 +340,9 @@ function buildBody(): WorkOrderUpdateRequest | null {
   if (numChanged(form.longitude, snapshot.value.longitude) && form.longitude != null) body.longitude = form.longitude
   if (numChanged(form.latitude, snapshot.value.latitude) && form.latitude != null) body.latitude = form.latitude
   if (form.planStartAt !== snapshot.value.planStartAt) body.planStartAt = form.planStartAt
-  if (numChanged(form.craneTonnage, snapshot.value.craneTonnage)) body.craneTonnage = form.craneTonnage
+  if (numChanged(form.craneTonnage, snapshot.value.craneTonnage) && isCraneType(currentVehicleType.value)) {
+    body.craneTonnage = form.craneTonnage
+  }
   if (numChanged(form.cargoWeightTon, snapshot.value.cargoWeightTon)) body.cargoWeightTon = form.cargoWeightTon
   if (numChanged(form.estimatedDays, snapshot.value.estimatedDays)) body.estimatedDays = form.estimatedDays
   const remark = form.remark.trim()
