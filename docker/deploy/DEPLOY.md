@@ -256,20 +256,20 @@ cat /crane/version.json
 ## 7. 启动系统
 
 ```bash
-# 1) 服务器原生构建后端镜像（首次需拉取 eclipse-temurin:17-jre）
-bash /crane/deploy/build-server-image.sh
-
-# 2) 确认本地镜像已生成（必须有 crane-backend:<APP_VERSION>）
-docker images | grep crane-backend
-
-# 3) 启动全部容器
 cd /crane/deploy
 docker compose config >/dev/null && echo "compose 配置校验通过"
-docker compose up -d
+
+# --build 会使用 /crane/backend/Dockerfile.runtime 构建后端镜像
+# 首次需要拉取 eclipse-temurin:17-jre
+docker compose up -d --build
 docker compose ps
 ```
 
-> `docker-compose.yml` 已为 `crane-app` 设置 `pull_policy: never`，后端镜像只使用服务器本地构建结果，不会再尝试从 Docker Hub 拉取。
+> `docker-compose.yml` 已为 `crane-app` 设置：
+> - `pull_policy: never`：后端镜像只使用服务器本地构建结果，不会去 Docker Hub 拉取；
+> - `build.context: ../backend`：执行 `--build` 时自动构建并打上 `crane-backend:<APP_VERSION>` 标签。
+>
+> 也可以手动构建后再启动：`bash /crane/deploy/build-server-image.sh && docker compose up -d`。
 
 首次启动流程：
 
@@ -420,10 +420,9 @@ scp docker/deploy/dist-release/crane-release-v1.0.1.tar.gz root@服务器IP:/tmp
 
 ```bash
 tar -xzf /tmp/crane-release-v1.0.1.tar.gz -C /crane --strip-components=1
-bash /crane/deploy/build-server-image.sh
 cd /crane/deploy
 sed -i 's/^APP_VERSION=.*/APP_VERSION=v1.0.1/' .env
-docker compose up -d
+docker compose up -d --build
 docker compose ps
 ```
 
@@ -495,7 +494,7 @@ docker exec crane-mysql mysql -ucrane -p"$MYSQL_PASSWORD" crane_workorder -e "SH
 
 | 现象 | 排查 |
 |---|---|
-| 启动报 `failed to resolve reference ... crane-backend` | 本地后端镜像未构建成功。执行 `bash /crane/deploy/build-server-image.sh`，再用 `docker images` 确认存在 crane-backend 镜像；compose 已设置 `pull_policy: never` |
+| 启动报 `failed to resolve reference ... crane-backend` | 本地后端镜像未构建成功。在 `/crane/deploy` 执行 `docker compose up -d --build`，或先执行 `bash build-server-image.sh`；再用 `docker images` 确认存在 crane-backend 镜像 |
 | 502 Bad Gateway | `docker logs crane-app`；确认 MySQL healthy；确认后端监听 7777 |
 | Nginx 起不来 | `docker exec crane-nginx nginx -t`；检查证书文件名/权限 |
 | 证书告警 | 确认 `fullchain.crt` 为完整链、域名 `jndys.top`、系统时间正确 |

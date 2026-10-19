@@ -57,7 +57,7 @@ cd "$ROOT"
 # 4. 组装发布目录（与服务器 /crane 目录结构一致）
 echo "== [3/5] 组装发布包 =="
 rm -rf "$STAGE"
-mkdir -p "$STAGE"/{deploy,mysql/init,backend,www/admin,www/h5,www/screen,mp-weixin,certs,data/files,backup}
+mkdir -p "$STAGE"/{deploy,mysql/init,backend/target,www/admin,www/h5,www/screen,mp-weixin,certs,data/files,backup}
 
 cp docker/deploy/docker-compose.yml "$STAGE/deploy/"
 cp docker/deploy/nginx.conf          "$STAGE/deploy/"
@@ -66,7 +66,7 @@ cp docker/deploy/backup-loop.sh      "$STAGE/deploy/"
 sed "s|^APP_VERSION=.*|APP_VERSION=$VERSION|" docker/deploy/.env.example > "$STAGE/deploy/.env.example"
 cp docker/deploy/DEPLOY.md           "$STAGE/DEPLOY.md"
 cp docker/mysql/init/*.sql           "$STAGE/mysql/init/"
-cp backend/target/crane-backend.jar  "$STAGE/backend/"
+cp backend/target/crane-backend.jar  "$STAGE/backend/target/"
 cp backend/Dockerfile.runtime        "$STAGE/backend/"
 cp -R frontend/apps/admin/dist/.            "$STAGE/www/admin/"
 cp -R frontend/apps/mobile/dist/build/h5/.  "$STAGE/www/h5/"
@@ -100,7 +100,7 @@ cat > "$STAGE/version.json" <<EOF
   "gitCommit": "$GIT_SHA",
   "gitDirty": $([ -n "$DIRTY_SUFFIX" ] && echo true || echo false),
   "platform": "linux/amd64",
-  "backendJar": "backend/crane-backend.jar",
+  "backendJar": "backend/target/crane-backend.jar",
   "backendDockerfile": "backend/Dockerfile.runtime",
   "backendImage": "crane-backend:$VERSION",
   "components": {

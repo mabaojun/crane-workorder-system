@@ -32,8 +32,7 @@ sudo chown -R "$USER":"$USER" /crane
 tar -xzf crane-release-<版本>.tar.gz -C /crane --strip-components=1
 cd /crane/deploy
 cp .env.example .env && vi .env
-bash build-server-image.sh
-docker compose up -d
+docker compose up -d --build
 ```
 
 验证：

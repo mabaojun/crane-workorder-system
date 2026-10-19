@@ -30,6 +30,10 @@ services:
     platform: linux/amd64
     # 后端镜像是服务器本地构建的，禁止 compose 去 Docker Hub 拉取
     pull_policy: never
+    # 首次部署 / 升级使用 docker compose up -d --build 自动构建
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.runtime
     environment:
       MYSQL_HOST: crane-mysql
       MYSQL_PORT: 3306
