@@ -96,12 +96,15 @@ const GROUP_LABEL: Record<string, string> = {
 
 /** ai 组各项说明（接入信息 + 简报/日报调度参数） */
 const AI_TIPS: Record<string, string> = {
-  'ai.enabled': 'AI 接入总开关，关闭时所有 AI 功能不调用外部接口',
-  'ai.api_base_url': 'OpenAI 兼容接口 Base URL，如 https://api.openai.com/v1 或中转地址',
+  'ai.enabled': 'AI 接入总开关，关闭时所有 AI 功能不调用外部接口（工作台/大屏「生成 AI 报告」也会被拒绝）',
+  'ai.api_base_url': 'OpenAI 兼容接口 Base URL，如 https://api.deepseek.com 或 https://api.openai.com/v1（自动拼接 /chat/completions）',
   'ai.api_key': 'OpenAI 兼容接口 API Key，仅后台可见，不下发前端',
-  'ai.model': '模型名称，如 gpt-4o-mini / deepseek-chat',
+  'ai.model': '模型名称，如 deepseek-chat / deepseek-reasoner / gpt-4o-mini',
+  'ai.mock': '演示模式：开启后不调用外部接口，返回固定演示文本（联调演示用）',
+  'ai.timeout_seconds': 'AI 单次调用超时时间（秒）',
   'ai.daily_run_time': 'AI 日报每日执行时间（HH:mm），由后端调度任务读取',
-  'ai.briefing_retention_days': 'AI 简报保留天数，超期自动清理'
+  'ai.briefing_retention_days': 'AI 简报保留天数，超期自动清理',
+  'ai.report_prompt': 'AI 日报提示词模板（支持占位符）：{date} 日期、{orderToday} 今日新增工单、{completedToday} 完成、{inProgress} 进行中、{pendingAccept} 待接单、{suspended} 暂停、{cancelled} 取消、{alarmCount} 报警数、{alarmTop} 报警分布、{exceptionToday} 异常上报、{demandPending} 待处理需求、{vehicleBusy} 作业车辆、{vehicleThird} 第三方外出、{vehicleMaintenance} 维保、{vehicleIdle} 空闲'
 }
 
 /** map 组各项说明（与后端代理 / 前端渲染 / mock 联调方式对应） */

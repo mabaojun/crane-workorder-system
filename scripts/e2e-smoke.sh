@@ -299,6 +299,32 @@ req "插单-任务A继续完成" POST /attendance/task-end "$DRIVER2" "{\"orderI
 END_CAR=$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT status FROM biz_vehicle WHERE id=$WVID;" 2>/dev/null | tr -d ' \n')
 if [ "$END_CAR" = "IDLE" ]; then PASS=$((PASS+1)); echo "PASS  A完成后车辆释放回IDLE"; else FAIL=$((FAIL+1)); echo "FAIL  A完成后车辆状态=$END_CAR"; fi
 
+echo "== 19. AI 报告（连通性 / mock / 手动触发 / 真实生成）=="
+req "AI开关临时关闭" PUT /system/configs/ai.enabled "$ADMIN" '{"configValue":"false"}'
+AI_DIS=$(curl -s -X POST "$BASE/ai/reports/generate" -H 'Content-Type: application/json' -H 'X-Client: admin' -H "Authorization: Bearer $ADMIN" -H "Idempotency-Key: e2e-$TS-ai0" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("code"))')
+if [ "$AI_DIS" = "50005" ]; then PASS=$((PASS+1)); echo "PASS  AI未开启时手动生成被拒(50005)"; else FAIL=$((FAIL+1)); echo "FAIL  AI未开启生成 code=$AI_DIS"; fi
+req "AI开关恢复" PUT /system/configs/ai.enabled "$ADMIN" '{"configValue":"true"}'
+req "开启mock演示模式" PUT /system/configs/ai.mock "$ADMIN" '{"configValue":"true"}'
+req "mock模式手动生成报告" POST /ai/reports/generate "$ADMIN" ""
+MOCK_OK=$(python3 -c '
+import json
+d=json.load(open("/tmp/e2e-last.json"))["data"]["report"]
+print("YES" if d["callStatus"]=="SUCCESS" and "mock" in d["contentMarkdown"] else "NO")
+')
+if [ "$MOCK_OK" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  mock模式生成SUCCESS且含演示文本"; else FAIL=$((FAIL+1)); echo "FAIL  mock生成结果异常"; fi
+req "查询最新报告" GET /ai/reports/latest "$ADMIN" ""
+req "AI连通性诊断(mock)" GET /ai/diagnose "$ADMIN" ""
+DG_OK=$(python3 -c 'import json;print("YES" if json.load(open("/tmp/e2e-last.json"))["data"]["ok"] else "NO")')
+if [ "$DG_OK" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  诊断ok(mock模式)"; else FAIL=$((FAIL+1)); echo "FAIL  诊断未通过"; fi
+req "关闭mock恢复真实调用" PUT /system/configs/ai.mock "$ADMIN" '{"configValue":"false"}'
+req "真实大模型生成日报(DeepSeek)" POST /ai/reports/generate "$ADMIN" ""
+REAL_OK=$(python3 -c '
+import json
+d=json.load(open("/tmp/e2e-last.json"))["data"]["report"]
+print("YES" if d["callStatus"]=="SUCCESS" and len(d["contentMarkdown"])>50 else "NO")
+')
+if [ "$REAL_OK" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  真实大模型生成SUCCESS(正文>50字)"; else FAIL=$((FAIL+1)); echo "FAIL  真实生成失败或内容过短"; fi
+
 echo "=============================="
 echo "E2E 结果：PASS=$PASS FAIL=$FAIL"
 exit $FAIL

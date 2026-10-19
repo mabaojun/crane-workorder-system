@@ -69,7 +69,9 @@ public enum ErrorCode {
     AI_UNAVAILABLE(50005, "AI 服务不可用（已降级）"),
     FILE_STORAGE_ERROR(50006, "文件存储读写失败"),
     IDEMPOTENCY_PROCESSING(50007, "幂等键处理中，请稍后重试"),
-    RATE_LIMITED(50008, "请求过于频繁");
+    RATE_LIMITED(50008, "请求过于频繁"),
+    AI_NOT_CONFIGURED(50009, "AI 调用配置缺失"),
+    AI_CALL_FAILED(50010, "AI 调用失败");
 
     private final int code;
     private final String message;

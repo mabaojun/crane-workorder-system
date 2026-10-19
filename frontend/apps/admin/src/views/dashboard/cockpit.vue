@@ -6,10 +6,20 @@
         <h2>{{ greeting }}，{{ auth.me?.name || '管理员' }}</h2>
         <p>今天是 {{ todayText }}，业务运行平稳，请注意跟进待办事项</p>
       </div>
-      <el-button type="primary" size="large" class="screen-btn" @click="openScreen">
-        <el-icon class="btn-icon"><DataBoard /></el-icon>
-        进入数据大屏
-      </el-button>
+      <div class="welcome-actions">
+        <el-button size="large" class="screen-btn" :loading="aiGenerating" @click="onGenerateAiReport">
+          <el-icon v-if="!aiGenerating" class="btn-icon"><MagicStick /></el-icon>
+          生成 AI 报告
+        </el-button>
+        <el-button v-if="aiLatestExists" size="large" class="screen-btn" @click="onShowLatestAiReport">
+          <el-icon class="btn-icon"><Document /></el-icon>
+          查看最新报告
+        </el-button>
+        <el-button type="primary" size="large" class="screen-btn" @click="openScreen">
+          <el-icon class="btn-icon"><DataBoard /></el-icon>
+          进入数据大屏
+        </el-button>
+      </div>
     </div>
 
     <!-- 快捷入口：高频功能图标直达 -->
@@ -133,6 +143,29 @@
         </div>
       </div>
     </el-card>
+
+    <!-- AI 报告全文模态框：生成完成或查看最新时弹出 -->
+    <el-dialog
+      v-model="aiDialogVisible"
+      :title="aiReport ? `AI 今日工作简报 · ${aiReport.briefingNo}` : 'AI 今日工作简报'"
+      width="680px"
+      :close-on-click-modal="false"
+    >
+      <div v-if="aiReport" class="ai-report-content">
+        <div class="ai-report-meta">
+          <el-tag size="small" :type="aiReport.callStatus === 'SUCCESS' ? 'success' : 'danger'">
+            {{ aiReport.callStatus === 'SUCCESS' ? '生成成功' : '生成失败' }}
+          </el-tag>
+          <span>{{ fmtTime(aiReport.generatedAt) }} 生成 · AI 输出仅供参考</span>
+        </div>
+        <div v-if="aiReport.callStatus === 'SUCCESS'" class="ai-report-content">{{ aiReport.contentMarkdown }}</div>
+        <el-alert v-else type="error" :closable="false" show-icon :title="'生成失败：' + (aiReport.failReason || '未知原因')" />
+      </div>
+      <template #footer>
+        <el-button @click="aiDialogVisible = false">关闭</el-button>
+        <el-button type="primary" :loading="aiGenerating" @click="onGenerateAiReport">重新生成</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -142,7 +175,8 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   Tickets, View, RefreshLeft, WarningFilled, DataBoard, List, Van, User,
-  Setting, Location, Clock, CircleCheck, Loading, VideoPause, Odometer
+  Setting, Location, Clock, CircleCheck, Loading, VideoPause, Odometer,
+  MagicStick, Document
 } from '@element-plus/icons-vue'
 import { pageWorkOrders, type WorkOrder } from '@crane/shared/api/workorder'
 import { WORK_ORDER_STATUS_LABEL } from '@crane/shared'
@@ -150,6 +184,7 @@ import { pageDemands } from '@crane/shared/api/demand'
 import { pageExceptions } from '@crane/shared/api/exception'
 import { pagePendingRedispatch } from '@crane/shared/api/dispatch'
 import { fetchStatAlarms, type StatAlarmItem } from '@crane/shared/api/stat'
+import { generateAiReport, getLatestAiReport, type AiReport } from '@crane/shared/api/ai'
 import { useAuthStore } from '../../stores/auth'
 import { fmtTime } from '../../utils/format'
 
@@ -198,6 +233,41 @@ const alarmLoading = ref(false)
 const recentOrders = ref<WorkOrder[]>([])
 const recentLoading = ref(false)
 
+// AI 报告：手动生成 / 查看最新，完成后模态框展示全文
+const aiDialogVisible = ref(false)
+const aiGenerating = ref(false)
+const aiReport = ref<AiReport | null>(null)
+const aiLatestExists = ref(false)
+
+async function onGenerateAiReport() {
+  aiGenerating.value = true
+  try {
+    const res = await generateAiReport()
+    aiReport.value = res.report
+    aiDialogVisible.value = true
+    aiLatestExists.value = true
+    ElMessage.success('AI 报告生成完成')
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : 'AI 报告生成失败')
+  } finally {
+    aiGenerating.value = false
+  }
+}
+
+async function onShowLatestAiReport() {
+  try {
+    const res = await getLatestAiReport()
+    if (!res.latest) {
+      ElMessage.info('尚未生成过 AI 报告，请先点击「生成 AI 报告」')
+      return
+    }
+    aiReport.value = res.latest
+    aiDialogVisible.value = true
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : 'AI 报告加载失败')
+  }
+}
+
 const isAdmin = () => auth.me?.role === 'ADMIN'
 
 const greeting = computed(() => {
@@ -241,7 +311,11 @@ onMounted(async () => {
       pagePendingRedispatch({ pageNum: 1, pageSize: 1 })
         .then((p) => { pendingRedispatch.value = p.total })
         .catch(() => {}),
-      alarmLoadingRun()
+      alarmLoadingRun(),
+      // AI 报告：静默探测是否已有历史报告，控制「查看最新报告」按钮显隐
+      getLatestAiReport()
+        .then((res) => { aiLatestExists.value = !!res.latest })
+        .catch(() => {})
     )
   }
   try {
@@ -332,6 +406,27 @@ function goOrderDetail(id: number) {
   font-weight: 600;
 }
 .screen-btn .btn-icon { margin-right: 6px; }
+.welcome-actions { display: flex; gap: 10px; }
+
+/* AI 报告模态框 */
+.ai-report-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--sub, #909399);
+  margin-bottom: 12px;
+}
+.ai-report-content {
+  max-height: 55vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  line-height: 1.8;
+  font-size: 14px;
+  padding: 14px 16px;
+  background: var(--bg, #f7f8fa);
+  border-radius: 8px;
+}
 
 /* 快捷入口 */
 .quick-nav {

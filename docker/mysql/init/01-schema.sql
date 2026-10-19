@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS sys_dict (
 CREATE TABLE IF NOT EXISTS sys_config (
     id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
     config_key   VARCHAR(128) NOT NULL COMMENT '配置键，如 conflict.ahead_window_minutes',
-    config_value VARCHAR(512) NULL COMMENT '配置值，统一字符串存储由服务层转换',
+    config_value TEXT NULL COMMENT '配置值，统一字符串存储由服务层转换；TEXT 支持长配置（如 AI 提示词模板）',
     value_type   VARCHAR(16)  NOT NULL DEFAULT 'STRING' COMMENT '值类型：INT/DECIMAL/STRING/BOOLEAN/JSON',
     group_name   VARCHAR(64)  NOT NULL COMMENT '分组：system/conflict/attendance/overtime/demand/alarm/sms/ai/storage',
     is_encrypted TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '是否密文存储',
@@ -1066,8 +1066,11 @@ INSERT INTO sys_config (config_key, config_value, value_type, group_name, descri
     ('ai.daily_run_time',                    '20:00','STRING',  'ai',         'AI 定时生成执行时刻'),
     ('ai.briefing_retention_days',           '10',   'INT',     'ai',         '简报保留天数，到期清除'),
     ('ai.enabled',                           'false','BOOLEAN', 'ai',         'AI 接入总开关，关闭时所有 AI 功能不调用外部接口'),
+    ('ai.mock',                              'false','BOOLEAN', 'ai',         'AI 演示模式：开启后不调用外部接口返回固定演示文本，供联调演示'),
+    ('ai.timeout_seconds',                   '30',   'INT',     'ai',         'AI 单次调用超时时间（秒）'),
     ('ai.api_base_url',                      '',     'STRING',  'ai',         'OpenAI 兼容接口 Base URL，如 https://api.openai.com/v1'),
     ('ai.api_key',                           '',     'STRING',  'ai',         'OpenAI 兼容接口 API Key（后台配置，不下发前端）'),
     ('ai.model',                             '',     'STRING',  'ai',         '模型名称，如 gpt-4o-mini / deepseek-chat'),
+    ('ai.report_prompt',                     '你是吊装公司的运营分析助手。请根据以下当日运营数据，输出一份 Markdown 格式的「今日工作简报」。要求：1. 使用二级标题分节：今日概览、工单执行情况、报警与风险、异常与需求、明日关注建议；2. 数据必须严格引用输入，不得编造，数值为 0 时也如实说明；3. 语言简洁专业，总长不超过 400 字，结尾给 2-3 条具体可执行的明日建议；4. 不要输出 JSON，不要使用代码块包裹全文。\n\n日期：{date}\n今日新增工单：{orderToday} 单，其中完成 {completedToday} 单、进行中 {inProgress} 单、待接单 {pendingAccept} 单、暂停 {suspended} 单、已取消 {cancelled} 单。\n当前未处理报警：{alarmCount} 条。报警类型分布：{alarmTop}。\n今日异常上报：{exceptionToday} 条。待处理需求单：{demandPending} 条。\n车辆状态：作业中 {vehicleBusy} 台，第三方派单外出 {vehicleThird} 台，维保 {vehicleMaintenance} 台，空闲 {vehicleIdle} 台。', 'STRING',  'ai',         'AI 日报提示词模板，支持 {date}{orderToday}{completedToday}{inProgress}{pendingAccept}{suspended}{cancelled}{alarmCount}{alarmTop}{exceptionToday}{demandPending}{vehicleBusy}{vehicleThird}{vehicleMaintenance}{vehicleIdle} 占位符'),
     ('storage.usage_alert_percent',          '80',   'INT',     'storage',    '存储使用率告警阈值（%）（待业务确认）')
 ON DUPLICATE KEY UPDATE config_value = VALUES(config_value);
