@@ -196,24 +196,21 @@ class DispatchCheckServiceTest {
     }
 
     @Test
-    void staffWithActiveOrderFails() {
+    void staffWithActiveOrderStillPasses() {
+        // 司机工单并发放开：有进行中工单（不同车）也放行派发，取舍权在司机（接单判断/退单）
         when(vehicleMapper.selectById(2L)).thenReturn(idleVehicle());
         when(staffMapper.selectById(1L)).thenReturn(onDutyStaff());
-        // 司机已有进行中工单且车辆与新车单不同（非同班组插单），互斥拦截
-        when(workOrderMapper.selectList(any())).thenReturn(List.of(activeOrder(9L, "GD202610180009",
-                3L, 3L, LocalDateTime.now().plusHours(1))));
+        when(workOrderMapper.selectCount(any())).thenReturn(0L);
         when(systemConfigService.getInt(anyString(), anyInt())).thenReturn(3);
 
         List<CheckItem> checks = dispatchCheckService.precheck(1L, 2L, LocalDateTime.now().plusHours(1));
 
-        CheckItem item = find(checks, "STAFF_NO_ACTIVE_ORDER");
-        assertThat(item.isPass()).isFalse();
-        assertThat(item.getMessage()).contains("进行中");
+        assertThat(find(checks, "STAFF_NO_ACTIVE_ORDER").isPass()).isTrue();
     }
 
     @Test
-    void sameCrewInsertionPassesMutexAndTimeWindow() {
-        // 司机正执行工单 9（同车 2，1 小时后开工）；新车单同车同司机（原班人马插突发单）
+    void sameCrewBusyVehicleTimeWindowExempted() {
+        // 车辆时段豁免：司机正执行工单 9（同车 2，1 小时后开工），插单 B 同车同司机不参与时段判断
         when(vehicleMapper.selectById(2L)).thenReturn(busyVehicle());
         when(staffMapper.selectById(1L)).thenReturn(onDutyStaff());
         when(workOrderMapper.selectList(any())).thenReturn(List.of(activeOrder(9L, "GD202610180009",
@@ -222,7 +219,6 @@ class DispatchCheckServiceTest {
 
         List<CheckItem> checks = dispatchCheckService.precheck(1L, 2L, LocalDateTime.now().plusHours(2));
 
-        assertThat(find(checks, "STAFF_NO_ACTIVE_ORDER").isPass()).isTrue();
         assertThat(find(checks, "VEHICLE_IDLE").isPass()).isTrue();
     }
 

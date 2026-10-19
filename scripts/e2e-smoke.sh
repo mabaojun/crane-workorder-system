@@ -247,7 +247,7 @@ req "司机改第三方外出" POST /staff/vehicles/$LVID/driver-status "$DRIVER
 NEG3=$(curl -s -X POST "$BASE/staff/vehicles/$LVID/driver-status" -H 'Content-Type: application/json' -H 'X-Client: admin' -H "Authorization: Bearer $DRIVER2" -H "Idempotency-Key: e2e-$TS-neg3" -d '{"status":"DISABLED"}' | python3 -c 'import sys,json;print(json.load(sys.stdin).get("code"))')
 if [ "$NEG3" = "20008" ]; then PASS=$((PASS+1)); echo "PASS  司机改停用返回20008"; else FAIL=$((FAIL+1)); echo "FAIL  司机改停用 code=$NEG3"; fi
 # 接单超时报警：时限临时改 0，把一条已完成工单置为超时 PENDING_ACCEPT，验证 NOT_ACCEPTED 后还原
-req "接单时限临时改0分钟" PUT /system/configs/order.accept_deadline_minutes "$ADMIN" '{"configValue":"0"}'
+req "接单底线临时改0分钟" PUT /system/configs/order.accept_lead_minutes "$ADMIN" '{"configValue":"0"}'
 ALOID=$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_work_order WHERE status='COMPLETED' AND deleted=0 ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n')
 docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -e "UPDATE biz_work_order SET status='PENDING_ACCEPT', accepted_at=NULL, accept_deadline_at=NOW() - INTERVAL 10 MINUTE WHERE id=$ALOID;" >/dev/null 2>&1
 req "查询报警中心" GET /stat/alarms "$ADMIN" ""
@@ -259,7 +259,7 @@ print("YES" if items else "NO")
 ')
 if [ "$HASNA" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  报警含超时未接单(NOT_ACCEPTED)"; else FAIL=$((FAIL+1)); echo "FAIL  报警未含NOT_ACCEPTED"; fi
 docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -e "UPDATE biz_work_order SET status='COMPLETED', accept_deadline_at=NULL WHERE id=$ALOID;" >/dev/null 2>&1
-req "接单时限还原60分钟" PUT /system/configs/order.accept_deadline_minutes "$ADMIN" '{"configValue":"60"}'
+req "接单底线还原120分钟" PUT /system/configs/order.accept_lead_minutes "$ADMIN" '{"configValue":"120"}'
 
 # BUSY 车时段校验：第 12 节退单后 WVID 车保持 BUSY（占用退单单，预计 2026-12-09T09:00 开工）
 # 同一 6 小时段内建单应拒绝（40002 时间冲突），时段充裕应放行（当前忙不代表派单时刻忙）

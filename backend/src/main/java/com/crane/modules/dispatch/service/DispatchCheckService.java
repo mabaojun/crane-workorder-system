@@ -133,22 +133,11 @@ public class DispatchCheckService {
     }
 
     /**
-     * 司机无进行中（IN_PROGRESS）工单；同班组插单豁免：
-     * 司机正执行的工单若与新车单同车同司机（原班人马临时借调执行突发任务），放行派发，
-     * 司机接单后自行取舍——无时间则退单，有时间则暂停当前任务转执行。
+     * 司机工单并发放开（校验项保留恒过）：司机有未暂停的进行中工单，管理员同样可以下单派发——
+     * 原班人马可临时借调执行突发任务；司机收到单子后自行判断当前任务能否安排时间，选择接单或退单。
+     * 执行层互斥仍在状态机：未暂停当前工单直接签新单会被 30001 拦截，引导司机先做取舍。
      */
     private CheckItem checkStaffNoActiveOrder(Long staffId, Long vehicleId) {
-        if (staffId == null) {
-            return CheckItem.fail(CHECK_STAFF_NO_ACTIVE_ORDER, "司机不存在");
-        }
-        List<WorkOrder> actives = workOrderMapper.selectList(new LambdaQueryWrapper<WorkOrder>()
-                .eq(WorkOrder::getStaffId, staffId)
-                .eq(WorkOrder::getStatus, "IN_PROGRESS"));
-        boolean sameCrewOnly = actives == null || actives.stream()
-                .allMatch(o -> vehicleId != null && vehicleId.equals(o.getVehicleId()));
-        if (actives != null && !actives.isEmpty() && !sameCrewOnly) {
-            return CheckItem.fail(CHECK_STAFF_NO_ACTIVE_ORDER, "司机已有未暂停的进行中工单");
-        }
         return CheckItem.pass(CHECK_STAFF_NO_ACTIVE_ORDER);
     }
 

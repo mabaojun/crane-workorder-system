@@ -151,9 +151,9 @@ public class WorkOrderService {
         if (STAFF_AWAY.equals(staff.getStatus()) || STAFF_RESIGNED.equals(staff.getStatus())) {
             throw new BizException(ErrorCode.DRIVER_NOT_AVAILABLE);
         }
-        // 司机互斥：存在进行中工单即阻断建单（同班组插单豁免：与新车单同车同司机时放行，
-        // 原班人马临时借调执行突发任务，司机接单后自行取舍退单或暂停当前任务）
-        checkStaffNoActiveOrder(command.getStaffId(), command.getVehicleId());
+        // 司机工单并发放开：司机有未暂停的进行中工单同样可以下单（原班人马临时借调执行突发任务），
+        // 取舍权在司机——接单后自行判断时间，可退单或暂停当前任务转执行；执行层互斥由状态机把关
+        // checkStaffNoActiveOrder 已移除（原 30001 拦截），签名保留见方法注释
         // 车辆必须存在且可用：空闲直接通过；作业中按 6 小时施工时段判断冲突（当前忙不代表派单时刻忙）；
         // 维保 / 第三方外出 / 停用物理不可用一律拒绝。校验规则与派单预检共用 DispatchCheckService。
         Vehicle vehicle = vehicleMapper.selectById(command.getVehicleId());
@@ -195,8 +195,7 @@ public class WorkOrderService {
         order.setRequirement(command.getRequirement());
         order.setStatus(STATUS_PENDING_ACCEPT);
         order.setCustomerVisibleStatus("DISPATCHED");
-        int deadlineMinutes = systemConfigService.getInt("order.accept_deadline_minutes", 30);
-        order.setAcceptDeadlineAt(LocalDateTime.now().plusMinutes(deadlineMinutes));
+        order.setAcceptDeadlineAt(computeAcceptDeadline(command.getPlanStartAt(), LocalDateTime.now()));
         order.setIsPinnedAlarm(0);
         order.setCreatedBy(operatorId);
 
@@ -210,6 +209,34 @@ public class WorkOrderService {
         log.info("工单创建成功 orderId={} orderNo={} staffId={} vehicleId={}",
                 order.getId(), order.getOrderNo(), order.getStaffId(), order.getVehicleId());
         return order;
+    }
+
+    /**
+     * 接单截止时间计算（超时未确认触发接单报警，后台可配）：
+     * 底线 = 约定开始时间前 N 分钟（order.accept_lead_minutes，默认 120 = 提前 2 小时）；
+     * 班内（下班前）下的第二天的单：须前一天下班前确认（overtime.normal_off_time，默认 18:00）；
+     * 下班后下的单：1 小时内确认（order.after_off_accept_minutes，默认 60）。
+     */
+    LocalDateTime computeAcceptDeadline(LocalDateTime planStartAt, LocalDateTime now) {
+        int leadMinutes = systemConfigService.getInt("order.accept_lead_minutes", 120);
+        LocalDateTime deadline = planStartAt.minusMinutes(leadMinutes);
+        LocalTime normalOff = LocalTime.parse(
+                systemConfigService.getOrDefault("overtime.normal_off_time", "18:00"));
+        if (now.toLocalTime().compareTo(normalOff) >= 0) {
+            // 下班后下单：派单时刻起 1 小时内确认
+            int afterOffMinutes = systemConfigService.getInt("order.after_off_accept_minutes", 60);
+            LocalDateTime afterOffDeadline = now.plusMinutes(afterOffMinutes);
+            if (afterOffDeadline.isBefore(deadline)) {
+                deadline = afterOffDeadline;
+            }
+        } else if (planStartAt.toLocalDate().isAfter(now.toLocalDate())) {
+            // 班内下的第二天的单：前一天下班前完成确认
+            LocalDateTime offToday = now.toLocalDate().atTime(normalOff);
+            if (offToday.isBefore(deadline)) {
+                deadline = offToday;
+            }
+        }
+        return deadline;
     }
 
     /**
@@ -835,23 +862,6 @@ public class WorkOrderService {
             throw new BizException(ErrorCode.NOT_FOUND);
         }
         return order;
-    }
-
-    /** 司机互斥：存在进行中工单则阻断；excludeOrderId 用于恢复执行 / 改派排除自身 */
-    /**
-     * 司机互斥校验（建单路径）：存在进行中工单即阻断（30001）；
-     * 同班组插单豁免——司机正执行的工单若与新车单同车同司机（原班人马临时借调），放行建单。
-     */
-    private void checkStaffNoActiveOrder(Long staffId, Long vehicleId) {
-        LambdaQueryWrapper<WorkOrder> wrapper = new LambdaQueryWrapper<WorkOrder>()
-                .eq(WorkOrder::getStaffId, staffId)
-                .eq(WorkOrder::getStatus, WorkOrderStateMachine.IN_PROGRESS);
-        List<WorkOrder> actives = workOrderMapper.selectList(wrapper);
-        boolean sameCrewOnly = actives == null || actives.stream()
-                .allMatch(o -> vehicleId != null && vehicleId.equals(o.getVehicleId()));
-        if (actives != null && !actives.isEmpty() && !sameCrewOnly) {
-            throw new BizException(ErrorCode.DRIVER_MUTEX_CONFLICT);
-        }
     }
 
     private void requireAdmin() {
