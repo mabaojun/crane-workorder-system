@@ -103,15 +103,21 @@ public class DispatchService {
 
     /** 前置校验不通过即抛对应错误码：车辆 40002、司机 30002、互斥 30001、上限 30003、时间 30004 */
     private void runPrecheckOrThrow(Long orderId, DispatchRequest request) {
+        WorkOrder order = workOrderMapper.selectById(orderId);
+        // 计划时间以请求为准，未携带时回退工单原值，保证车辆时段冲突判断基于最终生效时间
+        LocalDateTime planStartAt = request.getPlanStartAt() != null
+                ? request.getPlanStartAt()
+                : (order != null ? order.getExpectedStartAt() : null);
         List<CheckItem> checks = dispatchCheckService.precheck(
-                orderId, request.getStaffId(), request.getVehicleId(), request.getPlanStartAt());
+                orderId, request.getStaffId(), request.getVehicleId(), planStartAt);
         for (CheckItem item : checks) {
             if (item.isPass()) {
                 continue;
             }
             switch (item.getCode()) {
+                // 车辆项消息含具体原因（停用/维保/第三方外出/时段冲突），透传给管理端提示
                 case DispatchCheckService.CHECK_VEHICLE_IDLE ->
-                        throw new BizException(ErrorCode.VEHICLE_NOT_IDLE);
+                        throw new BizException(ErrorCode.VEHICLE_NOT_IDLE, item.getMessage());
                 case DispatchCheckService.CHECK_STAFF_ON_DUTY ->
                         throw new BizException(ErrorCode.DRIVER_NOT_AVAILABLE);
                 case DispatchCheckService.CHECK_STAFF_NO_ACTIVE_ORDER ->

@@ -189,20 +189,20 @@
                 v-model="createForm.vehicleId"
                 filterable
                 :loading="optionsLoading"
-                placeholder="选择空闲车辆"
+                placeholder="选择车辆（作业中车辆按施工时段校验）"
                 style="width: 100%"
                 @change="onVehicleChange"
               >
                 <el-option
-                  v-for="v in idleVehicles"
+                  v-for="v in availableVehicles"
                   :key="v.id"
                   :value="v.id"
-                  :label="`${v.plateNo}｜${vehicleSpecLabel(v)}｜空闲`"
+                  :label="`${v.plateNo}｜${vehicleSpecLabel(v)}｜${vehicleStatusText(v.status)}`"
                 />
                 <template #empty>
                   <p v-if="optionsLoading" class="select-hint">数据加载中…</p>
                   <p v-else-if="optionsError" class="select-hint">加载失败，请关闭弹窗重试</p>
-                  <p v-else class="select-hint">暂无空闲车辆</p>
+                  <p v-else class="select-hint">暂无可派车辆</p>
                 </template>
               </el-select>
             </el-form-item>
@@ -332,7 +332,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { WORK_ORDER_STATUS_LABEL } from '@crane/shared'
+import { WORK_ORDER_STATUS_LABEL, VEHICLE_STATUS_LABEL } from '@crane/shared'
 import {
   pageWorkOrders,
   createWorkOrder,
@@ -408,7 +408,12 @@ const createForm = reactive({
   confirmPast: false
 })
 
-const idleVehicles = computed(() => vehicles.value.filter((v) => v.status === 'IDLE'))
+/** 可派车辆：停用不可派，其余（含作业中）均可选，作业中提交时按 6 小时施工时段校验冲突 */
+const availableVehicles = computed(() => vehicles.value.filter((v) => v.status !== 'DISABLED'))
+
+function vehicleStatusText(status: string) {
+  return VEHICLE_STATUS_LABEL[status] || status
+}
 const needConfirmPast = computed(() =>
   !!createForm.planStartAt && new Date(createForm.planStartAt).getTime() < Date.now()
 )

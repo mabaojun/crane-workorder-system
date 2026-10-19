@@ -12,13 +12,14 @@ import com.crane.modules.workorder.mapper.WorkOrderMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * 派单前置校验（API-DISP-001）。五项规则：
- * 车辆空闲、司机在岗（非离岗 / 离职）、司机无进行中工单、未接单派单数未达上限、时间合法。
+ * 车辆可用（空闲或作业中但时段不冲突）、司机在岗（非离岗 / 离职）、司机无进行中工单、未接单派单数未达上限、时间合法。
  * 只读校验不落库，供派单与建单前的显式检查复用。
  */
 @Service
@@ -30,6 +31,13 @@ public class DispatchCheckService {
     public static final String CHECK_STAFF_NO_ACTIVE_ORDER = "STAFF_NO_ACTIVE_ORDER";
     public static final String CHECK_PENDING_DISPATCH_LIMIT = "PENDING_DISPATCH_LIMIT";
     public static final String CHECK_TIME_VALID = "TIME_VALID";
+
+    /** 车辆时段冲突窗口：两单预计开始时间相差不足 6 小时视为同一施工时段 */
+    private static final int VEHICLE_CONFLICT_HOURS = 6;
+
+    /** 车辆占用中的活跃工单状态集合 */
+    private static final List<String> ACTIVE_ORDER_STATUSES =
+            List.of("PENDING_ACCEPT", "PENDING_ARRIVE", "IN_PROGRESS", "SUSPENDED");
 
     private final VehicleMapper vehicleMapper;
     private final StaffMapper staffMapper;
@@ -44,12 +52,12 @@ public class DispatchCheckService {
     }
 
     /**
-     * 带工单上下文的校验：车辆已被本工单占用（BUSY 且 current_order_id 指向本单）视为通过，
+     * 带工单上下文的校验： orderId 非空时排除本单自身的时段冲突判断，
      * 覆盖「建单即占用车辆后同车派单 / 拒单重派」场景。
      */
     public List<CheckItem> precheck(Long orderId, Long staffId, Long vehicleId, LocalDateTime planStartAt) {
         List<CheckItem> checks = new ArrayList<>();
-        checks.add(checkVehicleIdle(orderId, vehicleId));
+        checks.add(checkVehicleAvailable(orderId, vehicleId, planStartAt));
         checks.add(checkStaffOnDuty(staffId));
         checks.add(checkStaffNoActiveOrder(staffId));
         checks.add(checkPendingDispatchLimit(staffId));
@@ -57,17 +65,51 @@ public class DispatchCheckService {
         return checks;
     }
 
-    /** 车辆存在且状态为 IDLE；或 BUSY 且当前占用工单即被派单的工单 */
-    private CheckItem checkVehicleIdle(Long orderId, Long vehicleId) {
+    /**
+     * 车辆可用性校验（供派单预检与建单复用）：
+     * 空闲直接通过；作业中（BUSY）按施工时段判断——当前忙不代表派单时刻忙，
+     * 与该车活跃工单的预计开始时间相隔不足 6 小时视为时段冲突，充裕则放行；
+     * 维保 / 第三方外出 / 停用属物理不可用，一律拒绝。
+     */
+    public CheckItem checkVehicleAvailable(Long orderId, Long vehicleId, LocalDateTime planStartAt) {
         Vehicle vehicle = vehicleId == null ? null : vehicleMapper.selectById(vehicleId);
         if (vehicle == null) {
             return CheckItem.fail(CHECK_VEHICLE_IDLE, "车辆不存在");
         }
+        String status = vehicle.getStatus();
+        return switch (status) {
+            case "IDLE" -> CheckItem.pass(CHECK_VEHICLE_IDLE);
+            case "DISABLED" -> CheckItem.fail(CHECK_VEHICLE_IDLE, "车辆已停用，不可派单");
+            case "MAINTENANCE" -> CheckItem.fail(CHECK_VEHICLE_IDLE, "车辆维保中，不可派单");
+            case "BUSY_THIRD" -> CheckItem.fail(CHECK_VEHICLE_IDLE, "车辆第三方派单外出，不可派单");
+            case "BUSY" -> checkBusyVehicleTimeWindow(orderId, vehicle, planStartAt);
+            default -> CheckItem.fail(CHECK_VEHICLE_IDLE, "车辆状态异常: " + status);
+        };
+    }
+
+    /** 作业中车辆：被本单占用直接通过；否则与活跃工单按 6 小时窗口判断时段冲突 */
+    private CheckItem checkBusyVehicleTimeWindow(Long orderId, Vehicle vehicle, LocalDateTime planStartAt) {
         boolean occupiedByThisOrder = orderId != null
-                && "BUSY".equals(vehicle.getStatus())
                 && orderId.equals(vehicle.getCurrentOrderId());
-        if (!"IDLE".equals(vehicle.getStatus()) && !occupiedByThisOrder) {
-            return CheckItem.fail(CHECK_VEHICLE_IDLE, "车辆非空闲，当前状态: " + vehicle.getStatus());
+        if (occupiedByThisOrder) {
+            return CheckItem.pass(CHECK_VEHICLE_IDLE);
+        }
+        if (planStartAt == null) {
+            return CheckItem.fail(CHECK_VEHICLE_IDLE, "车辆作业中，请指定计划开始时间以确认时段不冲突");
+        }
+        List<WorkOrder> actives = workOrderMapper.selectList(new LambdaQueryWrapper<WorkOrder>()
+                .eq(WorkOrder::getVehicleId, vehicle.getId())
+                .in(WorkOrder::getStatus, ACTIVE_ORDER_STATUSES)
+                .ne(orderId != null, WorkOrder::getId, orderId)
+                .isNotNull(WorkOrder::getExpectedStartAt));
+        for (WorkOrder active : actives) {
+            long gapHours = Math.abs(Duration.between(planStartAt, active.getExpectedStartAt()).toMinutes());
+            if (gapHours < VEHICLE_CONFLICT_HOURS * 60L) {
+                return CheckItem.fail(CHECK_VEHICLE_IDLE, String.format(
+                        "车辆在该时段已有工单 %s（%s 开工），6 小时内时间冲突，请调整时间或换车",
+                        active.getOrderNo(), active.getExpectedStartAt().toLocalDate() + " "
+                                + active.getExpectedStartAt().toLocalTime().withSecond(0).withNano(0)));
+            }
         }
         return CheckItem.pass(CHECK_VEHICLE_IDLE);
     }

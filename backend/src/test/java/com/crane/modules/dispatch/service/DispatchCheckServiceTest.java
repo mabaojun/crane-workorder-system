@@ -86,7 +86,9 @@ class DispatchCheckServiceTest {
 
     @Test
     void vehicleNotIdleFails() {
-        when(vehicleMapper.selectById(2L)).thenReturn(busyVehicle());
+        Vehicle maintenance = busyVehicle();
+        maintenance.setStatus("MAINTENANCE");
+        when(vehicleMapper.selectById(2L)).thenReturn(maintenance);
         lenient().when(staffMapper.selectById(1L)).thenReturn(onDutyStaff());
         lenient().when(workOrderMapper.selectCount(any())).thenReturn(0L);
         lenient().when(systemConfigService.getInt(anyString(), anyInt())).thenReturn(3);
@@ -95,7 +97,81 @@ class DispatchCheckServiceTest {
 
         CheckItem item = find(checks, "VEHICLE_IDLE");
         assertThat(item.isPass()).isFalse();
-        assertThat(item.getMessage()).contains("非空闲");
+        assertThat(item.getMessage()).contains("维保");
+    }
+
+    @Test
+    void disabledVehicleFails() {
+        Vehicle disabled = busyVehicle();
+        disabled.setStatus("DISABLED");
+        when(vehicleMapper.selectById(2L)).thenReturn(disabled);
+
+        List<CheckItem> checks = dispatchCheckService.precheck(1L, 2L, LocalDateTime.now().plusHours(1));
+
+        CheckItem item = find(checks, "VEHICLE_IDLE");
+        assertThat(item.isPass()).isFalse();
+        assertThat(item.getMessage()).contains("停用");
+    }
+
+    @Test
+    void thirdPartyAwayVehicleFails() {
+        Vehicle third = busyVehicle();
+        third.setStatus("BUSY_THIRD");
+        when(vehicleMapper.selectById(2L)).thenReturn(third);
+
+        List<CheckItem> checks = dispatchCheckService.precheck(1L, 2L, LocalDateTime.now().plusHours(1));
+
+        CheckItem item = find(checks, "VEHICLE_IDLE");
+        assertThat(item.isPass()).isFalse();
+        assertThat(item.getMessage()).contains("第三方");
+    }
+
+    @Test
+    void busyVehicleWithTimeConflictFails() {
+        when(vehicleMapper.selectById(2L)).thenReturn(busyVehicle());
+        when(workOrderMapper.selectList(any())).thenReturn(List.of(activeOrder("GD202610180001",
+                LocalDateTime.now().plusHours(2))));
+
+        List<CheckItem> checks = dispatchCheckService.precheck(1L, 2L, LocalDateTime.now().plusHours(3));
+
+        CheckItem item = find(checks, "VEHICLE_IDLE");
+        assertThat(item.isPass()).isFalse();
+        assertThat(item.getMessage()).contains("时间冲突").contains("GD202610180001");
+    }
+
+    @Test
+    void busyVehicleWithWideTimeGapPasses() {
+        when(vehicleMapper.selectById(2L)).thenReturn(busyVehicle());
+        when(workOrderMapper.selectList(any())).thenReturn(List.of(activeOrder("GD202610180001",
+                LocalDateTime.now().plusHours(2))));
+        lenient().when(staffMapper.selectById(1L)).thenReturn(onDutyStaff());
+        lenient().when(workOrderMapper.selectCount(any())).thenReturn(0L);
+        lenient().when(systemConfigService.getInt(anyString(), anyInt())).thenReturn(3);
+
+        // 派单时刻距现有工单 8 小时，时段充裕应放行
+        List<CheckItem> checks = dispatchCheckService.precheck(1L, 2L, LocalDateTime.now().plusHours(10));
+
+        assertThat(find(checks, "VEHICLE_IDLE").isPass()).isTrue();
+    }
+
+    @Test
+    void busyVehicleWithoutPlanStartFails() {
+        when(vehicleMapper.selectById(2L)).thenReturn(busyVehicle());
+
+        List<CheckItem> checks = dispatchCheckService.precheck(1L, 2L, null);
+
+        CheckItem item = find(checks, "VEHICLE_IDLE");
+        assertThat(item.isPass()).isFalse();
+        assertThat(item.getMessage()).contains("计划开始时间");
+    }
+
+    private com.crane.modules.workorder.entity.WorkOrder activeOrder(String orderNo, LocalDateTime startAt) {
+        com.crane.modules.workorder.entity.WorkOrder order = new com.crane.modules.workorder.entity.WorkOrder();
+        order.setId(9L);
+        order.setOrderNo(orderNo);
+        order.setVehicleId(2L);
+        order.setExpectedStartAt(startAt);
+        return order;
     }
 
     @Test

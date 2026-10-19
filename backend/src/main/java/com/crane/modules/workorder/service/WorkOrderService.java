@@ -8,6 +8,8 @@ import com.crane.common.exception.ErrorCode;
 import com.crane.common.result.PageResult;
 import com.crane.modules.customer.entity.Customer;
 import com.crane.modules.customer.mapper.CustomerMapper;
+import com.crane.modules.dispatch.dto.CheckItem;
+import com.crane.modules.dispatch.service.DispatchCheckService;
 import com.crane.modules.exception.service.ExceptionService;
 import com.crane.modules.notify.service.NotifyService;
 import com.crane.modules.place.service.CommonPlaceService;
@@ -95,6 +97,7 @@ public class WorkOrderService {
     private final NotifyService notifyService;
     private final ExceptionService exceptionService;
     private final CommonPlaceService commonPlaceService;
+    private final DispatchCheckService dispatchCheckService;
 
     // ==================== 建单 ====================
 
@@ -150,13 +153,16 @@ public class WorkOrderService {
         }
         // 司机互斥：存在进行中工单即阻断建单（命中时由冲突域触发提醒）
         checkStaffNoActiveOrder(command.getStaffId(), null);
-        // 车辆必须存在且空闲
+        // 车辆必须存在且可用：空闲直接通过；作业中按 6 小时施工时段判断冲突（当前忙不代表派单时刻忙）；
+        // 维保 / 第三方外出 / 停用物理不可用一律拒绝。校验规则与派单预检共用 DispatchCheckService。
         Vehicle vehicle = vehicleMapper.selectById(command.getVehicleId());
         if (vehicle == null) {
             throw new BizException(ErrorCode.NOT_FOUND, "车辆不存在");
         }
-        if (!VEHICLE_IDLE.equals(vehicle.getStatus())) {
-            throw new BizException(ErrorCode.VEHICLE_NOT_IDLE);
+        CheckItem vehicleCheck = dispatchCheckService.checkVehicleAvailable(
+                null, command.getVehicleId(), command.getPlanStartAt());
+        if (!vehicleCheck.isPass()) {
+            throw new BizException(ErrorCode.VEHICLE_NOT_IDLE, vehicleCheck.getMessage());
         }
         // 预计开始时间不得早于当前时间
         if (command.getPlanStartAt().isBefore(LocalDateTime.now())) {

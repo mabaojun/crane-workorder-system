@@ -211,8 +211,9 @@ const optionsError = ref(false)
 /** 后端 30004（计划时间早于当前）报错后强制展示二次确认勾选 */
 const confirmPastNeeded = ref(false)
 
+/** 可选车辆：停用不可选，其余（含作业中）均可选；作业中车辆换派由管理员判断，时段冲突由后端校验提示 */
 const selectableVehicles = computed(() =>
-  vehicleOptions.value.filter((v) => v.status === 'IDLE' || v.id === props.order.vehicleId)
+  vehicleOptions.value.filter((v) => v.status !== 'DISABLED')
 )
 
 const needConfirmPast = computed(() =>

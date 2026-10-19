@@ -260,6 +260,16 @@ print("YES" if items else "NO")
 if [ "$HASNA" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  报警含超时未接单(NOT_ACCEPTED)"; else FAIL=$((FAIL+1)); echo "FAIL  报警未含NOT_ACCEPTED"; fi
 docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -e "UPDATE biz_work_order SET status='COMPLETED', accept_deadline_at=NULL WHERE id=$ALOID;" >/dev/null 2>&1
 req "接单时限还原60分钟" PUT /system/configs/order.accept_deadline_minutes "$ADMIN" '{"configValue":"60"}'
+
+# BUSY 车时段校验：第 12 节退单后 WVID 车保持 BUSY（占用退单单，预计 2026-12-09T09:00 开工）
+# 同一 6 小时段内建单应拒绝（40002 时间冲突），时段充裕应放行（当前忙不代表派单时刻忙）
+CONFLICT_MSG=$(curl -s -X POST "$BASE/work-order/orders" -H 'Content-Type: application/json' -H 'X-Client: admin' -H "Authorization: Bearer $ADMIN" -H "Idempotency-Key: e2e-$TS-vconf" -d "{\"taskName\":\"时段冲突验证\",\"source\":\"DIRECT\",\"customerId\":$CID,\"staffId\":$SID2,\"vehicleId\":$WVID,\"planStartAt\":\"2026-12-09T12:00:00+08:00\",\"address\":\"冲突验证点位\",\"longitude\":117.12,\"latitude\":36.71,\"cargoName\":\"测试\",\"cargoQty\":1,\"cargoWeightTon\":1,\"craneTonnage\":25}")
+CONFLICT_CODE=$(echo "$CONFLICT_MSG" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("code"))')
+if [ "$CONFLICT_CODE" = "40002" ] && echo "$CONFLICT_MSG" | grep -q "时间冲突"; then PASS=$((PASS+1)); echo "PASS  BUSY车6小时段内建单被拒(40002+时间冲突)"; else FAIL=$((FAIL+1)); echo "FAIL  BUSY车时段冲突 code=$CONFLICT_MSG"; fi
+req "BUSY车时段充裕建单放行" POST /work-order/orders "$ADMIN" "{\"taskName\":\"时段充裕验证\",\"source\":\"DIRECT\",\"customerId\":$CID,\"staffId\":$SID2,\"vehicleId\":$WVID,\"planStartAt\":\"2026-12-09T20:00:00+08:00\",\"address\":\"充裕验证点位\",\"longitude\":117.12,\"latitude\":36.71,\"cargoName\":\"测试\",\"cargoQty\":1,\"cargoWeightTon\":1,\"craneTonnage\":25}"
+BUSY_OK_OID=$(jq_get data orderId)
+docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -e "UPDATE biz_work_order SET status='CANCELLED' WHERE id=$BUSY_OK_OID; UPDATE biz_vehicle SET status='IDLE', current_order_id=NULL WHERE id=$WVID;" >/dev/null 2>&1
+
 docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -e "UPDATE biz_vehicle SET deleted=1 WHERE id=$LVID;" >/dev/null 2>&1
 
 echo "=============================="

@@ -45,24 +45,24 @@
       <el-form-item label="施工车辆" required>
         <el-select
           v-model="form.vehicleId"
-          placeholder="选择空闲车辆"
+          placeholder="选择车辆（作业中车辆按施工时段校验）"
           filterable
           :loading="optionsLoading"
           style="width: 100%"
         >
           <el-option
-            v-for="v in idleVehicles"
+            v-for="v in availableVehicles"
             :key="v.id"
             :value="v.id"
-            :label="`${v.plateNo}｜${vehicleSpecLabel(v)}｜空闲`"
+            :label="`${v.plateNo}｜${vehicleSpecLabel(v)}｜${vehicleStatusText(v.status)}`"
           />
           <template #empty>
             <p v-if="optionsLoading" class="select-hint">数据加载中…</p>
             <p v-else-if="optionsError" class="select-hint">加载失败，请关闭弹窗重试</p>
-            <p v-else class="select-hint">暂无空闲车辆</p>
+            <p v-else class="select-hint">暂无可派车辆</p>
           </template>
         </el-select>
-        <div class="tip">仅展示空闲（IDLE）车辆；忙碌、维保车辆不可派</div>
+        <div class="tip">停用/维保/第三方外出车辆不可派；作业中车辆提交时按 6 小时施工时段校验冲突</div>
       </el-form-item>
       <el-form-item label="计划开始" required>
         <div class="plan-start">
@@ -143,6 +143,7 @@ import {
 import type { CheckItem } from '@crane/shared/api/dispatch'
 import { pageStaffs, type Staff, type Vehicle } from '@crane/shared/api/staff'
 import { pageVehicles, vehicleSpecLabel } from '@crane/shared/api/staff'
+import { VEHICLE_STATUS_LABEL } from '@crane/shared'
 import PrecheckList from './PrecheckList.vue'
 import dayjs from 'dayjs'
 
@@ -197,7 +198,12 @@ const submitting = ref(false)
 const optionsLoading = ref(false)
 const optionsError = ref(false)
 
-const idleVehicles = computed(() => vehicles.value.filter((v) => v.status === 'IDLE'))
+/** 可派车辆：停用不可派，其余（含作业中）均可选，作业中提交时按 6 小时施工时段校验冲突 */
+const availableVehicles = computed(() => vehicles.value.filter((v) => v.status !== 'DISABLED'))
+
+function vehicleStatusText(status: string) {
+  return VEHICLE_STATUS_LABEL[status] || status
+}
 const needConfirmPast = computed(() =>
   !!form.planStartAt && dayjs(form.planStartAt).isBefore(dayjs())
 )
