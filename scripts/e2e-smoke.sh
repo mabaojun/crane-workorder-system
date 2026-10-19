@@ -272,6 +272,31 @@ docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-se
 
 docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -e "UPDATE biz_vehicle SET deleted=1 WHERE id=$LVID;" >/dev/null 2>&1
 
+echo "== 18. 突发插单闭环（同班组借调：A 进行中 → 派 B → 暂停 A → 执行 B → 回签 A）=="
+# 前置：WVID 车已被置回 IDLE，DRIVER2 为空闲司机
+req "插单-建任务A" POST /work-order/orders "$ADMIN" "{\"taskName\":\"插单任务A\",\"source\":\"DIRECT\",\"customerId\":$CID,\"staffId\":$SID2,\"vehicleId\":$WVID,\"planStartAt\":\"2026-12-20T09:00:00+08:00\",\"address\":\"插单A点位\",\"longitude\":117.12,\"latitude\":36.71,\"cargoName\":\"测试\",\"cargoQty\":1,\"cargoWeightTon\":1,\"craneTonnage\":25}"
+A_OID=$(jq_get data orderId)
+req "插单-司机接A" POST /dispatch/orders/$A_OID/accept "$DRIVER2" '{}'
+req "插单-司机签A(进行中)" POST /attendance/check-in "$DRIVER2" "{\"orderId\":$A_OID,\"longitude\":117.12,\"latitude\":36.71,\"photoUrls\":[\"/files/e2e/ins-a-$TS.jpg\"]}"
+# 同车同司机建 B（与 A 同一 6 小时段）：同班组插单豁免应放行
+req "插单-同班组建任务B豁免放行" POST /work-order/orders "$ADMIN" "{\"taskName\":\"插单任务B\",\"source\":\"DIRECT\",\"customerId\":$CID,\"staffId\":$SID2,\"vehicleId\":$WVID,\"planStartAt\":\"2026-12-20T11:00:00+08:00\",\"address\":\"插单B点位\",\"longitude\":117.12,\"latitude\":36.71,\"cargoName\":\"测试\",\"cargoQty\":1,\"cargoWeightTon\":1,\"craneTonnage\":25}"
+B_OID=$(jq_get data orderId)
+req "插单-司机接B" POST /dispatch/orders/$B_OID/accept "$DRIVER2" '{}'
+# 未暂停 A 直接签 B：司机互斥 30001（司机先取舍）
+MUTEX_CODE=$(curl -s -X POST "$BASE/attendance/check-in" -H 'Content-Type: application/json' -H 'X-Client: admin' -H "Authorization: Bearer $DRIVER2" -H "Idempotency-Key: e2e-$TS-insm" -d "{\"orderId\":$B_OID,\"longitude\":117.12,\"latitude\":36.71,\"photoUrls\":[\"/files/e2e/ins-b0-$TS.jpg\"]}" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("code"))')
+if [ "$MUTEX_CODE" = "30001" ]; then PASS=$((PASS+1)); echo "PASS  未暂停A签B被互斥拦截(30001)"; else FAIL=$((FAIL+1)); echo "FAIL  未暂停A签B code=$MUTEX_CODE"; fi
+# 司机选择执行 B：暂停（临时签退）A
+req "插单-司机暂停A(临时签退)" POST /exception/reports "$DRIVER2" "{\"orderId\":$A_OID,\"type\":\"RAIN\",\"description\":\"突发任务插单，暂停当前作业\"}"
+req "插单-司机签B(执行突发任务)" POST /attendance/check-in "$DRIVER2" "{\"orderId\":$B_OID,\"longitude\":117.12,\"latitude\":36.71,\"photoUrls\":[\"/files/e2e/ins-b1-$TS.jpg\"]}"
+req "插单-任务B结束(车释放)" POST /attendance/task-end "$DRIVER2" "{\"orderId\":$B_OID,\"longitude\":117.12,\"latitude\":36.71,\"photoUrls\":[\"/files/e2e/ins-be-$TS.jpg\"]}"
+# 管理员批准 A 恢复：车辆若已释放应重占
+req "插单-管理员批准A恢复" POST /work-order/orders/$A_OID/resume "$ADMIN" ""
+RESUME_CAR=$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT CONCAT(status,'-',IFNULL(current_order_id,0)) FROM biz_vehicle WHERE id=$WVID;" 2>/dev/null | tr -d ' \n')
+if [ "$RESUME_CAR" = "BUSY-$A_OID" ]; then PASS=$((PASS+1)); echo "PASS  A恢复后车辆重占(BUSY+currentOrderId=A)"; else FAIL=$((FAIL+1)); echo "FAIL  A恢复车辆状态=$RESUME_CAR 期望 BUSY-$A_OID"; fi
+req "插单-任务A继续完成" POST /attendance/task-end "$DRIVER2" "{\"orderId\":$A_OID,\"longitude\":117.12,\"latitude\":36.71,\"photoUrls\":[\"/files/e2e/ins-ae-$TS.jpg\"]}"
+END_CAR=$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT status FROM biz_vehicle WHERE id=$WVID;" 2>/dev/null | tr -d ' \n')
+if [ "$END_CAR" = "IDLE" ]; then PASS=$((PASS+1)); echo "PASS  A完成后车辆释放回IDLE"; else FAIL=$((FAIL+1)); echo "FAIL  A完成后车辆状态=$END_CAR"; fi
+
 echo "=============================="
 echo "E2E 结果：PASS=$PASS FAIL=$FAIL"
 exit $FAIL

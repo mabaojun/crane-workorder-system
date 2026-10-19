@@ -129,8 +129,9 @@ class DispatchCheckServiceTest {
     @Test
     void busyVehicleWithTimeConflictFails() {
         when(vehicleMapper.selectById(2L)).thenReturn(busyVehicle());
-        when(workOrderMapper.selectList(any())).thenReturn(List.of(activeOrder("GD202610180001",
-                LocalDateTime.now().plusHours(2))));
+        // 活跃工单司机为 3L（非本次派单司机 1L），不构成同班组插单豁免
+        when(workOrderMapper.selectList(any())).thenReturn(List.of(activeOrder(9L, "GD202610180001",
+                3L, 2L, LocalDateTime.now().plusHours(2))));
 
         List<CheckItem> checks = dispatchCheckService.precheck(1L, 2L, LocalDateTime.now().plusHours(3));
 
@@ -142,8 +143,8 @@ class DispatchCheckServiceTest {
     @Test
     void busyVehicleWithWideTimeGapPasses() {
         when(vehicleMapper.selectById(2L)).thenReturn(busyVehicle());
-        when(workOrderMapper.selectList(any())).thenReturn(List.of(activeOrder("GD202610180001",
-                LocalDateTime.now().plusHours(2))));
+        when(workOrderMapper.selectList(any())).thenReturn(List.of(activeOrder(9L, "GD202610180001",
+                3L, 2L, LocalDateTime.now().plusHours(2))));
         lenient().when(staffMapper.selectById(1L)).thenReturn(onDutyStaff());
         lenient().when(workOrderMapper.selectCount(any())).thenReturn(0L);
         lenient().when(systemConfigService.getInt(anyString(), anyInt())).thenReturn(3);
@@ -165,11 +166,15 @@ class DispatchCheckServiceTest {
         assertThat(item.getMessage()).contains("计划开始时间");
     }
 
-    private com.crane.modules.workorder.entity.WorkOrder activeOrder(String orderNo, LocalDateTime startAt) {
+    private com.crane.modules.workorder.entity.WorkOrder activeOrder(Long id, String orderNo,
+                                                                      Long staffId, Long vehicleId,
+                                                                      LocalDateTime startAt) {
         com.crane.modules.workorder.entity.WorkOrder order = new com.crane.modules.workorder.entity.WorkOrder();
-        order.setId(9L);
+        order.setId(id);
         order.setOrderNo(orderNo);
-        order.setVehicleId(2L);
+        order.setStaffId(staffId);
+        order.setVehicleId(vehicleId);
+        order.setStatus("IN_PROGRESS");
         order.setExpectedStartAt(startAt);
         return order;
     }
@@ -194,8 +199,9 @@ class DispatchCheckServiceTest {
     void staffWithActiveOrderFails() {
         when(vehicleMapper.selectById(2L)).thenReturn(idleVehicle());
         when(staffMapper.selectById(1L)).thenReturn(onDutyStaff());
-        // 第一次查询为进行中工单数（命中互斥），第二次为待接单数
-        when(workOrderMapper.selectCount(any())).thenReturn(1L, 0L);
+        // 司机已有进行中工单且车辆与新车单不同（非同班组插单），互斥拦截
+        when(workOrderMapper.selectList(any())).thenReturn(List.of(activeOrder(9L, "GD202610180009",
+                3L, 3L, LocalDateTime.now().plusHours(1))));
         when(systemConfigService.getInt(anyString(), anyInt())).thenReturn(3);
 
         List<CheckItem> checks = dispatchCheckService.precheck(1L, 2L, LocalDateTime.now().plusHours(1));
@@ -206,11 +212,26 @@ class DispatchCheckServiceTest {
     }
 
     @Test
+    void sameCrewInsertionPassesMutexAndTimeWindow() {
+        // 司机正执行工单 9（同车 2，1 小时后开工）；新车单同车同司机（原班人马插突发单）
+        when(vehicleMapper.selectById(2L)).thenReturn(busyVehicle());
+        when(staffMapper.selectById(1L)).thenReturn(onDutyStaff());
+        when(workOrderMapper.selectList(any())).thenReturn(List.of(activeOrder(9L, "GD202610180009",
+                1L, 2L, LocalDateTime.now().plusHours(1))));
+        when(systemConfigService.getInt(anyString(), anyInt())).thenReturn(3);
+
+        List<CheckItem> checks = dispatchCheckService.precheck(1L, 2L, LocalDateTime.now().plusHours(2));
+
+        assertThat(find(checks, "STAFF_NO_ACTIVE_ORDER").isPass()).isTrue();
+        assertThat(find(checks, "VEHICLE_IDLE").isPass()).isTrue();
+    }
+
+    @Test
     void pendingDispatchLimitReachedFails() {
         when(vehicleMapper.selectById(2L)).thenReturn(idleVehicle());
         when(staffMapper.selectById(1L)).thenReturn(onDutyStaff());
-        // 第一次为进行中工单数（0），第二次为待接单数（达到上限 3）
-        when(workOrderMapper.selectCount(any())).thenReturn(0L, 3L);
+        // 待接单派单数达到上限 3
+        when(workOrderMapper.selectCount(any())).thenReturn(3L);
         when(systemConfigService.getInt(anyString(), anyInt())).thenReturn(3);
 
         List<CheckItem> checks = dispatchCheckService.precheck(1L, 2L, LocalDateTime.now().plusHours(1));

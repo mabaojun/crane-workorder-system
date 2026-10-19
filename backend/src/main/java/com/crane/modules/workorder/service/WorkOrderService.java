@@ -151,8 +151,9 @@ public class WorkOrderService {
         if (STAFF_AWAY.equals(staff.getStatus()) || STAFF_RESIGNED.equals(staff.getStatus())) {
             throw new BizException(ErrorCode.DRIVER_NOT_AVAILABLE);
         }
-        // 司机互斥：存在进行中工单即阻断建单（命中时由冲突域触发提醒）
-        checkStaffNoActiveOrder(command.getStaffId(), null);
+        // 司机互斥：存在进行中工单即阻断建单（同班组插单豁免：与新车单同车同司机时放行，
+        // 原班人马临时借调执行突发任务，司机接单后自行取舍退单或暂停当前任务）
+        checkStaffNoActiveOrder(command.getStaffId(), command.getVehicleId());
         // 车辆必须存在且可用：空闲直接通过；作业中按 6 小时施工时段判断冲突（当前忙不代表派单时刻忙）；
         // 维保 / 第三方外出 / 停用物理不可用一律拒绝。校验规则与派单预检共用 DispatchCheckService。
         Vehicle vehicle = vehicleMapper.selectById(command.getVehicleId());
@@ -160,7 +161,7 @@ public class WorkOrderService {
             throw new BizException(ErrorCode.NOT_FOUND, "车辆不存在");
         }
         CheckItem vehicleCheck = dispatchCheckService.checkVehicleAvailable(
-                null, command.getVehicleId(), command.getPlanStartAt());
+                null, command.getStaffId(), command.getVehicleId(), command.getPlanStartAt());
         if (!vehicleCheck.isPass()) {
             throw new BizException(ErrorCode.VEHICLE_NOT_IDLE, vehicleCheck.getMessage());
         }
@@ -280,6 +281,13 @@ public class WorkOrderService {
         exceptionService.autoClosePendingForOrder(orderId, operatorId,
                 "管理员批准继续施工，异常自动关闭", WorkOrderStateMachine.IN_PROGRESS);
         stateMachine.transition(order, WorkOrderStateMachine.IN_PROGRESS, operatorId, "管理员批准继续施工");
+        // 恢复执行重占车辆：突发插单链路中该车可能被临时任务释放（IDLE），回签时重新占用保证车辆状态闭环
+        if (order.getVehicleId() != null) {
+            Vehicle vehicle = vehicleMapper.selectById(order.getVehicleId());
+            if (vehicle != null && VEHICLE_IDLE.equals(vehicle.getStatus())) {
+                occupyVehicle(vehicle, order.getId(), order.getStaffId(), operatorId, "DISPATCH");
+            }
+        }
         notifyService.notifyAdminsOrderEvent(order, "RESUME", "工单已恢复施工",
                 "工单 " + order.getOrderNo() + " 已批准继续施工", System.currentTimeMillis());
         return Map.of(
@@ -830,15 +838,18 @@ public class WorkOrderService {
     }
 
     /** 司机互斥：存在进行中工单则阻断；excludeOrderId 用于恢复执行 / 改派排除自身 */
-    private void checkStaffNoActiveOrder(Long staffId, Long excludeOrderId) {
+    /**
+     * 司机互斥校验（建单路径）：存在进行中工单即阻断（30001）；
+     * 同班组插单豁免——司机正执行的工单若与新车单同车同司机（原班人马临时借调），放行建单。
+     */
+    private void checkStaffNoActiveOrder(Long staffId, Long vehicleId) {
         LambdaQueryWrapper<WorkOrder> wrapper = new LambdaQueryWrapper<WorkOrder>()
                 .eq(WorkOrder::getStaffId, staffId)
                 .eq(WorkOrder::getStatus, WorkOrderStateMachine.IN_PROGRESS);
-        if (excludeOrderId != null) {
-            wrapper.ne(WorkOrder::getId, excludeOrderId);
-        }
-        Long count = workOrderMapper.selectCount(wrapper);
-        if (count != null && count > 0) {
+        List<WorkOrder> actives = workOrderMapper.selectList(wrapper);
+        boolean sameCrewOnly = actives == null || actives.stream()
+                .allMatch(o -> vehicleId != null && vehicleId.equals(o.getVehicleId()));
+        if (actives != null && !actives.isEmpty() && !sameCrewOnly) {
             throw new BizException(ErrorCode.DRIVER_MUTEX_CONFLICT);
         }
     }

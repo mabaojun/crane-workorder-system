@@ -57,9 +57,9 @@ public class DispatchCheckService {
      */
     public List<CheckItem> precheck(Long orderId, Long staffId, Long vehicleId, LocalDateTime planStartAt) {
         List<CheckItem> checks = new ArrayList<>();
-        checks.add(checkVehicleAvailable(orderId, vehicleId, planStartAt));
+        checks.add(checkVehicleAvailable(orderId, staffId, vehicleId, planStartAt));
         checks.add(checkStaffOnDuty(staffId));
-        checks.add(checkStaffNoActiveOrder(staffId));
+        checks.add(checkStaffNoActiveOrder(staffId, vehicleId));
         checks.add(checkPendingDispatchLimit(staffId));
         checks.add(checkTimeValid(planStartAt));
         return checks;
@@ -69,9 +69,10 @@ public class DispatchCheckService {
      * 车辆可用性校验（供派单预检与建单复用）：
      * 空闲直接通过；作业中（BUSY）按施工时段判断——当前忙不代表派单时刻忙，
      * 与该车活跃工单的预计开始时间相隔不足 6 小时视为时段冲突，充裕则放行；
+     * 同班组插单（新单与进行中工单同车同司机）豁免时段判断，由司机接单后自行取舍；
      * 维保 / 第三方外出 / 停用属物理不可用，一律拒绝。
      */
-    public CheckItem checkVehicleAvailable(Long orderId, Long vehicleId, LocalDateTime planStartAt) {
+    public CheckItem checkVehicleAvailable(Long orderId, Long staffId, Long vehicleId, LocalDateTime planStartAt) {
         Vehicle vehicle = vehicleId == null ? null : vehicleMapper.selectById(vehicleId);
         if (vehicle == null) {
             return CheckItem.fail(CHECK_VEHICLE_IDLE, "车辆不存在");
@@ -82,13 +83,13 @@ public class DispatchCheckService {
             case "DISABLED" -> CheckItem.fail(CHECK_VEHICLE_IDLE, "车辆已停用，不可派单");
             case "MAINTENANCE" -> CheckItem.fail(CHECK_VEHICLE_IDLE, "车辆维保中，不可派单");
             case "BUSY_THIRD" -> CheckItem.fail(CHECK_VEHICLE_IDLE, "车辆第三方派单外出，不可派单");
-            case "BUSY" -> checkBusyVehicleTimeWindow(orderId, vehicle, planStartAt);
+            case "BUSY" -> checkBusyVehicleTimeWindow(orderId, staffId, vehicle, planStartAt);
             default -> CheckItem.fail(CHECK_VEHICLE_IDLE, "车辆状态异常: " + status);
         };
     }
 
-    /** 作业中车辆：被本单占用直接通过；否则与活跃工单按 6 小时窗口判断时段冲突 */
-    private CheckItem checkBusyVehicleTimeWindow(Long orderId, Vehicle vehicle, LocalDateTime planStartAt) {
+    /** 作业中车辆：被本单占用直接通过；同班组插单豁免；否则与活跃工单按 6 小时窗口判断时段冲突 */
+    private CheckItem checkBusyVehicleTimeWindow(Long orderId, Long staffId, Vehicle vehicle, LocalDateTime planStartAt) {
         boolean occupiedByThisOrder = orderId != null
                 && orderId.equals(vehicle.getCurrentOrderId());
         if (occupiedByThisOrder) {
@@ -103,6 +104,11 @@ public class DispatchCheckService {
                 .ne(orderId != null, WorkOrder::getId, orderId)
                 .isNotNull(WorkOrder::getExpectedStartAt));
         for (WorkOrder active : actives) {
+            // 同班组插单豁免：该车正被原班司机执行的工单不参与时段判断（司机可暂停当前任务转执行突发任务）
+            if ("IN_PROGRESS".equals(active.getStatus()) && staffId != null
+                    && staffId.equals(active.getStaffId())) {
+                continue;
+            }
             long gapHours = Math.abs(Duration.between(planStartAt, active.getExpectedStartAt()).toMinutes());
             if (gapHours < VEHICLE_CONFLICT_HOURS * 60L) {
                 return CheckItem.fail(CHECK_VEHICLE_IDLE, String.format(
@@ -126,15 +132,21 @@ public class DispatchCheckService {
         return CheckItem.pass(CHECK_STAFF_ON_DUTY);
     }
 
-    /** 司机无进行中（IN_PROGRESS）工单 */
-    private CheckItem checkStaffNoActiveOrder(Long staffId) {
+    /**
+     * 司机无进行中（IN_PROGRESS）工单；同班组插单豁免：
+     * 司机正执行的工单若与新车单同车同司机（原班人马临时借调执行突发任务），放行派发，
+     * 司机接单后自行取舍——无时间则退单，有时间则暂停当前任务转执行。
+     */
+    private CheckItem checkStaffNoActiveOrder(Long staffId, Long vehicleId) {
         if (staffId == null) {
             return CheckItem.fail(CHECK_STAFF_NO_ACTIVE_ORDER, "司机不存在");
         }
-        Long count = workOrderMapper.selectCount(new LambdaQueryWrapper<WorkOrder>()
+        List<WorkOrder> actives = workOrderMapper.selectList(new LambdaQueryWrapper<WorkOrder>()
                 .eq(WorkOrder::getStaffId, staffId)
                 .eq(WorkOrder::getStatus, "IN_PROGRESS"));
-        if (count != null && count > 0) {
+        boolean sameCrewOnly = actives == null || actives.stream()
+                .allMatch(o -> vehicleId != null && vehicleId.equals(o.getVehicleId()));
+        if (actives != null && !actives.isEmpty() && !sameCrewOnly) {
             return CheckItem.fail(CHECK_STAFF_NO_ACTIVE_ORDER, "司机已有未暂停的进行中工单");
         }
         return CheckItem.pass(CHECK_STAFF_NO_ACTIVE_ORDER);
