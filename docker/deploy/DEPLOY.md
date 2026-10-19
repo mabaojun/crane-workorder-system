@@ -18,10 +18,11 @@
 | 后端 | 容器 `crane-app`，仅内网 `7777`，不对外暴露 |
 | 数据库 | 容器 `crane-mysql`，宿主仅 `127.0.0.1:7772` |
 | 隔离 | 独立网络 `crane-net`、独立卷 `crane-mysql-data`、容器名统一 `crane-` 前缀 |
-| 数据目录 | `/opt/crane` |
+| 数据目录 | `/crane` |
 | 微信小程序 | 合法域名统一配置 `https://jndys.top`（必须是 443） |
 
-> 本系统只占用 `80/443/7772`，不会改动或停止服务器上已有的其他容器。
+> 本系统只占用 `80/443/7772`，不会改动或停止服务器上已有的其他容器。  
+> 部署目录固定为根目录下 `/crane`（不使用 `/opt/crane`，服务器 `/opt` 已有其他内容）。
 
 ---
 
@@ -147,16 +148,19 @@ ping -c 1 jndys.top
 
 ## 4. 解压发布包
 
+根目录下创建 `/crane` 需要 sudo 权限，创建后把目录归属改为当前登录用户：
+
 ```bash
-mkdir -p /opt/crane
-tar -xzf /tmp/crane-release-<版本>.tar.gz -C /opt/crane --strip-components=1
-ls -la /opt/crane
+sudo mkdir -p /crane
+sudo chown -R "$USER":"$USER" /crane
+tar -xzf /tmp/crane-release-<版本>.tar.gz -C /crane --strip-components=1
+ls -la /crane
 ```
 
 期望目录：
 
 ```text
-/opt/crane/
+/crane/
 ├── deploy/
 ├── mysql/init/
 ├── backend/
@@ -170,7 +174,7 @@ ls -la /opt/crane
 可选完整性校验：
 
 ```bash
-cd /opt/crane && sha256sum -c SHA256SUMS
+cd /crane && sha256sum -c SHA256SUMS
 ```
 
 ---
@@ -186,12 +190,12 @@ scp jndys.top_bundle.crt jndys.top.key root@服务器IP:/tmp/
 统一重命名并放到证书目录：
 
 ```bash
-mkdir -p /opt/crane/certs
-mv /tmp/jndys.top_bundle.crt /opt/crane/certs/fullchain.crt
-mv /tmp/jndys.top.key        /opt/crane/certs/privkey.key
-chmod 644 /opt/crane/certs/fullchain.crt
-chmod 600 /opt/crane/certs/privkey.key
-ls -l /opt/crane/certs
+mkdir -p /crane/certs
+mv /tmp/jndys.top_bundle.crt /crane/certs/fullchain.crt
+mv /tmp/jndys.top.key        /crane/certs/privkey.key
+chmod 644 /crane/certs/fullchain.crt
+chmod 600 /crane/certs/privkey.key
+ls -l /crane/certs
 ```
 
 本系统 Nginx 的 SSL 关键配置（已写入 `deploy/nginx.conf`）：
@@ -212,7 +216,7 @@ ssl_protocols TLSv1.2 TLSv1.3;
 ## 6. 配置环境变量
 
 ```bash
-cd /opt/crane/deploy
+cd /crane/deploy
 cp .env.example .env
 chmod 600 .env
 vi .env
@@ -241,7 +245,7 @@ openssl rand -hex 32
 查看本次版本号：
 
 ```bash
-cat /opt/crane/version.json
+cat /crane/version.json
 ```
 
 > 初始管理员账号为 `.env` 中的 `CRANE_ADMIN_PHONE` / `CRANE_ADMIN_PASSWORD`，首次启动自动创建。
@@ -253,10 +257,10 @@ cat /opt/crane/version.json
 
 ```bash
 # 1) 服务器原生构建后端镜像（首次需拉取 eclipse-temurin:17-jre）
-bash /opt/crane/deploy/build-server-image.sh
+bash /crane/deploy/build-server-image.sh
 
 # 2) 启动全部容器
-cd /opt/crane/deploy
+cd /crane/deploy
 docker compose config >/dev/null && echo "compose 配置校验通过"
 docker compose up -d
 docker compose ps
@@ -313,7 +317,7 @@ openssl s_client -connect jndys.top:443 -servername jndys.top </dev/null 2>/dev/
 后台打开工单详情上传一张图片，确认：
 
 ```bash
-ls -l /opt/crane/data/files
+ls -l /crane/data/files
 ```
 
 并有文件落盘。
@@ -350,7 +354,7 @@ WECHAT_SECRET=<小程序后台获取的 AppSecret>
 修改后重启后端：
 
 ```bash
-cd /opt/crane/deploy
+cd /crane/deploy
 docker compose up -d crane-app
 ```
 
@@ -410,9 +414,9 @@ scp docker/deploy/dist-release/crane-release-v1.0.1.tar.gz root@服务器IP:/tmp
 服务器：
 
 ```bash
-tar -xzf /tmp/crane-release-v1.0.1.tar.gz -C /opt/crane --strip-components=1
-bash /opt/crane/deploy/build-server-image.sh
-cd /opt/crane/deploy
+tar -xzf /tmp/crane-release-v1.0.1.tar.gz -C /crane --strip-components=1
+bash /crane/deploy/build-server-image.sh
+cd /crane/deploy
 sed -i 's/^APP_VERSION=.*/APP_VERSION=v1.0.1/' .env
 docker compose up -d
 docker compose ps
@@ -425,7 +429,7 @@ docker compose ps
 旧镜像仍在服务器本地时：
 
 ```bash
-cd /opt/crane/deploy
+cd /crane/deploy
 sed -i 's/^APP_VERSION=.*/APP_VERSION=<旧版本>/' .env
 docker compose up -d crane-app
 ```
@@ -447,26 +451,26 @@ docker images | grep crane-backend
 
 ### 11.1 自动备份
 
-`crane-backup` 每日 02:30 备份数据库和上传文件到 `/opt/crane/backup`，默认保留 7 天（`.env` 的 `BACKUP_KEEP_DAYS`）。
+`crane-backup` 每日 02:30 备份数据库和上传文件到 `/crane/backup`，默认保留 7 天（`.env` 的 `BACKUP_KEEP_DAYS`）。
 
 ### 11.2 手动备份
 
 ```bash
-cd /opt/crane/deploy
+cd /crane/deploy
 source .env
-mkdir -p /opt/crane/backup/manual
+mkdir -p /crane/backup/manual
 docker exec crane-mysql mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" \
   --single-transaction --routines --triggers --no-tablespaces crane_workorder \
-  | gzip > "/opt/crane/backup/manual/crane_$(date +%F_%H%M).sql.gz"
+  | gzip > "/crane/backup/manual/crane_$(date +%F_%H%M).sql.gz"
 ```
 
 ### 11.3 恢复
 
 ```bash
-cd /opt/crane/deploy
+cd /crane/deploy
 source .env
 docker compose stop crane-app
-gunzip < /opt/crane/backup/manual/crane_YYYY-MM-DD_HHMM.sql.gz \
+gunzip < /crane/backup/manual/crane_YYYY-MM-DD_HHMM.sql.gz \
   | docker exec -i crane-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" crane_workorder
 docker compose start crane-app
 ```
@@ -476,7 +480,7 @@ docker compose start crane-app
 ## 12. 日常运维与故障排查
 
 ```bash
-cd /opt/crane/deploy
+cd /crane/deploy
 docker compose ps
 docker compose logs -f crane-app --tail 200
 docker compose restart crane-app
@@ -498,7 +502,7 @@ docker exec crane-mysql mysql -ucrane -p"$MYSQL_PASSWORD" crane_workorder -e "SH
 停止与清理（**会删除数据库数据，先备份**）：
 
 ```bash
-cd /opt/crane/deploy
+cd /crane/deploy
 docker compose down          # 停容器，保留数据
 docker compose down -v       # 停容器并删除数据库卷
 ```
@@ -513,7 +517,7 @@ docker compose down -v       # 停容器并删除数据库卷
 - [ ] `WECHAT_SECRET` 仅服务器保存
 - [ ] 首次部署验证后，在后台「系统配置」轮换高德/AI API Key
 - [ ] 云安全组仅放行 80/443/SSH，禁止放行 7772
-- [ ] 定期检查 `/opt/crane/backup` 与磁盘空间
+- [ ] 定期检查 `/crane/backup` 与磁盘空间
 - [ ] 发布包保留 `version.json` 与 `release-history.log`，便于追溯
 
 ---

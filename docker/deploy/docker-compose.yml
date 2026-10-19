@@ -12,11 +12,11 @@ services:
       - "${NGINX_HTTPS_PORT:-443}:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ${DEPLOY_DIR:-/opt/crane}/certs:/etc/nginx/certs:ro
-      - ${DEPLOY_DIR:-/opt/crane}/www/admin:/usr/share/nginx/html/admin:ro
-      - ${DEPLOY_DIR:-/opt/crane}/www/h5:/usr/share/nginx/html/h5:ro
-      - ${DEPLOY_DIR:-/opt/crane}/www/screen:/usr/share/nginx/html/screen:ro
-      - ${DEPLOY_DIR:-/opt/crane}/data/files:/data/files:ro
+      - ${DEPLOY_DIR:-/crane}/certs:/etc/nginx/certs:ro
+      - ${DEPLOY_DIR:-/crane}/www/admin:/usr/share/nginx/html/admin:ro
+      - ${DEPLOY_DIR:-/crane}/www/h5:/usr/share/nginx/html/h5:ro
+      - ${DEPLOY_DIR:-/crane}/www/screen:/usr/share/nginx/html/screen:ro
+      - ${DEPLOY_DIR:-/crane}/data/files:/data/files:ro
     networks:
       - crane-net
     depends_on:
@@ -46,7 +46,7 @@ services:
       CRANE_CORS_ORIGINS: ${CRANE_CORS_ORIGINS:-https://jndys.top}
       TZ: Asia/Shanghai
     volumes:
-      - ${DEPLOY_DIR:-/opt/crane}/data/files:/data/files
+      - ${DEPLOY_DIR:-/crane}/data/files:/data/files
     networks:
       - crane-net
     depends_on:
@@ -90,8 +90,8 @@ services:
     entrypoint: ["bash", "/scripts/backup-loop.sh"]
     volumes:
       - ./backup-loop.sh:/scripts/backup-loop.sh:ro
-      - ${DEPLOY_DIR:-/opt/crane}/backup:/backup
-      - ${DEPLOY_DIR:-/opt/crane}/data/files:/data/files:ro
+      - ${DEPLOY_DIR:-/crane}/backup:/backup
+      - ${DEPLOY_DIR:-/crane}/data/files:/data/files:ro
     networks:
       - crane-net
     depends_on:

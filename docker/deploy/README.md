@@ -8,7 +8,7 @@
 - 反向代理：`crane-nginx` 直接接管宿主 80/443
 - 域名：`jndys.top`（HTTPS + 微信小程序合法域名）
 - 后端镜像：`linux/amd64`，容器内端口 7777
-- 数据目录：`/opt/crane`
+- 数据目录：`/crane`
 
 ## 打包
 
@@ -27,9 +27,10 @@ docker/deploy/dist-release/crane-release-<版本>.tar.gz
 ## 服务器
 
 ```bash
-mkdir -p /opt/crane
-tar -xzf crane-release-<版本>.tar.gz -C /opt/crane --strip-components=1
-cd /opt/crane/deploy
+sudo mkdir -p /crane
+sudo chown -R "$USER":"$USER" /crane
+tar -xzf crane-release-<版本>.tar.gz -C /crane --strip-components=1
+cd /crane/deploy
 cp .env.example .env && vi .env
 bash build-server-image.sh
 docker compose up -d

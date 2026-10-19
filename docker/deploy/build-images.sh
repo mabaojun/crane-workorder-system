@@ -54,7 +54,7 @@ corepack pnpm -F mobile build:mp-weixin
 SCREEN_BASE=/screen/ corepack pnpm -F screen build
 cd "$ROOT"
 
-# 4. 组装发布目录（与服务器 /opt/crane 目录结构一致）
+# 4. 组装发布目录（与服务器 /crane 目录结构一致）
 echo "== [3/5] 组装发布包 =="
 rm -rf "$STAGE"
 mkdir -p "$STAGE"/{deploy,mysql/init,backend,www/admin,www/h5,www/screen,mp-weixin,certs,data/files,backup}
@@ -79,7 +79,7 @@ cat > "$STAGE/deploy/build-server-image.sh" <<EOF
 #!/bin/sh
 # 在服务器上构建后端镜像（原生 amd64）
 set -eu
-cd /opt/crane/backend
+cd /crane/backend
 docker build -f Dockerfile.runtime -t crane-backend:$VERSION -t crane-backend:latest .
 echo "镜像构建完成：crane-backend:$VERSION"
 EOF
