@@ -105,9 +105,10 @@ public class StatService {
 
     static {
         ALARM_TYPE_PRIORITY.put("CONFLICT", 0);
-        ALARM_TYPE_PRIORITY.put("NOT_ARRIVED", 1);
-        ALARM_TYPE_PRIORITY.put("NOT_CHECKED_IN", 2);
-        ALARM_TYPE_PRIORITY.put("VEHICLE_OCCUPIED", 3);
+        ALARM_TYPE_PRIORITY.put("NOT_ACCEPTED", 1);
+        ALARM_TYPE_PRIORITY.put("NOT_ARRIVED", 2);
+        ALARM_TYPE_PRIORITY.put("NOT_CHECKED_IN", 3);
+        ALARM_TYPE_PRIORITY.put("VEHICLE_OCCUPIED", 4);
     }
 
     /** 报警级别排序权重：HIGH 在前 */
@@ -169,6 +170,7 @@ public class StatService {
         LocalDateTime now = LocalDateTime.now();
         List<AlarmItem> items = new ArrayList<>();
         collectConflictAlarms(items, now);
+        collectNotAcceptedAlarms(items, now);
         collectNotArrivedAlarms(items, now);
         collectNotCheckedInAlarms(items, now);
         collectVehicleOccupiedAlarms(items, now);
@@ -516,6 +518,19 @@ public class StatService {
         }
     }
 
+    /**
+     * 接单超时报警：建单时按 order.accept_deadline_minutes（默认 60 分钟，后台可改）固化 accept_deadline_at，
+     * 超时仍处于 PENDING_ACCEPT 的工单触发 HIGH 级报警，持续时长自超时点起算。
+     */
+    private void collectNotAcceptedAlarms(List<AlarmItem> items, LocalDateTime now) {
+        List<WorkOrder> orders = workOrderMapper.selectList(new LambdaQueryWrapper<WorkOrder>()
+                .eq(WorkOrder::getStatus, STATUS_PENDING_ACCEPT)
+                .isNotNull(WorkOrder::getStaffId)
+                .isNotNull(WorkOrder::getAcceptDeadlineAt)
+                .lt(WorkOrder::getAcceptDeadlineAt, now));
+        fillOrderRefAlarm(items, orders, "NOT_ACCEPTED", "HIGH", now);
+    }
+
     private void collectNotArrivedAlarms(List<AlarmItem> items, LocalDateTime now) {
         int graceMinutes = systemConfigService.getInt("alarm.arrive_grace_minutes", 15);
         List<WorkOrder> orders = workOrderMapper.selectList(new LambdaQueryWrapper<WorkOrder>()
@@ -554,6 +569,10 @@ public class StatService {
                 item.setSummary("预定 " + (order.getExpectedStartAt() != null
                         ? order.getExpectedStartAt().format(CLOCK_FORMAT) : "") + " 未到场");
                 item.setTriggeredAt(order.getExpectedStartAt());
+            } else if ("NOT_ACCEPTED".equals(type)) {
+                item.setSummary("派单超时未确认接单");
+                item.setTriggeredAt(order.getAcceptDeadlineAt() != null
+                        ? order.getAcceptDeadlineAt() : order.getCreatedAt());
             } else {
                 item.setSummary("接单超时未签到");
                 item.setTriggeredAt(order.getAcceptedAt());

@@ -127,7 +127,10 @@ req "发送退单司机验证码" POST /auth/sms-code "" "{\"phone\":\"$STAFF2_P
 WMSG=$(jq_get data debugCode)
 req "退单司机验证码登录" POST /auth/sms-login "" "{\"phone\":\"$STAFF2_PHONE\",\"smsCode\":\"$WMSG\"}"
 DRIVER2=$(jq_get data accessToken)
-req "创建退单验证单" POST /work-order/orders "$ADMIN" "{\"taskName\":\"退单验证单\",\"source\":\"DIRECT\",\"customerId\":$CID,\"staffId\":$SID2,\"vehicleId\":$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_vehicle WHERE status='IDLE' AND deleted=0 ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n'),\"planStartAt\":\"2026-12-09T09:00:00+08:00\",\"address\":\"退单测试点位\",\"longitude\":117.12,\"latitude\":36.71,\"cargoName\":\"测试\",\"cargoQty\":1,\"cargoWeightTon\":1,\"craneTonnage\":25}"
+# 退单专用车辆：历史轮次遗留车状态不可控（多为 BUSY），自建确保 IDLE 可派
+req "创建退单专用车辆" POST /staff/vehicles "$ADMIN" "{\"plateNo\":\"鲁W$((TS%10000))E2\",\"model\":\"徐工XCT25\",\"type\":\"CRANE\",\"tonnage\":25}"
+WVID=$(jq_get data id)
+req "创建退单验证单" POST /work-order/orders "$ADMIN" "{\"taskName\":\"退单验证单\",\"source\":\"DIRECT\",\"customerId\":$CID,\"staffId\":$SID2,\"vehicleId\":$WVID,\"planStartAt\":\"2026-12-09T09:00:00+08:00\",\"address\":\"退单测试点位\",\"longitude\":117.12,\"latitude\":36.71,\"cargoName\":\"测试\",\"cargoQty\":1,\"cargoWeightTon\":1,\"craneTonnage\":25}"
 WOID=$(jq_get data orderId)
 req "退单验证单司机接单" POST /dispatch/orders/$WOID/accept "$DRIVER2" "{}"
 req "司机接单后发起退单" POST /dispatch/orders/$WOID/withdraw "$DRIVER2" '{"reasonType":"ABILITY_MISMATCH"}'
@@ -205,6 +208,59 @@ print("YES" if ps and ps[0].get("longitude") is not None else "NO")
 if [ "$MYPLACE" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  我的常用地点含本客户工单地址（含经纬度）"; else FAIL=$((FAIL+1)); echo "FAIL  我的常用地点未含本客户工单地址"; fi
 code=$(curl -s "$BASE/place/my-places" -H 'X-Client: admin' -H "Authorization: Bearer $ADMIN" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("code"))')
 if [ "$code" = "0" ]; then PASS=$((PASS+1)); echo "PASS  管理员调用返回空列表不报错"; else FAIL=$((FAIL+1)); echo "FAIL  管理员调用 code=$code"; fi
+
+echo "== 17. 举升车与状态手动维护（第十一轮）=="
+# 建司机 + 举升车（举升高度 20 米），验证类型规格互斥与状态手动变更链路
+STAFF2_PHONE="136$((TS % 100000000))"
+req "创建举升车司机" POST /staff/staffs "$ADMIN" "{\"name\":\"E2E举升司机$TS\",\"phone\":\"$STAFF2_PHONE\",\"idCard\":\"370100199001020$((TS%1000))X\",\"position\":\"DRIVER\",\"createAccount\":true,\"initialPassword\":\"E2e@12345\"}"
+SID2=$(jq_get data id)
+SUID2=$(jq_get data userId)
+docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -e "UPDATE sys_user SET status='ACTIVE' WHERE id=$SUID2;" >/dev/null 2>&1
+req "创建举升车(高度20米)" POST /staff/vehicles "$ADMIN" "{\"plateNo\":\"鲁L$((TS%10000))E9\",\"model\":\"徐工XGS5060\",\"type\":\"LIFT\",\"liftHeight\":20,\"defaultStaffId\":$SID2}"
+LVID=$(jq_get data id)
+LIFT_OK=$(python3 -c '
+import json
+d=json.load(open("/tmp/e2e-last.json"))["data"]
+print("YES" if d.get("type")=="LIFT" and d.get("liftHeight")==20 and d.get("tonnage") is None else "NO")
+')
+if [ "$LIFT_OK" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  举升车规格回填(高度20/吨位空)"; else FAIL=$((FAIL+1)); echo "FAIL  举升车规格回填"; fi
+# req 只认 code=0 为 PASS，负向用例单独判定
+NEG1=$(curl -s -X POST "$BASE/staff/vehicles" -H 'Content-Type: application/json' -H 'X-Client: admin' -H "Authorization: Bearer $ADMIN" -H "Idempotency-Key: e2e-$TS-neg1" -d "{\"plateNo\":\"鲁L$((TS%10000))E8\",\"type\":\"LIFT\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("code"))')
+if [ "$NEG1" = "20001" ]; then PASS=$((PASS+1)); echo "PASS  举升车缺高度返回20001"; else FAIL=$((FAIL+1)); echo "FAIL  举升车缺高度 code=$NEG1"; fi
+NEG2=$(curl -s -X PATCH "$BASE/staff/vehicles/$LVID/status" -H 'Content-Type: application/json' -H 'X-Client: admin' -H "Authorization: Bearer $ADMIN" -H "Idempotency-Key: e2e-$TS-neg2" -d '{"status":"BUSY"}' | python3 -c 'import sys,json;print(json.load(sys.stdin).get("code"))')
+if [ "$NEG2" = "40004" ]; then PASS=$((PASS+1)); echo "PASS  管理员手动设作业中返回40004"; else FAIL=$((FAIL+1)); echo "FAIL  手动设作业中 code=$NEG2"; fi
+req "管理员改维保" PATCH /staff/vehicles/$LVID/status "$ADMIN" '{"status":"MAINTENANCE"}'
+# 司机常用设备与状态切换
+req "发送举升车司机验证码" POST /auth/sms-code "" "{\"phone\":\"$STAFF2_PHONE\",\"scene\":\"LOGIN\"}"
+DSMG2=$(jq_get data debugCode)
+req "举升车司机登录" POST /auth/sms-login "" "{\"phone\":\"$STAFF2_PHONE\",\"smsCode\":\"$DSMG2\"}"
+DRIVER2=$(jq_get data accessToken)
+req "司机查常用设备" GET /staff/my-vehicles "$DRIVER2" ""
+MYV=$(python3 -c '
+import json
+d=json.load(open("/tmp/e2e-last.json"))
+ids=[v["id"] for v in d.get("data") or []]
+print("YES" if int('"$LVID"') in ids else "NO")
+')
+if [ "$MYV" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  常用设备含举升车"; else FAIL=$((FAIL+1)); echo "FAIL  常用设备未含举升车"; fi
+req "司机改第三方外出" POST /staff/vehicles/$LVID/driver-status "$DRIVER2" '{"status":"BUSY_THIRD"}'
+NEG3=$(curl -s -X POST "$BASE/staff/vehicles/$LVID/driver-status" -H 'Content-Type: application/json' -H 'X-Client: admin' -H "Authorization: Bearer $DRIVER2" -H "Idempotency-Key: e2e-$TS-neg3" -d '{"status":"DISABLED"}' | python3 -c 'import sys,json;print(json.load(sys.stdin).get("code"))')
+if [ "$NEG3" = "20008" ]; then PASS=$((PASS+1)); echo "PASS  司机改停用返回20008"; else FAIL=$((FAIL+1)); echo "FAIL  司机改停用 code=$NEG3"; fi
+# 接单超时报警：时限临时改 0，把一条已完成工单置为超时 PENDING_ACCEPT，验证 NOT_ACCEPTED 后还原
+req "接单时限临时改0分钟" PUT /system/configs/order.accept_deadline_minutes "$ADMIN" '{"configValue":"0"}'
+ALOID=$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT id FROM biz_work_order WHERE status='COMPLETED' AND deleted=0 ORDER BY id DESC LIMIT 1;" 2>/dev/null | tr -d ' \n')
+docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -e "UPDATE biz_work_order SET status='PENDING_ACCEPT', accepted_at=NULL, accept_deadline_at=NOW() - INTERVAL 10 MINUTE WHERE id=$ALOID;" >/dev/null 2>&1
+req "查询报警中心" GET /stat/alarms "$ADMIN" ""
+HASNA=$(python3 -c '
+import json
+d=json.load(open("/tmp/e2e-last.json"))
+items=[a for a in d["data"]["list"] if a["type"]=="NOT_ACCEPTED" and a.get("orderId")==int('"$ALOID"')]
+print("YES" if items else "NO")
+')
+if [ "$HASNA" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  报警含超时未接单(NOT_ACCEPTED)"; else FAIL=$((FAIL+1)); echo "FAIL  报警未含NOT_ACCEPTED"; fi
+docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -e "UPDATE biz_work_order SET status='COMPLETED', accept_deadline_at=NULL WHERE id=$ALOID;" >/dev/null 2>&1
+req "接单时限还原60分钟" PUT /system/configs/order.accept_deadline_minutes "$ADMIN" '{"configValue":"60"}'
+docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -e "UPDATE biz_vehicle SET deleted=1 WHERE id=$LVID;" >/dev/null 2>&1
 
 echo "=============================="
 echo "E2E 结果：PASS=$PASS FAIL=$FAIL"

@@ -23,8 +23,15 @@
         <el-table-column label="型号" prop="model" min-width="140">
           <template #default="{ row }">{{ row.model || '-' }}</template>
         </el-table-column>
-        <el-table-column label="吨位" width="90" align="right">
-          <template #default="{ row }">{{ row.tonnage }}吨</template>
+        <el-table-column label="类型" width="90">
+          <template #default="{ row }">
+            <el-tag :type="row.type === 'LIFT' ? 'warning' : 'primary'" effect="plain">
+              {{ row.type === 'LIFT' ? '举升车' : '吊车' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="规格" width="110" align="right">
+          <template #default="{ row }">{{ vehicleSpecLabel(row) }}</template>
         </el-table-column>
         <el-table-column label="默认司机" width="120">
           <template #default="{ row }">{{ staffName(row.defaultStaffId) }}</template>
@@ -37,9 +44,29 @@
         <el-table-column label="备注" prop="remark" min-width="140" show-overflow-tooltip>
           <template #default="{ row }">{{ row.remark || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="130" fixed="right">
+        <el-table-column label="操作" width="230" fixed="right">
           <template #default="{ row }">
             <el-button size="small" text type="primary" @click="openForm(row)">编辑</el-button>
+            <el-dropdown
+              v-if="row.status !== 'BUSY'"
+              trigger="click"
+              @command="(status: string) => onChangeStatus(row, status)"
+            >
+              <el-button size="small" text type="warning">变更状态</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item
+                    v-for="opt in MANUAL_STATUS_OPTIONS"
+                    :key="opt.value"
+                    :command="opt.value"
+                    :disabled="row.status === opt.value"
+                  >{{ opt.label }}</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-tooltip v-else content="作业中状态由工单自动驱动" placement="top">
+              <el-button size="small" text type="info" disabled>作业中</el-button>
+            </el-tooltip>
             <el-button size="small" text type="danger" @click="onDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -69,9 +96,28 @@
         <el-form-item label="车辆型号">
           <el-input v-model="form.model" maxlength="64" placeholder="如 中联 25K5" />
         </el-form-item>
-        <el-form-item label="吊车吨位" prop="tonnage">
+        <el-form-item label="车辆类型" prop="type">
+          <el-radio-group v-model="form.type">
+            <el-radio-button value="CRANE">吊车</el-radio-button>
+            <el-radio-button value="LIFT">举升车</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="form.type === 'CRANE'" label="吊车吨位" prop="tonnage">
           <el-input-number v-model="form.tonnage" :min="1" :precision="1" controls-position="right" style="width: 200px" />
           <span class="unit">吨</span>
+        </el-form-item>
+        <el-form-item v-else label="举升高度" prop="liftHeight">
+          <el-input-number v-model="form.liftHeight" :min="1" :precision="1" controls-position="right" style="width: 200px" />
+          <span class="unit">米</span>
+          <div class="quick-heights">
+            <span class="quick-label">常用：</span>
+            <el-check-tag
+              v-for="h in COMMON_LIFT_HEIGHTS"
+              :key="h"
+              :checked="form.liftHeight === h"
+              @change="form.liftHeight = h"
+            >{{ h }}米</el-check-tag>
+          </div>
         </el-form-item>
         <el-form-item label="默认司机">
           <el-select v-model="form.defaultStaffId" clearable filterable placeholder="选择司机（可空）" style="width: 100%">
@@ -99,11 +145,24 @@ import {
   createVehicle,
   updateVehicle,
   deleteVehicle,
+  changeVehicleStatus,
+  vehicleSpecLabel,
   pageStaffs,
   type Vehicle,
   type Staff
 } from '@crane/shared/api/staff'
 import StatusTag from '../../components/StatusTag.vue'
+
+/** 常用举升高度（米），可点选也可直接输入 */
+const COMMON_LIFT_HEIGHTS = [20, 30]
+
+/** 管理员可手动切换的目标状态（BUSY 作业中由工单自动驱动） */
+const MANUAL_STATUS_OPTIONS = [
+  { value: 'IDLE', label: '空闲' },
+  { value: 'BUSY_THIRD', label: '第三方派单外出' },
+  { value: 'MAINTENANCE', label: '维保' },
+  { value: 'DISABLED', label: '停用' }
+]
 
 const query = reactive({ plateNo: '', status: '', pageNum: 1, pageSize: 20 })
 const list = ref<Vehicle[]>([])
@@ -118,14 +177,29 @@ const formRef = ref<FormInstance>()
 const form = reactive({
   plateNo: '',
   model: '',
+  type: 'CRANE',
   tonnage: undefined as number | undefined,
+  liftHeight: undefined as number | undefined,
   defaultStaffId: undefined as number | undefined,
   remark: ''
 })
 
 const rules: FormRules = {
   plateNo: [{ required: true, message: '请填写车牌号', trigger: 'blur' }],
-  tonnage: [{ required: true, message: '请填写吨位', trigger: 'change' }]
+  tonnage: [{
+    validator: (_r, _v, cb) => {
+      if (form.type === 'CRANE' && form.tonnage == null) cb(new Error('请填写吨位'))
+      else cb()
+    },
+    trigger: 'change'
+  }],
+  liftHeight: [{
+    validator: (_r, _v, cb) => {
+      if (form.type === 'LIFT' && form.liftHeight == null) cb(new Error('请填写举升高度'))
+      else cb()
+    },
+    trigger: 'change'
+  }]
 }
 
 onMounted(async () => {
@@ -181,7 +255,9 @@ function openForm(row?: Vehicle) {
   editing.value = row ?? null
   form.plateNo = row?.plateNo ?? ''
   form.model = row?.model ?? ''
+  form.type = row?.type === 'LIFT' ? 'LIFT' : 'CRANE'
   form.tonnage = row?.tonnage ?? undefined
+  form.liftHeight = row?.liftHeight ?? undefined
   form.defaultStaffId = row?.defaultStaffId ?? undefined
   form.remark = row?.remark ?? ''
   formVisible.value = true
@@ -194,7 +270,9 @@ async function submit() {
   const body = {
     plateNo: form.plateNo.trim(),
     model: form.model.trim() || undefined,
-    tonnage: form.tonnage as number,
+    type: form.type,
+    tonnage: form.type === 'CRANE' ? form.tonnage : undefined,
+    liftHeight: form.type === 'LIFT' ? form.liftHeight : undefined,
     defaultStaffId: form.defaultStaffId,
     remark: form.remark.trim() || undefined
   }
@@ -212,6 +290,27 @@ async function submit() {
     ElMessage.error(e instanceof Error ? e.message : '保存失败')
   } finally {
     submitting.value = false
+  }
+}
+
+/** 管理员手动变更状态：确认后调 PATCH，BUSY 中入口已在前端隐藏 */
+async function onChangeStatus(row: Vehicle, status: string) {
+  const label = MANUAL_STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status
+  try {
+    await ElMessageBox.confirm(
+      `确认将车辆「${row.plateNo}」状态变更为「${label}」？`,
+      '变更状态',
+      { type: 'warning', confirmButtonText: '确认', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  try {
+    await changeVehicleStatus(row.id, status)
+    ElMessage.success(`已变更为「${label}」`)
+    load()
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '状态变更失败')
   }
 }
 
@@ -237,4 +336,6 @@ async function onDelete(row: Vehicle) {
 
 <style scoped>
 .unit { margin-left: 8px; color: var(--sub); }
+.quick-heights { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.quick-label { color: var(--sub); font-size: 12px; }
 </style>

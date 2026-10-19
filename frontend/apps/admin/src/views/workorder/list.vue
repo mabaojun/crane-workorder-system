@@ -197,7 +197,7 @@
                   v-for="v in idleVehicles"
                   :key="v.id"
                   :value="v.id"
-                  :label="`${v.plateNo}｜${v.tonnage}吨｜空闲`"
+                  :label="`${v.plateNo}｜${vehicleSpecLabel(v)}｜空闲`"
                 />
                 <template #empty>
                   <p v-if="optionsLoading" class="select-hint">数据加载中…</p>
@@ -342,7 +342,7 @@ import {
   type WorkOrder
 } from '@crane/shared/api/workorder'
 import { precheckDispatch, type CheckItem } from '@crane/shared/api/dispatch'
-import { pageStaffs, pageVehicles, type Staff, type Vehicle } from '@crane/shared/api/staff'
+import { pageStaffs, pageVehicles, vehicleSpecLabel, type Staff, type Vehicle } from '@crane/shared/api/staff'
 import { pageCustomers, type Customer } from '@crane/shared/api/customer'
 import { listMyPlaces, type MyPlace } from '@crane/shared/api/place'
 import { fmtTime } from '../../utils/format'

@@ -31,8 +31,12 @@ export interface Vehicle {
   id: number
   plateNo: string
   model: string | null
-  /** 吊车吨位（吨） */
-  tonnage: number
+  /** 车辆类型：CRANE 吊车 / LIFT 举升车 */
+  type: string
+  /** 吊车吨位（吨），仅 CRANE 有值 */
+  tonnage: number | null
+  /** 举升高度（米），仅 LIFT 有值，常用 20/30 */
+  liftHeight: number | null
   defaultStaffId: number | null
   /** IDLE / BUSY / BUSY_THIRD / MAINTENANCE / DISABLED */
   status: string
@@ -64,7 +68,12 @@ export interface StaffUpsertRequest {
 export interface VehicleUpsertRequest {
   plateNo: string
   model?: string
-  tonnage: number
+  /** CRANE 吊车 / LIFT 举升车，缺省 CRANE */
+  type?: string
+  /** CRANE 必填 */
+  tonnage?: number
+  /** LIFT 必填，常用 20/30 米 */
+  liftHeight?: number
   defaultStaffId?: number
   status?: string
   remark?: string
@@ -100,4 +109,27 @@ export function updateVehicle(id: number | string, body: VehicleUpsertRequest) {
 
 export function deleteVehicle(id: number | string) {
   return request<void>(`/staff/vehicles/${id}`, { method: 'DELETE' })
+}
+
+/** 管理员手动变更车辆状态：IDLE/BUSY_THIRD/MAINTENANCE/DISABLED（BUSY 由工单驱动） */
+export function changeVehicleStatus(id: number | string, status: string) {
+  return request<Vehicle>(`/staff/vehicles/${id}/status`, { method: 'PATCH', body: { status } })
+}
+
+/** 司机常用设备：本人为默认司机的车辆列表 */
+export function listMyVehicles() {
+  return request<Vehicle[]>('/staff/my-vehicles')
+}
+
+/** 司机变更常用设备状态：仅 IDLE/BUSY_THIRD/MAINTENANCE */
+export function driverChangeVehicleStatus(id: number | string, status: string) {
+  return request<Vehicle>(`/staff/vehicles/${id}/driver-status`, { method: 'POST', body: { status } })
+}
+
+/** 车辆规格展示文案：吊车「25吨」/ 举升车「举升20米」 */
+export function vehicleSpecLabel(vehicle: Pick<Vehicle, 'type' | 'tonnage' | 'liftHeight'>): string {
+  if (vehicle.type === 'LIFT') {
+    return vehicle.liftHeight != null ? `举升${vehicle.liftHeight}米` : '举升车'
+  }
+  return vehicle.tonnage != null ? `${vehicle.tonnage}吨` : '吊车'
 }

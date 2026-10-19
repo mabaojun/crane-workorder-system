@@ -244,12 +244,15 @@ class StatServiceTest {
         alert.setIsPinned(1);
         when(conflictAlertMapper.selectList(any())).thenReturn(List.of(alert));
 
-        // 未到场工单（预定 20 分钟前）与未签到工单（接单 40 分钟前）
+        // 超时未接单（接单时限 70 分钟前已过）、未到场工单（预定 20 分钟前）与未签到工单（接单 40 分钟前）
+        WorkOrder notAccepted = workOrder(50L, "GD202610180050", "PENDING_ACCEPT", 5L, 7L);
+        notAccepted.setAcceptDeadlineAt(now.minusMinutes(70));
         WorkOrder notArrived = workOrder(100L, "GD202610180100", "PENDING_ARRIVE", 5L, 7L);
         notArrived.setExpectedStartAt(now.minusMinutes(20));
         WorkOrder notCheckedIn = workOrder(200L, "GD202610180200", "PENDING_ARRIVE", 5L, 7L);
         notCheckedIn.setAcceptedAt(now.minusMinutes(40));
-        when(workOrderMapper.selectList(any())).thenReturn(List.of(notArrived), List.of(notCheckedIn));
+        when(workOrderMapper.selectList(any()))
+                .thenReturn(List.of(notAccepted), List.of(notArrived), List.of(notCheckedIn));
 
         // 车辆：BUSY 施工占用 13 小时（超 12 小时阈值），BUSY_THIRD 第三方占用 25 小时（超 24 小时阈值）
         Vehicle busy = new Vehicle();
@@ -271,7 +274,7 @@ class StatServiceTest {
 
         AlarmListVO vo = statService.alarms();
 
-        assertEquals(5, vo.getCount());
+        assertEquals(6, vo.getCount());
         List<AlarmItem> list = vo.getList();
         // 冲突最前
         assertEquals("CONFLICT", list.get(0).getType());
@@ -282,30 +285,37 @@ class StatServiceTest {
         assertEquals("GD202610180011", list.get(0).getOrderNo());
         assertEquals("王五", list.get(0).getStaffName());
         assertEquals(90, list.get(0).getDurationMinutes());
-        // 未到场：HIGH、置顶、按预定时间提示
-        assertEquals("NOT_ARRIVED", list.get(1).getType());
+        // 超时未接单：HIGH、置顶、自接单时限超时点起算
+        assertEquals("NOT_ACCEPTED", list.get(1).getType());
         assertEquals("HIGH", list.get(1).getLevel());
         assertTrue(list.get(1).isPinned());
-        assertEquals("预定 " + notArrived.getExpectedStartAt().format(DateTimeFormatter.ofPattern("HH:mm")) + " 未到场",
-                list.get(1).getSummary());
-        assertEquals(20, list.get(1).getDurationMinutes());
-        assertEquals("鲁A88888", list.get(1).getPlateNo());
-        // 未签到：MEDIUM、置顶
-        assertEquals("NOT_CHECKED_IN", list.get(2).getType());
-        assertEquals("MEDIUM", list.get(2).getLevel());
+        assertEquals("派单超时未确认接单", list.get(1).getSummary());
+        assertEquals(70, list.get(1).getDurationMinutes());
+        assertEquals("GD202610180050", list.get(1).getOrderNo());
+        // 未到场：HIGH、置顶、按预定时间提示
+        assertEquals("NOT_ARRIVED", list.get(2).getType());
+        assertEquals("HIGH", list.get(2).getLevel());
         assertTrue(list.get(2).isPinned());
-        assertEquals("接单超时未签到", list.get(2).getSummary());
-        assertEquals(40, list.get(2).getDurationMinutes());
+        assertEquals("预定 " + notArrived.getExpectedStartAt().format(DateTimeFormatter.ofPattern("HH:mm")) + " 未到场",
+                list.get(2).getSummary());
+        assertEquals(20, list.get(2).getDurationMinutes());
+        assertEquals("鲁A88888", list.get(2).getPlateNo());
+        // 未签到：MEDIUM、置顶
+        assertEquals("NOT_CHECKED_IN", list.get(3).getType());
+        assertEquals("MEDIUM", list.get(3).getLevel());
+        assertTrue(list.get(3).isPinned());
+        assertEquals("接单超时未签到", list.get(3).getSummary());
+        assertEquals(40, list.get(3).getDurationMinutes());
         // 车辆占用：置顶为假，BUSY 高级别在前、BUSY_THIRD 次之
-        assertEquals("VEHICLE_OCCUPIED", list.get(3).getType());
-        assertEquals("HIGH", list.get(3).getLevel());
-        assertEquals("车辆持续占用 13 小时", list.get(3).getSummary());
-        assertEquals(780, list.get(3).getDurationMinutes());
-        assertTrue(!list.get(3).isPinned());
         assertEquals("VEHICLE_OCCUPIED", list.get(4).getType());
-        assertEquals("MEDIUM", list.get(4).getLevel());
-        assertEquals("车辆持续占用 25 小时", list.get(4).getSummary());
-        assertEquals("鲁B99999", list.get(4).getPlateNo());
+        assertEquals("HIGH", list.get(4).getLevel());
+        assertEquals("车辆持续占用 13 小时", list.get(4).getSummary());
+        assertEquals(780, list.get(4).getDurationMinutes());
+        assertTrue(!list.get(4).isPinned());
+        assertEquals("VEHICLE_OCCUPIED", list.get(5).getType());
+        assertEquals("MEDIUM", list.get(5).getLevel());
+        assertEquals("车辆持续占用 25 小时", list.get(5).getSummary());
+        assertEquals("鲁B99999", list.get(5).getPlateNo());
     }
 
     /** 车辆地图：缺坐标工单不产出点位，命中未到场 / 未签到规则时打报警标记 */

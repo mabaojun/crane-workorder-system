@@ -6,6 +6,7 @@ import com.crane.common.exception.ErrorCode;
 import com.crane.common.result.ApiResult;
 import com.crane.common.result.PageResult;
 import com.crane.modules.staff.dto.StaffUpsertRequest;
+import com.crane.modules.staff.dto.VehicleStatusChangeRequest;
 import com.crane.modules.staff.dto.VehicleUpsertRequest;
 import com.crane.modules.staff.entity.Staff;
 import com.crane.modules.staff.entity.Vehicle;
@@ -15,6 +16,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -22,6 +24,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 员工与车辆档案接口（管理端专用）。
@@ -90,6 +94,41 @@ public class StaffController {
         requireAdmin();
         vehicleService.delete(id, currentUserId());
         return ApiResult.ok();
+    }
+
+    /** 管理员手动变更车辆状态（作业中由工单自动驱动，不可手动设置） */
+    @PatchMapping("/vehicles/{id}/status")
+    public ApiResult<Vehicle> changeVehicleStatus(@PathVariable Long id,
+                                                  @RequestBody VehicleStatusChangeRequest request) {
+        requireAdmin();
+        if (request == null || request.getStatus() == null || request.getStatus().isBlank()) {
+            throw new BizException(ErrorCode.PARAM_MISSING, "目标状态必填");
+        }
+        return ApiResult.ok(vehicleService.manualChangeStatus(id, request.getStatus(), currentUserId()));
+    }
+
+    /** 司机常用设备列表：本人为默认司机的车辆（含状态），供司机端主页维护 */
+    @GetMapping("/my-vehicles")
+    public ApiResult<List<Vehicle>> myVehicles() {
+        AuthContext ctx = AuthContext.get();
+        if (ctx == null || ctx.getStaffId() == null) {
+            return ApiResult.ok(List.of());
+        }
+        return ApiResult.ok(vehicleService.listMyVehicles(ctx.getStaffId()));
+    }
+
+    /** 司机变更常用设备状态（空闲/第三方派单外出/维保；停用仅管理员） */
+    @PostMapping("/vehicles/{id}/driver-status")
+    public ApiResult<Vehicle> driverChangeVehicleStatus(@PathVariable Long id,
+                                                        @RequestBody VehicleStatusChangeRequest request) {
+        AuthContext ctx = AuthContext.get();
+        if (ctx == null || ctx.getStaffId() == null) {
+            throw new BizException(ErrorCode.FORBIDDEN, "仅司机可操作");
+        }
+        if (request == null || request.getStatus() == null || request.getStatus().isBlank()) {
+            throw new BizException(ErrorCode.PARAM_MISSING, "目标状态必填");
+        }
+        return ApiResult.ok(vehicleService.driverChangeStatus(id, request.getStatus(), ctx.getStaffId(), ctx.getUserId()));
     }
 
     private void requireAdmin() {

@@ -36,6 +36,7 @@ import { fmtHM } from '../utils/format'
 
 const TYPE_LABELS: Record<StatAlarmType, string> = {
   CONFLICT: '司机工时冲突',
+  NOT_ACCEPTED: '超时未接单',
   NOT_ARRIVED: '预定时间未到场',
   NOT_CHECKED_IN: '未执行签到',
   VEHICLE_OCCUPIED: '车辆长时占用'

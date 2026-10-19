@@ -155,6 +155,7 @@ import { fmtTime } from '../../utils/format'
 
 const ALARM_TYPE_LABEL: Record<string, string> = {
   CONFLICT: '冲突',
+  NOT_ACCEPTED: '超时未接单',
   NOT_ARRIVED: '未按时到场',
   NOT_CHECKED_IN: '未签到',
   VEHICLE_OCCUPIED: '车辆占用'

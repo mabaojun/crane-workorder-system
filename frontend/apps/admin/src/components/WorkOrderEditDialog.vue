@@ -70,7 +70,7 @@
                 v-for="v in selectableVehicles"
                 :key="v.id"
                 :value="v.id"
-                :label="`${v.plateNo}｜${v.tonnage}吨｜${vehicleLabel(v)}`"
+                :label="`${v.plateNo}｜${vehicleSpecLabel(v)}｜${vehicleLabel(v)}`"
               />
               <template #empty>
                 <p v-if="optionsLoading" class="select-hint">数据加载中…</p>
@@ -149,7 +149,7 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { updateOrder, type WorkOrder, type WorkOrderUpdateRequest } from '@crane/shared/api/workorder'
-import { pageStaffs, pageVehicles, type Staff, type Vehicle } from '@crane/shared/api/staff'
+import { pageStaffs, pageVehicles, vehicleSpecLabel, type Staff, type Vehicle } from '@crane/shared/api/staff'
 import { ApiError } from '@crane/shared/api/client'
 import { VEHICLE_STATUS_LABEL } from '@crane/shared'
 import type { AmapPickResult } from '@crane/shared/api/map'

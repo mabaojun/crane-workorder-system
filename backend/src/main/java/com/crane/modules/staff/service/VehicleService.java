@@ -33,6 +33,12 @@ public class VehicleService {
     /** 车辆状态合法取值（01 §6.3 锁定） */
     private static final Set<String> STATUSES = Set.of("IDLE", "BUSY", "BUSY_THIRD", "MAINTENANCE", "DISABLED");
 
+    /** 车辆类型合法取值 */
+    private static final Set<String> TYPES = Set.of("CRANE", "LIFT");
+
+    /** 司机端允许手动切换的目标状态（停用仅管理员） */
+    private static final Set<String> DRIVER_ALLOWED_TARGETS = Set.of("IDLE", "BUSY_THIRD", "MAINTENANCE");
+
     private final VehicleMapper vehicleMapper;
     private final VehicleStatusLogMapper vehicleStatusLogMapper;
     private final StaffMapper staffMapper;
@@ -181,9 +187,78 @@ public class VehicleService {
     private void applyUpsert(Vehicle vehicle, VehicleUpsertRequest req) {
         vehicle.setPlateNo(req.getPlateNo());
         vehicle.setModel(req.getModel());
-        vehicle.setTonnage(req.getTonnage());
         vehicle.setDefaultStaffId(req.getDefaultStaffId());
         vehicle.setRemark(req.getRemark());
+        // 车辆类型规格：吊车维护吨位、举升车维护举升高度，互斥清理
+        String type = req.getType() == null || req.getType().isBlank() ? "CRANE" : req.getType();
+        if (!TYPES.contains(type)) {
+            throw new BizException(ErrorCode.ENUM_INVALID, "车辆类型取值非法");
+        }
+        vehicle.setType(type);
+        if ("LIFT".equals(type)) {
+            if (req.getLiftHeight() == null) {
+                throw new BizException(ErrorCode.PARAM_MISSING, "举升车必须填写举升高度");
+            }
+            vehicle.setLiftHeight(req.getLiftHeight());
+            vehicle.setTonnage(null);
+        } else {
+            if (req.getTonnage() == null) {
+                throw new BizException(ErrorCode.PARAM_MISSING, "吊车必须填写吨位");
+            }
+            vehicle.setTonnage(req.getTonnage());
+            vehicle.setLiftHeight(null);
+        }
+    }
+
+    /**
+     * 管理员手动变更车辆状态：BUSY（作业中，由工单驱动）不允许手动改，
+     * 其余 IDLE/BUSY_THIRD/MAINTENANCE/DISABLED 可自由切换，状态日志 changeType 走 MANUAL 前缀语义由 resolveChangeType 承担。
+     */
+    @Transactional
+    public Vehicle manualChangeStatus(Long vehicleId, String status, Long operatorId) {
+        if (!STATUSES.contains(status)) {
+            throw new BizException(ErrorCode.ENUM_INVALID, "车辆状态取值非法");
+        }
+        if ("BUSY".equals(status)) {
+            throw new BizException(ErrorCode.RESOURCE_STATUS_NOT_ALLOWED, "作业中状态由工单自动驱动，不可手动设置");
+        }
+        Vehicle vehicle = vehicleMapper.selectById(vehicleId);
+        if (vehicle == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "车辆不存在");
+        }
+        if ("BUSY".equals(vehicle.getStatus())) {
+            throw new BizException(ErrorCode.RESOURCE_STATUS_NOT_ALLOWED, "车辆作业中，请先完成工单再变更状态");
+        }
+        return changeStatus(vehicleId, status, operatorId);
+    }
+
+    /**
+     * 司机变更常用设备状态：仅限本人为默认司机的车辆；
+     * 目标仅 空闲/第三方派单外出/维保（停用仅管理员）；作业中车辆不可动。
+     */
+    @Transactional
+    public Vehicle driverChangeStatus(Long vehicleId, String status, Long staffId, Long operatorId) {
+        if (!DRIVER_ALLOWED_TARGETS.contains(status)) {
+            throw new BizException(ErrorCode.ENUM_INVALID, "司机仅可切换 空闲/第三方派单外出/维保 状态");
+        }
+        Vehicle vehicle = vehicleMapper.selectById(vehicleId);
+        if (vehicle == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "车辆不存在");
+        }
+        if (!staffId.equals(vehicle.getDefaultStaffId())) {
+            throw new BizException(ErrorCode.FORBIDDEN, "仅可变更本人常用设备的状态");
+        }
+        if ("BUSY".equals(vehicle.getStatus())) {
+            throw new BizException(ErrorCode.RESOURCE_STATUS_NOT_ALLOWED, "车辆作业中，状态由工单自动驱动");
+        }
+        return changeStatus(vehicleId, status, operatorId, null, staffId);
+    }
+
+    /** 司机常用设备：本人为默认司机的车辆列表（含状态），供司机端主页维护状态 */
+    public List<Vehicle> listMyVehicles(Long staffId) {
+        return vehicleMapper.selectList(new LambdaQueryWrapper<Vehicle>()
+                .eq(Vehicle::getDefaultStaffId, staffId)
+                .orderByDesc(Vehicle::getId));
     }
 
     private void checkStatus(String status) {

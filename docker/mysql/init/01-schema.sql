@@ -273,7 +273,9 @@ CREATE TABLE IF NOT EXISTS biz_vehicle (
     id                     BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
     plate_no               VARCHAR(16)   NOT NULL COMMENT '车牌号',
     model                  VARCHAR(64)   NULL COMMENT '车辆型号',
-    tonnage                DECIMAL(8,2)  NOT NULL COMMENT '吊车吨位（吨）',
+    type                   VARCHAR(16)   NOT NULL DEFAULT 'CRANE' COMMENT '车辆类型：CRANE 吊车/LIFT 举升车',
+    tonnage                DECIMAL(8,2)  NULL COMMENT '吊车吨位（吨），仅 CRANE 填写',
+    lift_height            DECIMAL(6,1)  NULL COMMENT '举升高度（米），仅 LIFT 填写，常用 20/30',
     default_staff_id       BIGINT UNSIGNED NULL COMMENT '默认司机（固定归属），一人多车表现为多行共用同一值',
     status                 VARCHAR(16)   NOT NULL DEFAULT 'IDLE' COMMENT '车辆状态：IDLE 空闲/BUSY 忙碌（系统派单）/BUSY_THIRD 忙碌（第三方派单）/MAINTENANCE 维保/DISABLED 停用',
     current_order_id       BIGINT UNSIGNED NULL COMMENT '当前绑定的进行中工单',
@@ -912,6 +914,8 @@ CREATE TABLE IF NOT EXISTS ai_alarm_record (
 CREATE TABLE IF NOT EXISTS biz_common_place (
     id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
     place_name  VARCHAR(128) NOT NULL COMMENT '地点名称（展示与搜索用）',
+    longitude   DECIMAL(10,6) NULL COMMENT '经度（GCJ-02，下单随地点回填）',
+    latitude    DECIMAL(10,6) NULL COMMENT '纬度（GCJ-02，下单随地点回填）',
     sort_order  INT          NOT NULL DEFAULT 0 COMMENT '排序权重，越大越靠前',
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -1043,7 +1047,7 @@ INSERT INTO sys_config (config_key, config_value, value_type, group_name, descri
     ('attendance.photo_max_size_mb',         '10',   'INT',     'attendance', '单张附件大小上限（MB）'),
     ('attendance.photo_max_long_edge_px',    '1920', 'INT',     'attendance', '单张长边压缩上限（px）'),
     ('overtime.normal_off_time',             '18:00','STRING',  'overtime',   '正常下班时间节点'),
-    ('order.accept_deadline_minutes',        '30',   'INT',     'order',      '接单时限（分钟）'),
+    ('order.accept_deadline_minutes',        '60',   'INT',     'order',      '接单时限（分钟），超时未确认触发接单报警'),
     ('order.max_pending_orders_per_staff',   '3',    'INT',     'order',      '同一司机同时未接单派单数上限'),
     ('demand.retention_days',                '10',   'INT',     'demand',     '需求单暂存时限（天）'),
     ('vehicle.third_party_remind_hours',     '24',   'INT',     'vehicle',    '第三方派单标记持续提醒阈值（小时）'),
@@ -1058,5 +1062,9 @@ INSERT INTO sys_config (config_key, config_value, value_type, group_name, descri
     ('customer.activity_threshold',          '3',    'INT',     'customer',   '客户合作活跃度阈值（待业务确认）'),
     ('ai.daily_run_time',                    '20:00','STRING',  'ai',         'AI 定时生成执行时刻'),
     ('ai.briefing_retention_days',           '10',   'INT',     'ai',         '简报保留天数，到期清除'),
+    ('ai.enabled',                           'false','BOOLEAN', 'ai',         'AI 接入总开关，关闭时所有 AI 功能不调用外部接口'),
+    ('ai.api_base_url',                      '',     'STRING',  'ai',         'OpenAI 兼容接口 Base URL，如 https://api.openai.com/v1'),
+    ('ai.api_key',                           '',     'STRING',  'ai',         'OpenAI 兼容接口 API Key（后台配置，不下发前端）'),
+    ('ai.model',                             '',     'STRING',  'ai',         '模型名称，如 gpt-4o-mini / deepseek-chat'),
     ('storage.usage_alert_percent',          '80',   'INT',     'storage',    '存储使用率告警阈值（%）（待业务确认）')
 ON DUPLICATE KEY UPDATE config_value = VALUES(config_value);

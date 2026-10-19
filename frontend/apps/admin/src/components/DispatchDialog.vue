@@ -54,7 +54,7 @@
             v-for="v in idleVehicles"
             :key="v.id"
             :value="v.id"
-            :label="`${v.plateNo}｜${v.tonnage}吨｜空闲`"
+            :label="`${v.plateNo}｜${vehicleSpecLabel(v)}｜空闲`"
           />
           <template #empty>
             <p v-if="optionsLoading" class="select-hint">数据加载中…</p>
@@ -142,7 +142,7 @@ import {
 } from '@crane/shared/api/dispatch'
 import type { CheckItem } from '@crane/shared/api/dispatch'
 import { pageStaffs, type Staff, type Vehicle } from '@crane/shared/api/staff'
-import { pageVehicles } from '@crane/shared/api/staff'
+import { pageVehicles, vehicleSpecLabel } from '@crane/shared/api/staff'
 import PrecheckList from './PrecheckList.vue'
 import dayjs from 'dayjs'
 
