@@ -79,7 +79,7 @@
           <el-input v-model="form.phone" maxlength="20" placeholder="手机号" />
         </el-form-item>
         <el-form-item label="身份证号" prop="idCard">
-          <el-input v-model="form.idCard" maxlength="64" placeholder="身份证号（可选）" />
+          <el-input v-model="form.idCard" maxlength="64" placeholder="身份证号（必填）" />
         </el-form-item>
         <el-form-item label="岗位" prop="position">
           <el-radio-group v-model="form.position">
@@ -177,6 +177,7 @@ const rules: FormRules = {
     { required: true, message: '请填写手机号', trigger: 'blur' },
     { pattern: /^1\d{10}$/, message: '手机号格式不正确', trigger: 'blur' }
   ],
+  idCard: [{ required: true, message: '请填写身份证号', trigger: 'blur' }],
   position: [{ required: true, message: '请选择岗位', trigger: 'change' }],
   initialPassword: [
     {

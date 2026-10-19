@@ -126,6 +126,15 @@ echo "== [5/5] 生成压缩包 =="
 tar -czf "$TARBALL" -C "$OUT" "$STAGE_NAME_BASE-$VERSION"
 echo "$(date '+%F %T')  $VERSION  linux/amd64  $(du -h "$TARBALL" | cut -f1)  $TARBALL" >> "$OUT/release-history.log"
 
+# 6. 升级说明：自动追加本次打包记录（项目根目录，随代码提交）
+UPGRADE_DOC="$ROOT/升级说明.md"
+if [ -f "$UPGRADE_DOC" ]; then
+  printf '| %s | %s | %s | %s | %s |\n' \
+    "$(date '+%F %T')" "$VERSION" "$GIT_SHA" "$(basename "$TARBALL")" "$(du -h "$TARBALL" | cut -f1)" \
+    >> "$UPGRADE_DOC"
+  echo "已更新升级说明：$UPGRADE_DOC"
+fi
+
 du -sh "$STAGE"/* | sed 's/^/  /'
 echo "DONE"
 echo "发布目录：$STAGE"

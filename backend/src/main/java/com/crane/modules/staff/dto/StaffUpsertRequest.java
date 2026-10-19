@@ -21,7 +21,8 @@ public class StaffUpsertRequest {
     @Size(max = 20, message = "手机号长度不能超过 20")
     private String phone;
 
-    /** 可空；提供时做重复校验 */
+    /** 必填；数据库该列非空，同时做重复校验 */
+    @NotBlank(message = "身份证号不能为空")
     @Size(max = 64, message = "身份证号长度不能超过 64")
     private String idCard;
 
