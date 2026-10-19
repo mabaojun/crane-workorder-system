@@ -39,7 +39,9 @@ const TYPE_LABELS: Record<StatAlarmType, string> = {
   NOT_ACCEPTED: '超时未接单',
   NOT_ARRIVED: '预定时间未到场',
   NOT_CHECKED_IN: '未执行签到',
-  VEHICLE_OCCUPIED: '车辆长时占用'
+  VEHICLE_OCCUPIED: '车辆长时占用',
+  VEHICLE_INSURANCE_EXPIRING: '车险临期',
+  VEHICLE_INSPECTION_EXPIRING: '审车临期'
 }
 
 const list = computed(() => statStore.alarms.list)

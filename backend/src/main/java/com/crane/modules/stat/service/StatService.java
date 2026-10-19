@@ -46,6 +46,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -109,6 +110,8 @@ public class StatService {
         ALARM_TYPE_PRIORITY.put("NOT_ARRIVED", 2);
         ALARM_TYPE_PRIORITY.put("NOT_CHECKED_IN", 3);
         ALARM_TYPE_PRIORITY.put("VEHICLE_OCCUPIED", 4);
+        ALARM_TYPE_PRIORITY.put("VEHICLE_INSURANCE_EXPIRING", 5);
+        ALARM_TYPE_PRIORITY.put("VEHICLE_INSPECTION_EXPIRING", 6);
     }
 
     /** 报警级别排序权重：HIGH 在前 */
@@ -174,6 +177,7 @@ public class StatService {
         collectNotArrivedAlarms(items, now);
         collectNotCheckedInAlarms(items, now);
         collectVehicleOccupiedAlarms(items, now);
+        collectVehicleCertificateAlarms(items, now);
         sortAlarms(items);
 
         AlarmListVO vo = new AlarmListVO();
@@ -639,6 +643,55 @@ public class StatService {
             item.setPinned(false);
             items.add(item);
         }
+    }
+
+    /**
+     * 车辆证照临期报警（车险 / 审车）：
+     * 车险到期 = 购买日 + 1 年；下次审车 = 最近审车日 + 周期（半年车龄 15 年以上，否则一年）。
+     * 距到期日 <= alarm.vehicle_cert_expire_days（默认 30 天，即提前 1 个月）触发 MEDIUM；已过期升 HIGH。
+     */
+    private void collectVehicleCertificateAlarms(List<AlarmItem> items, LocalDateTime now) {
+        int aheadDays = systemConfigService.getInt("alarm.vehicle_cert_expire_days", 30);
+        LocalDate today = now.toLocalDate();
+        List<Vehicle> vehicles = vehicleMapper.selectList(new LambdaQueryWrapper<Vehicle>()
+                .and(w -> w.isNotNull(Vehicle::getInsurancePurchaseDate)
+                        .or().isNotNull(Vehicle::getInspectionDate)));
+        for (Vehicle vehicle : vehicles) {
+            if (vehicle.getInsurancePurchaseDate() != null) {
+                LocalDate expire = vehicle.getInsurancePurchaseDate().plusYears(1);
+                addCertAlarm(items, vehicle, "VEHICLE_INSURANCE_EXPIRING", "车险", expire, today, aheadDays);
+            }
+            if (vehicle.getInspectionDate() != null) {
+                LocalDate expire = "HALF_YEAR".equals(vehicle.getInspectionCycle())
+                        ? vehicle.getInspectionDate().plusMonths(6)
+                        : vehicle.getInspectionDate().plusYears(1);
+                addCertAlarm(items, vehicle, "VEHICLE_INSPECTION_EXPIRING", "审车", expire, today, aheadDays);
+            }
+        }
+    }
+
+    /** 证照到期判定：过期 HIGH、临期 aheadDays 内 MEDIUM，未临期不产出报警 */
+    private void addCertAlarm(List<AlarmItem> items, Vehicle vehicle, String type, String label,
+                              LocalDate expire, LocalDate today, int aheadDays) {
+        long daysLeft = ChronoUnit.DAYS.between(today, expire);
+        if (daysLeft > aheadDays) {
+            return;
+        }
+        boolean expired = daysLeft < 0;
+        AlarmItem item = new AlarmItem();
+        item.setAlarmNo("AL-" + vehicle.getPlateNo() + "-" + type);
+        item.setType(type);
+        item.setLevel(expired ? "HIGH" : "MEDIUM");
+        item.setTargetType("VEHICLE");
+        item.setVehicleId(vehicle.getId());
+        item.setPlateNo(vehicle.getPlateNo());
+        item.setSummary(expired
+                ? label + "已过期 " + Math.abs(daysLeft) + " 天（到期 " + expire + "）"
+                : label + "将在 " + daysLeft + " 天后到期（" + expire + "）");
+        item.setTriggeredAt(expire.atStartOfDay());
+        item.setDurationMinutes(Math.max(daysLeft, 0) * 24 * 60);
+        item.setPinned(true);
+        items.add(item);
     }
 
     private void sortAlarms(List<AlarmItem> items) {

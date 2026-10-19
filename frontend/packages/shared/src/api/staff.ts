@@ -38,6 +38,14 @@ export interface Vehicle {
   /** 举升高度（米），仅 LIFT 有值，常用 20/30 */
   liftHeight: number | null
   defaultStaffId: number | null
+  /** 车架号 VIN */
+  vin: string | null
+  /** 车险购买日期（yyyy-MM-dd），保险到期 = 购买日 + 1 年 */
+  insurancePurchaseDate: string | null
+  /** 最近审车日期（yyyy-MM-dd） */
+  inspectionDate: string | null
+  /** 审车周期：HALF_YEAR 半年 / YEAR 一年 */
+  inspectionCycle: string | null
   /** IDLE / BUSY / BUSY_THIRD / MAINTENANCE / DISABLED */
   status: string
   currentOrderId: number | null
@@ -77,6 +85,14 @@ export interface VehicleUpsertRequest {
   defaultStaffId?: number
   status?: string
   remark?: string
+  /** 车架号 VIN（选填，第 10 位年款码用于推算车龄与审车周期） */
+  vin?: string
+  /** 车险购买日期 yyyy-MM-dd */
+  insurancePurchaseDate?: string
+  /** 最近审车日期 yyyy-MM-dd */
+  inspectionDate?: string
+  /** 审车周期 HALF_YEAR / YEAR，留空按 VIN 车龄自动带出 */
+  inspectionCycle?: string
 }
 
 export function pageStaffs(query: { name?: string; phone?: string; status?: string; pageNum?: number; pageSize?: number }) {

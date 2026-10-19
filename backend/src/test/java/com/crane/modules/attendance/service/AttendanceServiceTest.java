@@ -87,7 +87,7 @@ class AttendanceServiceTest {
                 workOrderMapper, workHourStatMapper, workOrderStateMachine, vehicleMapper,
                 vehicleStatusLogMapper, exceptionRecordMapper, systemConfigService, geoService,
                 new ObjectMapper(), exceptionService, commonPlaceService);
-        AuthContext.set(new AuthContext(USER_ID, "DRIVER", "SELF", STAFF_ID, null, List.of()));
+        AuthContext.set(new AuthContext(USER_ID, "DRIVER", "SELF", STAFF_ID, null, null, List.of()));
         when(systemConfigService.getInt("attendance.valid_range_meters", 1000)).thenReturn(1000);
         when(systemConfigService.getInt("attendance.overtime_range_meters", 1000)).thenReturn(1000);
         when(systemConfigService.getOrDefault("overtime.normal_off_time", "18:00")).thenReturn("18:00");

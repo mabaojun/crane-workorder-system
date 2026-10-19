@@ -64,6 +64,9 @@ public class WorkOrderCreateRequest {
     @DecimalMin(value = "0.5", message = "estimatedDays 最小 0.5 天")
     private BigDecimal estimatedDays;
 
+    /** 结算主体：ENTERPRISE 企业客户名称（默认，按客户结算）/PERSONAL 个人结算；缺省由服务层按客户类型兜底 */
+    private String settlementType;
+
     /** 枚举 DEMAND、DIRECT */
     @NotBlank(message = "source 必填")
     private String source;

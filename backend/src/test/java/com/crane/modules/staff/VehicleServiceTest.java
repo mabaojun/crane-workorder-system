@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -114,6 +115,69 @@ class VehicleServiceTest {
         req.setType(null);
         Vehicle vehicle = vehicleService.create(req, 1L);
         assertEquals("CRANE", vehicle.getType());
+    }
+
+    /** 构造 17 位 VIN，第 10 位为年款码 */
+    private String vinWithYearCode(char code) {
+        return "LSVAA24A0" + code + "1234567";
+    }
+
+    @Test
+    void 车龄超过15年按VIN自动带出半年一审() {
+        mockCreatePass();
+        VehicleUpsertRequest req = craneRequest();
+        req.setVin(vinWithYearCode('A')); // 2010 年款，车龄已超 15 年
+        Vehicle vehicle = vehicleService.create(req, 1L);
+        assertEquals("HALF_YEAR", vehicle.getInspectionCycle());
+        assertEquals(vinWithYearCode('A'), vehicle.getVin());
+    }
+
+    @Test
+    void 车龄不足15年按VIN自动带出一年一审() {
+        mockCreatePass();
+        VehicleUpsertRequest req = craneRequest();
+        req.setVin(vinWithYearCode('Y')); // 2030 年款，车龄不足 15 年
+        Vehicle vehicle = vehicleService.create(req, 1L);
+        assertEquals("YEAR", vehicle.getInspectionCycle());
+    }
+
+    @Test
+    void 未填车架号默认一年一审() {
+        mockCreatePass();
+        Vehicle vehicle = vehicleService.create(craneRequest(), 1L);
+        assertEquals("YEAR", vehicle.getInspectionCycle());
+    }
+
+    @Test
+    void 显式指定审车周期优先于VIN推算() {
+        mockCreatePass();
+        VehicleUpsertRequest req = craneRequest();
+        req.setVin(vinWithYearCode('A'));
+        req.setInspectionCycle("YEAR");
+        Vehicle vehicle = vehicleService.create(req, 1L);
+        assertEquals("YEAR", vehicle.getInspectionCycle());
+    }
+
+    @Test
+    void 非法审车周期应抛出20008() {
+        VehicleUpsertRequest req = craneRequest();
+        req.setInspectionCycle("QUARTER");
+        BizException e = assertThrows(BizException.class, () -> vehicleService.create(req, 1L));
+        assertEquals(20008, e.getCode());
+    }
+
+    @Test
+    void 证照信息落库() {
+        mockCreatePass();
+        VehicleUpsertRequest req = craneRequest();
+        LocalDate insurance = LocalDate.now().minusMonths(11);
+        LocalDate inspection = LocalDate.now().minusMonths(5);
+        req.setVin(vinWithYearCode('Y'));
+        req.setInsurancePurchaseDate(insurance);
+        req.setInspectionDate(inspection);
+        Vehicle vehicle = vehicleService.create(req, 1L);
+        assertEquals(insurance, vehicle.getInsurancePurchaseDate());
+        assertEquals(inspection, vehicle.getInspectionDate());
     }
 
     @Test

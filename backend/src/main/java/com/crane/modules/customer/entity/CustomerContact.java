@@ -21,6 +21,9 @@ public class CustomerContact {
 
     private Long customerId;
 
+    /** 联系人登录账号 sys_user.id；企业客户可为每个联系人建号独立提报，null 表示未建号 */
+    private Long userId;
+
     private String name;
 
     private String gender;

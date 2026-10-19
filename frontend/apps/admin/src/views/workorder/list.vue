@@ -29,6 +29,11 @@
         <el-table-column label="工单号" prop="orderNo" width="170" />
         <el-table-column label="任务名" prop="taskName" min-width="160" show-overflow-tooltip />
         <el-table-column label="客户" prop="customerName" min-width="140" show-overflow-tooltip />
+        <el-table-column label="结算主体" width="150" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.settlementType === 'PERSONAL' ? '个人结算' : (row.settlementCustomerName || row.customerName || '企业主体') }}
+          </template>
+        </el-table-column>
         <el-table-column label="司机" prop="staffName" width="100">
           <template #default="{ row }">{{ row.staffName || '-' }}</template>
         </el-table-column>
@@ -163,6 +168,16 @@
                   <p v-else class="select-hint">暂无客户数据</p>
                 </template>
               </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="结算主体" required>
+              <el-radio-group v-model="createForm.settlementType">
+                <el-radio value="ENTERPRISE" :disabled="selectedCustomerIsPerson">
+                  企业主体{{ selectedCustomer ? `（${selectedCustomer.name}）` : '' }}
+                </el-radio>
+                <el-radio value="PERSONAL">个人结算</el-radio>
+              </el-radio-group>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -419,9 +434,14 @@ const createForm = reactive({
   cargoWeightTon: undefined as number | undefined,
   craneTonnage: undefined as number | undefined,
   estimatedDays: undefined as number | undefined,
+  /** 结算主体：企业主体（所选客户）或个人结算 */
+  settlementType: 'ENTERPRISE' as string,
   remark: '',
   confirmPast: false
 })
+
+const selectedCustomer = computed(() => customers.value.find((c) => c.id === createForm.customerId))
+const selectedCustomerIsPerson = computed(() => selectedCustomer.value?.type === 'PERSON')
 
 /** 预计使用时长常用档位（天），仅备注提示不作换算 */
 const COMMON_ESTIMATE_DAYS = [0.5, 1, 1.5, 2, 3]
@@ -579,6 +599,7 @@ function openCreate() {
   createForm.cargoWeightTon = undefined
   createForm.craneTonnage = undefined
   createForm.estimatedDays = undefined
+  createForm.settlementType = 'ENTERPRISE'
   createForm.remark = ''
   createForm.confirmPast = false
   createVisible.value = true
@@ -627,6 +648,8 @@ watch(
   () => createForm.customerId,
   () => {
     selectedPlaceName.value = ''
+    // 个人客户仅支持个人结算；企业客户默认企业主体，可手动切换个人
+    createForm.settlementType = selectedCustomerIsPerson.value ? 'PERSONAL' : 'ENTERPRISE'
     loadMyPlaces()
   }
 )
@@ -731,6 +754,7 @@ async function submitCreate() {
       cargoWeightTon: createForm.cargoWeightTon,
       craneTonnage: createForm.craneTonnage,
       estimatedDays: createForm.estimatedDays,
+      settlementType: createForm.settlementType,
       remark: createForm.remark.trim() || undefined,
       confirmPast: createForm.confirmPast
     })

@@ -59,6 +59,9 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (binding != null && binding.length >= 2) {
             ctx.setStaffId(binding[0]);
             ctx.setCustomerId(binding[1]);
+            if (binding.length >= 3) {
+                ctx.setContactId(binding[2]);
+            }
         }
         AuthContext.set(ctx);
         request.setAttribute("userId", userId);

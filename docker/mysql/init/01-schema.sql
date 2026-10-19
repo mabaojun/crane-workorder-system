@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS sys_user (
     role_id         BIGINT UNSIGNED NOT NULL COMMENT '所属角色，一个账号一个角色',
     staff_id        BIGINT UNSIGNED NULL COMMENT '员工账号绑定的员工档案',
     customer_id     BIGINT UNSIGNED NULL COMMENT '客户账号绑定的客户档案',
+    contact_id      BIGINT UNSIGNED NULL COMMENT '客户联系人账号绑定的联系人（企业多联系人独立提报）',
     status          VARCHAR(16)  NOT NULL DEFAULT 'PENDING_BIND' COMMENT '账号状态：PENDING_BIND 待绑定/ACTIVE 已激活/FROZEN 冻结/DISABLED 停用',
     bound_at        DATETIME     NULL COMMENT '手机号绑定成功（激活）时间',
     last_login_at   DATETIME     NULL COMMENT '最近登录时间',
@@ -95,7 +96,8 @@ CREATE TABLE IF NOT EXISTS sys_user (
     UNIQUE KEY uk_su_open_id (open_id),
     KEY idx_su_role (role_id),
     KEY idx_su_staff (staff_id),
-    KEY idx_su_customer (customer_id)
+    KEY idx_su_customer (customer_id),
+    KEY idx_su_contact (contact_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户表';
 
 -- ------------------------------------------------------------
@@ -248,6 +250,7 @@ CREATE TABLE IF NOT EXISTS biz_customer (
 CREATE TABLE IF NOT EXISTS biz_customer_contact (
     id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
     customer_id BIGINT UNSIGNED NOT NULL COMMENT '所属客户',
+    user_id     BIGINT UNSIGNED NULL COMMENT '联系人登录账号 sys_user.id，企业客户可为每个联系人建号独立提报',
     name        VARCHAR(64)  NOT NULL COMMENT '联系人姓名',
     gender      VARCHAR(8)   NULL COMMENT '性别',
     position    VARCHAR(64)  NULL COMMENT '职务',
@@ -263,7 +266,8 @@ CREATE TABLE IF NOT EXISTS biz_customer_contact (
     deleted     TINYINT(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除',
     PRIMARY KEY (id),
     UNIQUE KEY uk_cc_phone (phone),
-    KEY idx_cc_customer (customer_id)
+    KEY idx_cc_customer (customer_id),
+    KEY idx_cc_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='客户联系人表';
 
 -- ------------------------------------------------------------
@@ -280,6 +284,10 @@ CREATE TABLE IF NOT EXISTS biz_vehicle (
     status                 VARCHAR(16)   NOT NULL DEFAULT 'IDLE' COMMENT '车辆状态：IDLE 空闲/BUSY 忙碌（系统派单）/BUSY_THIRD 忙碌（第三方派单）/MAINTENANCE 维保/DISABLED 停用',
     current_order_id       BIGINT UNSIGNED NULL COMMENT '当前绑定的进行中工单',
     third_party_marked_at  DATETIME      NULL COMMENT '第三方派单标记时刻，外部占用时长起点',
+    vin                    VARCHAR(32)   NULL COMMENT '车架号 VIN（17 位），第 10 位年款码可推算车龄',
+    insurance_purchase_date DATE         NULL COMMENT '车险购买日期，保险到期 = 购买日 + 1 年，临期报警基准',
+    inspection_date        DATE          NULL COMMENT '最近审车日期，下次审车 = 审车日 + 周期，临期报警基准',
+    inspection_cycle       VARCHAR(16)   NULL COMMENT '审车周期：HALF_YEAR 半年（车龄 15 年以上默认）/YEAR 一年，缺省按 VIN 年款自动带出',
     is_away                TINYINT(1)    NOT NULL DEFAULT 0 COMMENT '是否在外未回场，由每日签退确认派生',
     remark                 VARCHAR(255)  NULL COMMENT '备注',
     created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -315,6 +323,7 @@ CREATE TABLE IF NOT EXISTS biz_demand_order (
     crane_tonnage       DECIMAL(8,2) NULL COMMENT '吊车吨位需求（需管理员复核）',
     cargo_weight        DECIMAL(10,2) NULL COMMENT '被吊装货物重量（吨，需管理员复核）',
     estimated_days      DECIMAL(4,1) NULL COMMENT '预计使用时长（天），客户自估仅备注提示，不参与时间换算',
+    settlement_type     VARCHAR(16)  NOT NULL DEFAULT 'ENTERPRISE' COMMENT '结算主体类型：ENTERPRISE 企业主体（默认，企业联系人提报时自动带出可切个人）/PERSONAL 个人主体',
     expected_start_at   DATETIME     NULL COMMENT '期望施工时间',
     status              VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT '需求单状态：PENDING 待处理/REVIEWING 待复核/CONVERTED 已转工单/REJECTED 已驳回/CLOSED 已关闭',
     review_remark       VARCHAR(500) NULL COMMENT '复核意见或驳回原因，对客户可见',
@@ -358,6 +367,8 @@ CREATE TABLE IF NOT EXISTS biz_work_order (
     cargo_weight             DECIMAL(10,2) NULL COMMENT '实际吊装货物重量（吨）',
     crane_tonnage            DECIMAL(8,2)  NULL COMMENT '吊车吨位',
     estimated_days           DECIMAL(4,1)  NULL COMMENT '预计使用时长（天），仅备注提示，不参与时间换算',
+    settlement_type          VARCHAR(16)   NOT NULL DEFAULT 'ENTERPRISE' COMMENT '结算主体类型：ENTERPRISE 企业客户主体（对账按 customer_id 汇总）/PERSONAL 个人结算（对账按联系人）',
+    settlement_customer_id   BIGINT UNSIGNED NULL COMMENT '结算主体客户 id，ENTERPRISE 时=归属企业客户；PERSONAL 时为空',
     expected_start_at        DATETIME      NOT NULL COMMENT '预计开始时间，超时提醒与冲突巡检基准',
     accepted_at              DATETIME      NULL COMMENT '司机接单时间',
     started_at               DATETIME      NULL COMMENT '任务启动时间（签到成功写入），工时起点',
@@ -1058,6 +1069,7 @@ INSERT INTO sys_config (config_key, config_value, value_type, group_name, descri
     ('alarm.checkin_deadline_minutes',       '30',   'INT',     'alarm',      '未签到报警时限（分钟）'),
     ('alarm.vehicle_busy_hours',             '12',   'INT',     'alarm',      '车辆作业中占用报警阈值（小时）'),
     ('alarm.vehicle_third_party_hours',      '24',   'INT',     'alarm',      '车辆第三方派单占用报警阈值（小时）'),
+    ('alarm.vehicle_cert_expire_days',       '30',   'INT',     'alarm',      '车辆车险/审车临期报警提前天数（默认提前 1 个月）'),
     ('notification.sms_retry_max',           '2',    'INT',     'sms',        '短信失败重试次数上限'),
     ('notification.sms_daily_limit',         '200',  'INT',     'sms',        '短信每日发送上限（待业务确认）'),
     ('notification.sms_monthly_limit',       '3000', 'INT',     'sms',        '短信每月发送上限（待业务确认）'),

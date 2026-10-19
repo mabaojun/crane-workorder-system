@@ -58,7 +58,7 @@ class ExceptionServiceTest {
     void setUp() {
         service = new ExceptionService(exceptionRecordMapper, approvalRecordMapper,
                 workOrderMapper, workOrderStateMachine, new ObjectMapper());
-        AuthContext.set(new AuthContext(USER_ID, "DRIVER", "SELF", STAFF_ID, null, List.of()));
+        AuthContext.set(new AuthContext(USER_ID, "DRIVER", "SELF", STAFF_ID, null, null, List.of()));
         when(exceptionRecordMapper.selectCount(any())).thenReturn(0L);
     }
 
@@ -133,7 +133,7 @@ class ExceptionServiceTest {
     /** 批复 CONTINUE：工单经状态机恢复 IN_PROGRESS，记录回写已批复与状态快照。 */
     @Test
     void replyContinueResumesOrderViaStateMachine() {
-        AuthContext.set(new AuthContext(USER_ID, "ADMIN", "ALL", null, null, List.of()));
+        AuthContext.set(new AuthContext(USER_ID, "ADMIN", "ALL", null, null, null, List.of()));
         ExceptionRecord record = pendingRecord();
         when(exceptionRecordMapper.selectById(EXCEPTION_ID)).thenReturn(record);
         WorkOrder order = inProgressOrder();
@@ -160,7 +160,7 @@ class ExceptionServiceTest {
     /** 批复 TERMINATE：工单经状态机取消并写对客户可见的取消原因。 */
     @Test
     void replyTerminateCancelsOrder() {
-        AuthContext.set(new AuthContext(USER_ID, "ADMIN", "ALL", null, null, List.of()));
+        AuthContext.set(new AuthContext(USER_ID, "ADMIN", "ALL", null, null, null, List.of()));
         ExceptionRecord record = pendingRecord();
         when(exceptionRecordMapper.selectById(EXCEPTION_ID)).thenReturn(record);
         WorkOrder order = inProgressOrder();
@@ -185,7 +185,7 @@ class ExceptionServiceTest {
     /** 已批复记录不可重复批复，返回 40004。 */
     @Test
     void replyAlreadyHandledThrows40004() {
-        AuthContext.set(new AuthContext(USER_ID, "ADMIN", "ALL", null, null, List.of()));
+        AuthContext.set(new AuthContext(USER_ID, "ADMIN", "ALL", null, null, null, List.of()));
         ExceptionRecord record = pendingRecord();
         record.setStatus("APPROVED");
         when(exceptionRecordMapper.selectById(EXCEPTION_ID)).thenReturn(record);

@@ -167,7 +167,7 @@ public final class StatDtos {
     public static class AlarmItem {
         /** 报警编号，AL- 前缀手工拼接 */
         private String alarmNo;
-        /** CONFLICT / NOT_ARRIVED / NOT_CHECKED_IN / VEHICLE_OCCUPIED */
+        /** CONFLICT / NOT_ACCEPTED / NOT_ARRIVED / NOT_CHECKED_IN / VEHICLE_OCCUPIED / VEHICLE_INSURANCE_EXPIRING / VEHICLE_INSPECTION_EXPIRING */
         private String type;
         /** HIGH / MEDIUM */
         private String level;

@@ -238,6 +238,17 @@ public class AuthService {
         resp.setPhone(user.getPhone());
         resp.setStaffId(user.getStaffId());
         resp.setCustomerId(user.getCustomerId());
+        resp.setContactId(user.getContactId());
+        if (user.getCustomerId() != null) {
+            // 企业联系人提报页需展示所属企业主体，按客户档案回填名称与类型
+            List<Map<String, Object>> customers = jdbcTemplate.queryForList(
+                    "SELECT name, type FROM biz_customer WHERE id = ? AND deleted = 0",
+                    user.getCustomerId());
+            if (!customers.isEmpty()) {
+                resp.setCustomerName((String) customers.get(0).get("name"));
+                resp.setCustomerType((String) customers.get(0).get("type"));
+            }
+        }
         resp.setDataScope(DATA_SCOPE_BY_ROLE.get(role));
         resp.setPermissions(permissionMapper.selectPermissionCodes(user.getRoleId()));
         return resp;

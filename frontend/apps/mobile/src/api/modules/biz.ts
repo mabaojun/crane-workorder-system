@@ -102,6 +102,8 @@ export function createDemandOrder(body: {
   craneTonnage?: number
   /** 预计使用时长（天），选填，仅备注提示 */
   estimatedDays?: number
+  /** 结算主体：ENTERPRISE 企业主体 / PERSONAL 个人用车，缺省按客户类型判定 */
+  settlementType?: string
   expectedStartAt?: string
   parentDemandId?: number
 }) {

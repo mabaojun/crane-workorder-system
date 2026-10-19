@@ -19,6 +19,8 @@ public class AuthContext {
     private String dataScope;
     private Long staffId;
     private Long customerId;
+    /** 客户联系人账号绑定的联系人 id（企业多联系人独立提报时标识提报人），非联系人账号为 null */
+    private Long contactId;
     private List<String> permissions;
 
     public boolean isAdmin() {

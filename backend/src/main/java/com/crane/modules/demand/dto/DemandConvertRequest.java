@@ -37,6 +37,9 @@ public class DemandConvertRequest {
     /** 预计使用时长（天），选填，缺省带入需求单客户自估值，仅备注提示 */
     private BigDecimal estimatedDays;
 
+    /** 结算主体：ENTERPRISE 企业客户主体（管理员工单创建入口手动选择企业客户名称）/PERSONAL 个人结算；缺省带入需求单值 */
+    private String settlementType;
+
     /** 任务备注 */
     @NotBlank(message = "任务备注不能为空")
     private String remark;

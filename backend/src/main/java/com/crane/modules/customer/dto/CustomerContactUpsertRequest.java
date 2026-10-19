@@ -39,6 +39,13 @@ public class CustomerContactUpsertRequest {
     /** 是否默认联系人：1 是 / 0 否 */
     private Integer isDefault;
 
+    /** 创建时是否同时为该联系人创建登录账号（企业多联系人独立提报用） */
+    private Boolean createAccount;
+
+    /** 登录账号初始密码，仅 createAccount=true 且新建账号时生效，≥6 位；留空由系统默认生成 */
+    @Size(min = 6, max = 32, message = "初始密码长度须在 6-32 位之间")
+    private String initialPassword;
+
     @Size(max = 255, message = "备注长度不能超过 255")
     private String remark;
 }

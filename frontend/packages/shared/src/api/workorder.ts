@@ -28,6 +28,12 @@ export interface WorkOrder {
   craneTonnage: number | null
   /** 预计使用时长（天），仅备注提示 */
   estimatedDays: number | null
+  /** 结算主体：ENTERPRISE 企业客户主体 / PERSONAL 个人结算 */
+  settlementType: string
+  /** 结算主体客户 id（企业主体时=归属客户） */
+  settlementCustomerId: number | null
+  /** 结算主体客户名称（企业主体回填客户名，个人结算为「个人」） */
+  settlementCustomerName: string | null
   expectedStartAt: string | null
   acceptedAt: string | null
   startedAt: string | null
@@ -81,6 +87,8 @@ export interface WorkOrderCreateRequest {
   craneTonnage: number
   /** 预计使用时长（天），选填，快捷 0.5/1/1.5/2 或自定义，仅备注提示 */
   estimatedDays?: number
+  /** 结算主体：ENTERPRISE 企业客户主体（管理员选客户名称）/ PERSONAL 个人结算 */
+  settlementType?: string
   remark?: string
   requirement?: string
   /** 时间早于当前时的二次确认 */
@@ -102,6 +110,8 @@ export interface WorkOrderUpdateRequest {
   cargoWeightTon?: number
   /** 预计使用时长（天），选填，仅备注提示 */
   estimatedDays?: number
+  /** 结算主体：ENTERPRISE 企业主体 / PERSONAL 个人结算，管理员可调整 */
+  settlementType?: string
   remark?: string
   requirement?: string
   /** 计划时间早于当前时的二次确认 */

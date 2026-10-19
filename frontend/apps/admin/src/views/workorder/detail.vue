@@ -71,6 +71,11 @@
         <el-descriptions-item label="任务名称">{{ order.taskName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="来源">{{ ORDER_SOURCE_LABEL[order.source] || order.source }}</el-descriptions-item>
         <el-descriptions-item label="客户">{{ order.customerName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="结算主体">
+          <el-tag :type="order.settlementType === 'PERSONAL' ? 'info' : 'primary'" effect="plain" size="small">
+            {{ order.settlementType === 'PERSONAL' ? '个人结算' : (order.settlementCustomerName || order.customerName || '企业主体') }}
+          </el-tag>
+        </el-descriptions-item>
         <el-descriptions-item label="司机">{{ order.staffName || '-' }}{{ order.staffPhone ? `（${order.staffPhone}）` : '' }}</el-descriptions-item>
         <el-descriptions-item label="车辆">{{ order.vehiclePlateNo || '-' }}{{ order.vehicleTonnage ? `｜${order.vehicleTonnage}吨` : '' }}</el-descriptions-item>
         <el-descriptions-item label="计划开始">{{ fmtTime(order.expectedStartAt) }}</el-descriptions-item>

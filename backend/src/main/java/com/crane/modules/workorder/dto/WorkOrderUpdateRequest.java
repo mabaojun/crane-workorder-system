@@ -44,6 +44,9 @@ public class WorkOrderUpdateRequest {
     @DecimalMin(value = "0.5", message = "estimatedDays 最小 0.5 天")
     private BigDecimal estimatedDays;
 
+    /** 结算主体：ENTERPRISE 企业客户主体 / PERSONAL 个人结算，管理员可后台调整 */
+    private String settlementType;
+
     /** 施工要求 */
     private String requirement;
 

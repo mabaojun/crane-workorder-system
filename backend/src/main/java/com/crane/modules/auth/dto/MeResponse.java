@@ -26,6 +26,15 @@ public class MeResponse {
     /** 关联客户 id，未绑定为 null */
     private Long customerId;
 
+    /** 客户联系人账号绑定的联系人 id（企业多联系人提报身份），非联系人账号为 null */
+    private Long contactId;
+
+    /** 所属客户名称（企业主体展示用），无客户绑定为 null */
+    private String customerName;
+
+    /** 所属客户类型：COMPANY / PERSON，无客户绑定为 null */
+    private String customerType;
+
     /** 数据范围：ALL / SELF_STAFF / SELF_CUSTOMER */
     private String dataScope;
 

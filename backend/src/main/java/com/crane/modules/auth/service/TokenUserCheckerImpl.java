@@ -36,6 +36,9 @@ public class TokenUserCheckerImpl implements TokenUserChecker {
     @Override
     public Long[] resolveBinding(Long userId) {
         SysUser user = sysUserMapper.selectById(userId);
-        return user == null ? new Long[]{null, null} : new Long[]{user.getStaffId(), user.getCustomerId()};
+        // 三元组：员工档案 / 客户档案 / 客户联系人（企业多联系人账号），无绑定为 null
+        return user == null
+                ? new Long[]{null, null, null}
+                : new Long[]{user.getStaffId(), user.getCustomerId(), user.getContactId()};
     }
 }

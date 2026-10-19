@@ -58,6 +58,9 @@ public class WorkOrderCreateCommand {
     /** 预计使用时长（天），选填，仅备注提示 */
     private BigDecimal estimatedDays;
 
+    /** 结算主体：ENTERPRISE 企业客户主体（缺省，按客户结算）/PERSONAL 个人结算；缺省值由服务层按客户类型兜底 */
+    private String settlementType;
+
     /** 预计开始时间 */
     private LocalDateTime planStartAt;
 

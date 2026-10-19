@@ -119,6 +119,7 @@ public class WorkOrderService {
         command.setCargoWeightTon(request.getCargoWeightTon());
         command.setCraneTonnage(request.getCraneTonnage());
         command.setEstimatedDays(request.getEstimatedDays());
+        command.setSettlementType(request.getSettlementType());
         command.setPlanStartAt(request.getPlanStartAt());
         command.setRemark(request.getRemark());
         command.setRequirement(request.getRequirement());
@@ -192,6 +193,7 @@ public class WorkOrderService {
         order.setCargoWeight(command.getCargoWeightTon());
         order.setCraneTonnage(command.getCraneTonnage());
         order.setEstimatedDays(command.getEstimatedDays());
+        applySettlement(order, customer, command.getSettlementType());
         order.setExpectedStartAt(command.getPlanStartAt());
         order.setRemark(command.getRemark());
         order.setRequirement(command.getRequirement());
@@ -239,6 +241,23 @@ public class WorkOrderService {
             }
         }
         return deadline;
+    }
+
+    /**
+     * 结算主体落库：ENTERPRISE 记结算客户 id = 归属客户（企业主体，对账按客户汇总）；
+     * PERSONAL 清空结算客户 id（个人结算，对账按提报联系人）。
+     * 个人客户（Customer.type=PERSON）强制 PERSONAL。
+     */
+    private void applySettlement(WorkOrder order, Customer customer, String requestedType) {
+        String type = requestedType == null || requestedType.isBlank() ? "ENTERPRISE" : requestedType;
+        if (!"ENTERPRISE".equals(type) && !"PERSONAL".equals(type)) {
+            throw new BizException(ErrorCode.ENUM_INVALID, "结算主体类型取值非法");
+        }
+        if ("PERSON".equals(customer.getType())) {
+            type = "PERSONAL";
+        }
+        order.setSettlementType(type);
+        order.setSettlementCustomerId("ENTERPRISE".equals(type) ? customer.getId() : null);
     }
 
     /**
@@ -470,6 +489,9 @@ public class WorkOrderService {
             if (o.getCustomerId() != null) {
                 customerIds.add(o.getCustomerId());
             }
+            if (o.getSettlementCustomerId() != null) {
+                customerIds.add(o.getSettlementCustomerId());
+            }
             if (o.getStaffId() != null) {
                 staffIds.add(o.getStaffId());
             }
@@ -520,6 +542,17 @@ public class WorkOrderService {
         resp.setCargoWeight(order.getCargoWeight());
         resp.setCraneTonnage(order.getCraneTonnage());
         resp.setEstimatedDays(order.getEstimatedDays());
+        resp.setSettlementType(order.getSettlementType());
+        resp.setSettlementCustomerId(order.getSettlementCustomerId());
+        // 结算主体名称：企业主体取结算客户名（通常与归属客户一致），个人结算回显「个人」
+        if ("ENTERPRISE".equals(order.getSettlementType())) {
+            Customer settleCustomer = order.getSettlementCustomerId() == null ? null
+                    : refs.customers().get(order.getSettlementCustomerId());
+            resp.setSettlementCustomerName(settleCustomer != null ? settleCustomer.getName()
+                    : (customer != null ? customer.getName() : null));
+        } else {
+            resp.setSettlementCustomerName("个人");
+        }
         resp.setExpectedStartAt(order.getExpectedStartAt());
         resp.setAcceptedAt(order.getAcceptedAt());
         resp.setStartedAt(order.getStartedAt());
@@ -597,6 +630,15 @@ public class WorkOrderService {
         }
         if (request.getEstimatedDays() != null) {
             order.setEstimatedDays(request.getEstimatedDays());
+        }
+        if (request.getSettlementType() != null && !request.getSettlementType().isBlank()) {
+            // 管理员后台调整结算主体：企业主体回填结算客户 id（= 归属客户），个人主体清空
+            String type = request.getSettlementType();
+            if (!"ENTERPRISE".equals(type) && !"PERSONAL".equals(type)) {
+                throw new BizException(ErrorCode.ENUM_INVALID, "结算主体类型取值非法");
+            }
+            order.setSettlementType(type);
+            order.setSettlementCustomerId("ENTERPRISE".equals(type) ? order.getCustomerId() : null);
         }
         if (request.getRequirement() != null) {
             order.setRequirement(request.getRequirement());

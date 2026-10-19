@@ -131,11 +131,77 @@ public class CustomerService {
 
     /**
      * 创建联系人：手机号全局唯一；每客户默认联系人唯一（设默认时同事务清零其他）。
+     * createAccount=true 时同步为联系人创建独立登录账号（企业多联系人提报）。
      */
     @Transactional
     public CustomerContact createContact(CustomerContactUpsertRequest req, Long operatorId) {
         requireCustomer(req.getCustomerId());
-        return createContactInternal(req.getCustomerId(), req, operatorId);
+        CustomerContact contact = createContactInternal(req.getCustomerId(), req, operatorId);
+        if (Boolean.TRUE.equals(req.getCreateAccount())) {
+            bindContactAccount(contact, normalizeInitialPassword(req.getInitialPassword()), operatorId);
+        }
+        return contact;
+    }
+
+    /**
+     * 为已有联系人补建 / 绑定登录账号（管理员绑定入口）：
+     * 手机号取联系人手机号；已有账号则补绑（customer_id + contact_id），无则新建（roleId=3、PENDING_BIND），
+     * 初始密码仅新建时写入；双向回写 biz_customer_contact.user_id 与 sys_user.contact_id。
+     */
+    @Transactional
+    public CustomerContact createContactAccount(Long contactId, String initialPassword, Long operatorId) {
+        CustomerContact contact = customerContactMapper.selectById(contactId);
+        if (contact == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "联系人不存在");
+        }
+        bindContactAccount(contact, normalizeInitialPassword(initialPassword), operatorId);
+        return customerContactMapper.selectById(contactId);
+    }
+
+    /**
+     * 联系人账号绑定：已有同手机号账号直接补绑，否则新建；双向回写联系人与账号。
+     */
+    private void bindContactAccount(CustomerContact contact, String initialPassword, Long operatorId) {
+        String phone = contact.getPhone();
+        if (phone == null || phone.isBlank()) {
+            throw new BizException(ErrorCode.PARAM_INVALID, "联系人手机号为空，无法创建登录账号");
+        }
+        SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getPhone, phone)
+                .last("LIMIT 1"));
+        boolean created = false;
+        if (user == null) {
+            user = new SysUser();
+            user.setPhone(phone);
+            user.setNickName(contact.getName());
+            if (initialPassword != null) {
+                user.setPassword(passwordEncoder.encode(initialPassword));
+            }
+            user.setRoleId(3L);
+            user.setStatus("PENDING_BIND");
+            user.setCreatedBy(operatorId);
+            user.setUpdatedBy(operatorId);
+            sysUserMapper.insert(user);
+            created = true;
+        }
+        boolean dirty = false;
+        if (user.getContactId() == null || !user.getContactId().equals(contact.getId())) {
+            user.setContactId(contact.getId());
+            dirty = true;
+        }
+        if (user.getCustomerId() == null || !user.getCustomerId().equals(contact.getCustomerId())) {
+            user.setCustomerId(contact.getCustomerId());
+            dirty = true;
+        }
+        if (dirty || created) {
+            user.setUpdatedBy(operatorId);
+            sysUserMapper.updateById(user);
+        }
+        if (contact.getUserId() == null || !contact.getUserId().equals(user.getId())) {
+            contact.setUserId(user.getId());
+            contact.setUpdatedBy(operatorId);
+            customerContactMapper.updateById(contact);
+        }
     }
 
     /**

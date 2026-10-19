@@ -65,6 +65,9 @@ public class DemandOrder {
     /** 预计使用时长（天），客户自估仅作备注提示，不参与时间换算 */
     private BigDecimal estimatedDays;
 
+    /** 结算主体：ENTERPRISE 企业主体（默认，企业联系人提报自动带出可切个人）/PERSONAL 个人主体 */
+    private String settlementType;
+
     private LocalDateTime expectedStartAt;
 
     /** 状态：PENDING / REVIEWING / CONVERTED / REJECTED / CLOSED */

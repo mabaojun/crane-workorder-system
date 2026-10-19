@@ -48,6 +48,7 @@ public class AiReportService {
             日期：{date}
             今日新增工单：{orderToday} 单，其中完成 {completedToday} 单、进行中 {inProgress} 单、待接单 {pendingAccept} 单、暂停 {suspended} 单、已取消 {cancelled} 单。
             当前未处理报警：{alarmCount} 条。报警类型分布：{alarmTop}。
+            车辆证照临期：车险临期 {insuranceExpiring} 台，审车临期 {inspectionExpiring} 台（临期/过期明细：{certDetail}）。
             今日异常上报：{exceptionToday} 条。待处理需求单：{demandPending} 条。
             车辆状态：作业中 {vehicleBusy} 台，第三方派单外出 {vehicleThird} 台，维保 {vehicleMaintenance} 台，空闲 {vehicleIdle} 台。
             """;
@@ -135,6 +136,15 @@ public class AiReportService {
                 .limit(5)
                 .map(a -> String.format("%s(%s,%d分钟)", labelOf(a.getType()), a.getLevel(), a.getDurationMinutes()))
                 .collect(Collectors.joining("、"));
+        // 证照临期：从报警集合中按类型拆分计数与明细（已纳入 AI 分析的车辆管理数据）
+        List<AlarmItem> insurance = alarms.stream()
+                .filter(a -> "VEHICLE_INSURANCE_EXPIRING".equals(a.getType())).toList();
+        List<AlarmItem> inspection = alarms.stream()
+                .filter(a -> "VEHICLE_INSPECTION_EXPIRING".equals(a.getType())).toList();
+        String certDetail = java.util.stream.Stream.concat(insurance.stream(), inspection.stream())
+                .limit(6)
+                .map(a -> a.getPlateNo() + " " + a.getSummary())
+                .collect(Collectors.joining("；"));
         return template
                 .replace("{date}", date.format(CN_DATE))
                 .replace("{orderToday}", String.valueOf(dash.getOrder().getToday()))
@@ -145,6 +155,9 @@ public class AiReportService {
                 .replace("{cancelled}", String.valueOf(dash.getOrder().getCancelled()))
                 .replace("{alarmCount}", String.valueOf(alarms.size()))
                 .replace("{alarmTop}", alarmTop)
+                .replace("{insuranceExpiring}", String.valueOf(insurance.size()))
+                .replace("{inspectionExpiring}", String.valueOf(inspection.size()))
+                .replace("{certDetail}", certDetail.isBlank() ? "无" : certDetail)
                 .replace("{exceptionToday}", String.valueOf(dash.getExceptionDistribution().stream()
                         .mapToInt(e -> e.getCount()).sum()))
                 .replace("{demandPending}", String.valueOf(dash.getCustomer().getDemandPending()))
@@ -176,6 +189,8 @@ public class AiReportService {
             case "NOT_ARRIVED" -> "未按时到场";
             case "NOT_CHECKED_IN" -> "未签到";
             case "VEHICLE_OCCUPIED" -> "车辆长时占用";
+            case "VEHICLE_INSURANCE_EXPIRING" -> "车险临期";
+            case "VEHICLE_INSPECTION_EXPIRING" -> "审车临期";
             default -> type;
         };
     }

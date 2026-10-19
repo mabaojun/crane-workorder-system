@@ -125,6 +125,12 @@
         <el-table-column label="邮箱" min-width="140">
           <template #default="{ row }">{{ row.email || '-' }}</template>
         </el-table-column>
+        <el-table-column label="登录账号" width="110">
+          <template #default="{ row }">
+            <el-tag v-if="row.userId" type="success" effect="plain" size="small">已绑定</el-tag>
+            <el-button v-else size="small" text type="primary" @click="bindAccount(row)">创建账号</el-button>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="190" fixed="right">
           <template #default="{ row }">
             <el-button size="small" text type="primary" @click="openContactForm(row)">编辑</el-button>
@@ -164,6 +170,18 @@
           <el-form-item label="设为默认">
             <el-switch v-model="contactForm.isDefault" :active-value="1" :inactive-value="0" />
           </el-form-item>
+          <el-form-item v-if="!contactEditing">
+            <el-checkbox v-model="contactForm.createAccount">同时创建登录账号（可独立提报用车需求）</el-checkbox>
+          </el-form-item>
+          <el-form-item v-if="!contactEditing && contactForm.createAccount" label="初始密码">
+            <el-input
+              v-model="contactForm.initialPassword"
+              type="password"
+              show-password
+              maxlength="64"
+              placeholder="选填，至少 6 位；留空由系统默认生成"
+            />
+          </el-form-item>
         </el-form>
         <template #footer>
           <el-button @click="contactFormVisible = false">取消</el-button>
@@ -185,6 +203,7 @@ import {
   deleteCustomer,
   listContacts,
   createContact,
+  createContactAccount,
   updateContact,
   deleteContact,
   type Customer,
@@ -254,7 +273,9 @@ const contactForm = reactive({
   phone: '',
   position: '',
   email: '',
-  isDefault: 0
+  isDefault: 0,
+  createAccount: true,
+  initialPassword: ''
 })
 const contactRules: FormRules = {
   name: [{ required: true, message: '请填写姓名', trigger: 'blur' }],
@@ -390,6 +411,8 @@ function openContactForm(row?: CustomerContact) {
   contactForm.position = row?.position ?? ''
   contactForm.email = row?.email ?? ''
   contactForm.isDefault = row?.isDefault ?? 0
+  contactForm.createAccount = true
+  contactForm.initialPassword = ''
   contactFormVisible.value = true
 }
 
@@ -403,7 +426,12 @@ async function submitContact() {
     phone: contactForm.phone.trim(),
     position: contactForm.position.trim() || undefined,
     email: contactForm.email.trim() || undefined,
-    isDefault: contactForm.isDefault
+    isDefault: contactForm.isDefault,
+    createAccount: contactEditing.value ? undefined : contactForm.createAccount,
+    initialPassword:
+      !contactEditing.value && contactForm.createAccount && contactForm.initialPassword
+        ? contactForm.initialPassword
+        : undefined
   }
   try {
     if (contactEditing.value) {
@@ -419,6 +447,26 @@ async function submitContact() {
     ElMessage.error(e instanceof Error ? e.message : '保存失败')
   } finally {
     contactSubmitting.value = false
+  }
+}
+
+/** 为已有联系人补建登录账号（同手机号已有账号则直接绑定） */
+async function bindAccount(row: CustomerContact) {
+  try {
+    await ElMessageBox.confirm(
+      `确认为联系人「${row.name}（${row.phone}）」创建登录账号？创建后可独立登录提报用车需求。`,
+      '创建账号',
+      { type: 'info', confirmButtonText: '创建', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  try {
+    await createContactAccount(row.id)
+    ElMessage.success('账号已创建并绑定')
+    loadContacts()
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '账号创建失败')
   }
 }
 

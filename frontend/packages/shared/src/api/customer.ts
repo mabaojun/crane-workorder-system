@@ -27,6 +27,8 @@ export interface Customer {
 export interface CustomerContact {
   id: number
   customerId: number
+  /** 绑定登录账号 sys_user.id，null 表示未建号 */
+  userId: number | null
   name: string
   gender: string | null
   position: string | null
@@ -65,6 +67,10 @@ export interface ContactUpsertRequest {
   email?: string
   isDefault?: number
   remark?: string
+  /** 创建时同时为该联系人创建登录账号（企业多联系人独立提报） */
+  createAccount?: boolean
+  /** 登录账号初始密码（选填，≥6 位） */
+  initialPassword?: string
 }
 
 export function pageCustomers(query: { name?: string; phone?: string; status?: string; pageNum?: number; pageSize?: number }) {
@@ -93,6 +99,14 @@ export function createContact(body: ContactUpsertRequest) {
 
 export function updateContact(id: number | string, body: ContactUpsertRequest) {
   return request<CustomerContact>(`/customer/contacts/${id}`, { method: 'PUT', body })
+}
+
+/** 为已有联系人补建 / 绑定登录账号（管理员绑定入口） */
+export function createContactAccount(id: number | string, initialPassword?: string) {
+  return request<CustomerContact>(`/customer/contacts/${id}/account`, {
+    method: 'POST',
+    body: initialPassword ? { initialPassword } : {}
+  })
 }
 
 export function deleteContact(id: number | string) {

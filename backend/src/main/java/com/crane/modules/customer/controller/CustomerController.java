@@ -90,6 +90,19 @@ public class CustomerController {
         return ApiResult.ok();
     }
 
+    /** 为已有联系人补建 / 绑定登录账号（企业多联系人独立提报的绑定入口） */
+    @PostMapping("/contacts/{id}/account")
+    public ApiResult<CustomerContact> createContactAccount(@PathVariable Long id,
+                                                           @RequestBody(required = false) ContactAccountRequest request) {
+        requireAdmin();
+        String password = request == null ? null : request.initialPassword();
+        return ApiResult.ok(customerService.createContactAccount(id, password, currentUserId()));
+    }
+
+    /** 联系人建号请求体：initialPassword 选填（≥6 位，留空系统默认生成） */
+    public record ContactAccountRequest(String initialPassword) {
+    }
+
     private void requireAdmin() {
         AuthContext ctx = AuthContext.get();
         if (ctx == null || !ctx.isAdmin()) {

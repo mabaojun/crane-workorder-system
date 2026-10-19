@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -44,6 +45,18 @@ public class Vehicle {
 
     /** 第三方派单标记时刻 */
     private LocalDateTime thirdPartyMarkedAt;
+
+    /** 车架号 VIN（17 位），第 10 位年款码可推算车龄与审车周期 */
+    private String vin;
+
+    /** 车险购买日期，保险到期 = 购买日 + 1 年 */
+    private LocalDate insurancePurchaseDate;
+
+    /** 最近审车日期，下次审车 = 审车日 + 周期 */
+    private LocalDate inspectionDate;
+
+    /** 审车周期：HALF_YEAR 半年（车龄 15 年以上）/ YEAR 一年 */
+    private String inspectionCycle;
 
     /** 是否在外未回场（由每日签退派生，档案域只读） */
     private Integer isAway;

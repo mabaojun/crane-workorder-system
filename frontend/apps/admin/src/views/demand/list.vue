@@ -81,6 +81,11 @@
         <el-descriptions-item label="状态">
           <status-tag kind="demand" :status="detail.status" />
         </el-descriptions-item>
+        <el-descriptions-item label="结算主体">
+          <el-tag :type="detail.settlementType === 'PERSONAL' ? 'info' : 'primary'" effect="plain" size="small">
+            {{ settlementLabel(detail) }}
+          </el-tag>
+        </el-descriptions-item>
         <el-descriptions-item label="联系人">{{ detail.contactName || '无' }}</el-descriptions-item>
         <el-descriptions-item label="联系电话">{{ detail.contactPhone || '无' }}</el-descriptions-item>
         <el-descriptions-item label="施工地址">{{ detail.address || '无' }}</el-descriptions-item>
@@ -155,6 +160,7 @@ import {
   convertDemand,
   type DemandOrder
 } from '@crane/shared/api/demand'
+import { pageCustomers, type Customer } from '@crane/shared/api/customer'
 import { DEMAND_SOURCE_LABEL } from '../../utils/tags'
 import { fmtTime, parseImageUrls } from '../../utils/format'
 import DispatchDialog from '../../components/DispatchDialog.vue'
@@ -197,9 +203,37 @@ const convertPrefill = ref<{
   latitude?: number
   /** 客户需求描述，带入任务备注 */
   remark?: string
+  /** 结算主体：带入需求单值，管理员可在转工单时改选 */
+  settlementType?: string
+  settlementCustomerName?: string
+  settlementCustomerIsPerson?: boolean
 }>({})
 
-onMounted(load)
+/** 客户档案缓存：用于展示结算主体企业名称与判断个人客户 */
+const customers = ref<Customer[]>([])
+
+onMounted(async () => {
+  await Promise.all([load(), loadCustomers()])
+})
+
+async function loadCustomers() {
+  try {
+    customers.value = (await pageCustomers({ pageSize: 100 })).list
+  } catch {
+    /* 客户档案加载失败不阻塞列表，结算主体退化为类型标签 */
+  }
+}
+
+function customerOf(customerId?: number | null) {
+  return customerId ? customers.value.find((c) => c.id === customerId) : undefined
+}
+
+/** 结算主体展示：企业主体带客户名，个人主体统一显示个人 */
+function settlementLabel(row: DemandOrder) {
+  if (row.settlementType === 'PERSONAL') return '个人主体'
+  const customer = customerOf(row.customerId)
+  return customer ? `企业主体（${customer.name}）` : '企业主体'
+}
 
 async function load() {
   loading.value = true
@@ -276,7 +310,11 @@ function openConvert(row: DemandOrder) {
     longitude: row.longitude ?? undefined,
     latitude: row.latitude ?? undefined,
     // 客户需求描述带入任务备注，管理员可在此基础上补充
-    remark: row.description || undefined
+    remark: row.description || undefined,
+    // 结算主体默认沿用需求单归属，管理员可在弹窗内改选企业主体或个人
+    settlementType: row.settlementType || 'ENTERPRISE',
+    settlementCustomerName: customerOf(row.customerId)?.name,
+    settlementCustomerIsPerson: customerOf(row.customerId)?.type === 'PERSON'
   }
   convertVisible.value = true
 }
@@ -288,6 +326,7 @@ async function submitConvert(payload: {
   craneTonnage?: number
   cargoWeightTon?: number
   estimatedDays?: number
+  settlementType?: string
   remark: string
 }) {
   if (!convertTarget.value) return
@@ -298,6 +337,7 @@ async function submitConvert(payload: {
     craneTonnage: payload.craneTonnage as number,
     cargoWeightTon: payload.cargoWeightTon as number,
     estimatedDays: payload.estimatedDays,
+    settlementType: payload.settlementType,
     remark: payload.remark
   })
   ElMessage.success('已转工单')

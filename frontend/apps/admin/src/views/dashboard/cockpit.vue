@@ -193,7 +193,9 @@ const ALARM_TYPE_LABEL: Record<string, string> = {
   NOT_ACCEPTED: '超时未接单',
   NOT_ARRIVED: '未按时到场',
   NOT_CHECKED_IN: '未签到',
-  VEHICLE_OCCUPIED: '车辆占用'
+  VEHICLE_OCCUPIED: '车辆占用',
+  VEHICLE_INSURANCE_EXPIRING: '车险临期',
+  VEHICLE_INSPECTION_EXPIRING: '审车临期'
 }
 
 const router = useRouter()

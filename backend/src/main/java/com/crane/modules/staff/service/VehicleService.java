@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -38,6 +39,9 @@ public class VehicleService {
 
     /** 司机端允许手动切换的目标状态（停用仅管理员） */
     private static final Set<String> DRIVER_ALLOWED_TARGETS = Set.of("IDLE", "BUSY_THIRD", "MAINTENANCE");
+
+    /** 审车周期合法取值：半年 / 一年 */
+    private static final Set<String> INSPECTION_CYCLES = Set.of("HALF_YEAR", "YEAR");
 
     private final VehicleMapper vehicleMapper;
     private final VehicleStatusLogMapper vehicleStatusLogMapper;
@@ -208,6 +212,50 @@ public class VehicleService {
             vehicle.setTonnage(req.getTonnage());
             vehicle.setLiftHeight(null);
         }
+        // 证照信息：车架号 / 车险购买日 / 审车日；审车周期未指定时按 VIN 年款自动带出
+        vehicle.setVin(trimToNull(req.getVin()));
+        vehicle.setInsurancePurchaseDate(req.getInsurancePurchaseDate());
+        vehicle.setInspectionDate(req.getInspectionDate());
+        String cycle = req.getInspectionCycle();
+        if (cycle != null && !cycle.isBlank()) {
+            if (!INSPECTION_CYCLES.contains(cycle)) {
+                throw new BizException(ErrorCode.ENUM_INVALID, "审车周期取值非法");
+            }
+            vehicle.setInspectionCycle(cycle);
+        } else {
+            vehicle.setInspectionCycle(resolveInspectionCycle(vehicle.getVin()));
+        }
+    }
+
+    /**
+     * 审车周期自动带出：解析 VIN 第 10 位年款码推算车龄，
+     * 车龄 15 年以上 → HALF_YEAR（半年一审），否则 YEAR（一年一审）；VIN 缺失或不可解析默认 YEAR。
+     */
+    private String resolveInspectionCycle(String vin) {
+        Integer modelYear = parseModelYear(vin);
+        if (modelYear == null) {
+            return "YEAR";
+        }
+        int age = LocalDate.now().getYear() - modelYear;
+        return age > 15 ? "HALF_YEAR" : "YEAR";
+    }
+
+    /** VIN 第 10 位年款码：数字 1-9 表示 2001-2009，字母 A-Y（剔除 I/O/Q/U/Z）表示 2010-2030 */
+    private Integer parseModelYear(String vin) {
+        if (vin == null || vin.length() < 10) {
+            return null;
+        }
+        char code = Character.toUpperCase(vin.charAt(9));
+        if (code >= '1' && code <= '9') {
+            return 2000 + (code - '0');
+        }
+        String letters = "ABCDEFGHJKLMNPRSTVWXY";
+        int idx = letters.indexOf(code);
+        return idx < 0 ? null : 2010 + idx;
+    }
+
+    private String trimToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 
     /**

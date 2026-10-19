@@ -325,6 +325,73 @@ print("YES" if d["callStatus"]=="SUCCESS" and len(d["contentMarkdown"])>50 else 
 ')
 if [ "$REAL_OK" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  真实大模型生成SUCCESS(正文>50字)"; else FAIL=$((FAIL+1)); echo "FAIL  真实生成失败或内容过短"; fi
 
+echo "== 20. 企业多联系人账号 + 结算主体 + 车辆证照临期（第十三轮）=="
+C2_PHONE="135$((TS % 100000000))"
+CONTACT_PHONE="134$((TS % 100000000))"
+req "创建企业客户(不含账号)" POST /customer/customers "$ADMIN" "{\"name\":\"E2E企业$TS\",\"type\":\"COMPANY\",\"phone\":\"$C2_PHONE\",\"creditCode\":\"91370100MA3E2E13$((TS%1000))\",\"contacts\":[]}"
+C2CID=$(jq_get data id)
+# 联系人建号：企业多联系人各自独立登录提报
+req "创建企业联系人并同步建号" POST /customer/contacts "$ADMIN" "{\"customerId\":$C2CID,\"name\":\"E2E联系人甲\",\"phone\":\"$CONTACT_PHONE\",\"position\":\"调度\",\"createAccount\":true,\"initialPassword\":\"E2e@12345\"}"
+CONTACT_ID=$(jq_get data id)
+CONTACT_UID=$(jq_get data userId)
+if [ -n "$CONTACT_UID" ] && [ "$CONTACT_UID" != "None" ] && [ "$CONTACT_UID" != "null" ]; then PASS=$((PASS+1)); echo "PASS  联系人建号返回 userId=$CONTACT_UID"; else FAIL=$((FAIL+1)); echo "FAIL  联系人未建号 userId=$CONTACT_UID"; fi
+# 已有联系人补建账号入口（第二个联系人先不建号，再走补建接口）
+req "创建无账号联系人乙" POST /customer/contacts "$ADMIN" "{\"customerId\":$C2CID,\"name\":\"E2E联系人乙\",\"phone\":\"133$((TS % 100000000))\"}"
+CONTACT2_ID=$(jq_get data id)
+req "为联系人乙补建账号" POST /customer/contacts/$CONTACT2_ID/account "$ADMIN" '{"initialPassword":"E2e@12345"}'
+CONTACT2_UID=$(jq_get data userId)
+if [ -n "$CONTACT2_UID" ] && [ "$CONTACT2_UID" != "None" ] && [ "$CONTACT2_UID" != "null" ]; then PASS=$((PASS+1)); echo "PASS  已有联系人补建账号成功"; else FAIL=$((FAIL+1)); echo "FAIL  联系人补建账号失败"; fi
+req "激活联系人甲账号" PUT /iam/users/$CONTACT_UID/status "$ADMIN" '{"status":"ACTIVE"}'
+req "发送联系人甲验证码" POST /auth/sms-code "" "{\"phone\":\"$CONTACT_PHONE\",\"scene\":\"LOGIN\"}"
+CMSG=$(jq_get data debugCode)
+req "联系人甲验证码登录" POST /auth/sms-login "" "{\"phone\":\"$CONTACT_PHONE\",\"smsCode\":\"$CMSG\"}"
+CONTACT_TOKEN=$(jq_get data accessToken)
+req "联系人读取当前用户信息" GET /auth/me "$CONTACT_TOKEN" ""
+ME_OK=$(python3 -c '
+import json
+d=json.load(open("/tmp/e2e-last.json"))["data"]
+print("YES" if d.get("contactId")==int('"$CONTACT_ID"') and d.get("customerId")==int('"$C2CID"') and d.get("customerType")=="COMPANY" and d.get("customerName") else "NO")
+')
+if [ "$ME_OK" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  /auth/me 返回联系人+企业主体信息"; else FAIL=$((FAIL+1)); echo "FAIL  /auth/me 联系人信息缺失"; fi
+# 企业联系人默认企业主体提报 → 转工单结算主体为企业
+req "联系人提报(企业主体)" POST /demand/orders "$CONTACT_TOKEN" "{\"source\":\"CUSTOMER_MP\",\"contactName\":\"E2E联系人甲\",\"contactPhone\":\"$CONTACT_PHONE\",\"address\":\"企业主体测试点位$TS\",\"longitude\":117.12,\"latitude\":36.71,\"description\":\"企业主体结算验证\",\"craneTonnage\":25,\"cargoWeightTon\":8,\"settlementType\":\"ENTERPRISE\",\"expectedStartAt\":\"2027-01-05T09:00:00+08:00\"}"
+D1=$(jq_get data id)
+D1_SETTLE=$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT settlement_type FROM biz_demand_order WHERE id=$D1;" 2>/dev/null | tr -d ' \n')
+if [ "$D1_SETTLE" = "ENTERPRISE" ]; then PASS=$((PASS+1)); echo "PASS  企业联系人需求单归属企业主体"; else FAIL=$((FAIL+1)); echo "FAIL  企业需求单结算主体=$D1_SETTLE"; fi
+req "复核企业主体需求单" POST /demand/orders/$D1/review "$ADMIN" '{"approve":true,"reviewRemark":"复核通过"}'
+req "转工单(企业主体)" POST /demand/orders/$D1/convert "$ADMIN" "{\"staffId\":$SID2,\"vehicleId\":$WVID,\"planStartAt\":\"2027-01-05T09:00:00+08:00\",\"craneTonnage\":25,\"cargoWeightTon\":8,\"remark\":\"E2E企业主体转单\"}"
+O1=$(jq_get data convertedOrderId)
+SETTLE1=$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT CONCAT(settlement_type,'-',IFNULL(settlement_customer_id,0)) FROM biz_work_order WHERE id=$O1;" 2>/dev/null | tr -d ' \n')
+if [ "$SETTLE1" = "ENTERPRISE-$C2CID" ]; then PASS=$((PASS+1)); echo "PASS  工单结算主体=企业客户($C2CID)"; else FAIL=$((FAIL+1)); echo "FAIL  工单结算主体=$SETTLE1 期望 ENTERPRISE-$C2CID"; fi
+req "取消企业主体工单(释放资源)" POST /work-order/orders/$O1/status "$ADMIN" '{"action":"CANCEL","reason":"E2E 清理"}'
+# 同一联系人切换个人用车模式 → 工单个人结算（不归属企业）
+req "联系人提报(个人用车)" POST /demand/orders "$CONTACT_TOKEN" "{\"source\":\"CUSTOMER_MP\",\"contactName\":\"E2E联系人甲\",\"contactPhone\":\"$CONTACT_PHONE\",\"address\":\"个人用车测试点位$TS\",\"longitude\":117.12,\"latitude\":36.71,\"description\":\"个人结算验证\",\"craneTonnage\":25,\"cargoWeightTon\":8,\"settlementType\":\"PERSONAL\",\"expectedStartAt\":\"2027-01-06T09:00:00+08:00\"}"
+D2=$(jq_get data id)
+req "复核个人用车需求单" POST /demand/orders/$D2/review "$ADMIN" '{"approve":true,"reviewRemark":"复核通过"}'
+req "转工单(个人结算)" POST /demand/orders/$D2/convert "$ADMIN" "{\"staffId\":$SID2,\"vehicleId\":$WVID,\"planStartAt\":\"2027-01-06T09:00:00+08:00\",\"craneTonnage\":25,\"cargoWeightTon\":8,\"remark\":\"E2E个人结算转单\"}"
+O2=$(jq_get data convertedOrderId)
+SETTLE2=$(docker exec ${E2E_MYSQL_CONTAINER:-crane-mysql-dev} mysql --default-character-set=utf8mb4 -u${E2E_MYSQL_USER:-crane} -p${E2E_MYSQL_PW:-crane123} crane_workorder -N -e "SELECT CONCAT(settlement_type,'-',IFNULL(settlement_customer_id,0)) FROM biz_work_order WHERE id=$O2;" 2>/dev/null | tr -d ' \n')
+if [ "$SETTLE2" = "PERSONAL-0" ]; then PASS=$((PASS+1)); echo "PASS  个人用车工单不归属企业(PERSONAL)"; else FAIL=$((FAIL+1)); echo "FAIL  个人工单结算=$SETTLE2 期望 PERSONAL-0"; fi
+req "取消个人用车工单(释放资源)" POST /work-order/orders/$O2/status "$ADMIN" '{"action":"CANCEL","reason":"E2E 清理"}'
+# 车辆证照：VIN 年款码 A(2010) 自动半年一审；车险临期 + 审车过期触发报警
+CERT_PLATE="鲁V$((TS % 10000))E2"
+INS_DATE=$(python3 -c 'import datetime;print((datetime.date.today()-datetime.timedelta(days=355)).isoformat())')
+INSP_DATE=$(python3 -c 'import datetime;print((datetime.date.today()-datetime.timedelta(days=190)).isoformat())')
+req "创建证照测试车(VIN自动半年一审)" POST /staff/vehicles "$ADMIN" "{\"plateNo\":\"$CERT_PLATE\",\"model\":\"证照测试车\",\"type\":\"CRANE\",\"tonnage\":25,\"vin\":\"LSVAA24A0A1234567\",\"insurancePurchaseDate\":\"$INS_DATE\",\"inspectionDate\":\"$INSP_DATE\"}"
+CERT_VID=$(jq_get data id)
+CYCLE=$(jq_get data inspectionCycle)
+if [ "$CYCLE" = "HALF_YEAR" ]; then PASS=$((PASS+1)); echo "PASS  VIN车龄超15年自动带出半年审车周期"; else FAIL=$((FAIL+1)); echo "FAIL  审车周期=$CYCLE 期望 HALF_YEAR"; fi
+req "查询报警中心(证照临期)" GET /stat/alarms "$ADMIN" ""
+CERT_OK=$(PLATE="$CERT_PLATE" python3 -c '
+import json,os
+d=json.load(open("/tmp/e2e-last.json"))
+plate=os.environ.get("PLATE","")
+types={a["type"] for a in d["data"]["list"] if a.get("plateNo")==plate}
+print("YES" if {"VEHICLE_INSURANCE_EXPIRING","VEHICLE_INSPECTION_EXPIRING"} <= types else "NO")
+')
+if [ "$CERT_OK" = "YES" ]; then PASS=$((PASS+1)); echo "PASS  报警含车险临期+审车临期($CERT_PLATE)"; else FAIL=$((FAIL+1)); echo "FAIL  证照报警缺失 plate=$CERT_PLATE"; fi
+req "删除证照测试车(清理)" DELETE /staff/vehicles/$CERT_VID "$ADMIN" ""
+
 echo "=============================="
 echo "E2E 结果：PASS=$PASS FAIL=$FAIL"
 exit $FAIL

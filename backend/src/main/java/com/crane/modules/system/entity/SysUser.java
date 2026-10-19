@@ -37,6 +37,9 @@ public class SysUser {
 
     private Long customerId;
 
+    /** 客户联系人账号绑定的联系人 id（企业多联系人独立提报） */
+    private Long contactId;
+
     /** PENDING_BIND 待绑定 / ACTIVE 已激活 / FROZEN 冻结 / DISABLED 停用 */
     private String status;
 

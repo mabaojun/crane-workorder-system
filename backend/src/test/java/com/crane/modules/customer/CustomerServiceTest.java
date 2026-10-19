@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -125,6 +126,71 @@ class CustomerServiceTest {
         String encoded = captor.getValue().getPassword();
         assertNotNull(encoded);
         assertTrue(encoded.startsWith("$2"));
+    }
+
+    /** 创建企业联系人并同步建号：新账号绑定 customer_id + contact_id，联系人与账号双向回写 */
+    @Test
+    void 创建联系人可同步创建独立登录账号() {
+        Customer customer = new Customer();
+        customer.setId(5L);
+        when(customerMapper.selectById(5L)).thenReturn(customer);
+        when(contactMapper.selectCount(any())).thenReturn(0L);
+        when(contactMapper.insert(any(CustomerContact.class))).thenAnswer(inv -> {
+            inv.getArgument(0, CustomerContact.class).setId(11L);
+            return 1;
+        });
+        when(contactMapper.selectList(any())).thenReturn(List.of());
+        when(sysUserMapper.selectOne(any())).thenReturn(null);
+        when(sysUserMapper.insert(any(SysUser.class))).thenAnswer(inv -> {
+            inv.getArgument(0, SysUser.class).setId(30L);
+            return 1;
+        });
+
+        CustomerContactUpsertRequest req = contactRequest();
+        req.setCreateAccount(true);
+        req.setInitialPassword("abc123");
+        customerService.createContact(req, 1L);
+
+        ArgumentCaptor<SysUser> userCaptor = ArgumentCaptor.forClass(SysUser.class);
+        verify(sysUserMapper).insert(userCaptor.capture());
+        SysUser created = userCaptor.getValue();
+        assertEquals("13900000002", created.getPhone());
+        assertEquals(3L, created.getRoleId());
+        assertEquals("PENDING_BIND", created.getStatus());
+        assertEquals(5L, created.getCustomerId());
+        assertEquals(11L, created.getContactId());
+        assertTrue(created.getPassword().startsWith("$2"));
+
+        // 联系人与账号双向绑定
+        ArgumentCaptor<CustomerContact> contactCaptor = ArgumentCaptor.forClass(CustomerContact.class);
+        verify(contactMapper).updateById(contactCaptor.capture());
+        assertEquals(30L, contactCaptor.getValue().getUserId());
+    }
+
+    /** 联系人已有同手机号账号时补建入口只补绑、不新建账号 */
+    @Test
+    void 已有同手机号账号时创建联系人账号只补绑() {
+        CustomerContact contact = new CustomerContact();
+        contact.setId(11L);
+        contact.setCustomerId(5L);
+        contact.setName("李四");
+        contact.setPhone("13900000002");
+        when(contactMapper.selectById(11L)).thenReturn(contact);
+        SysUser existing = new SysUser();
+        existing.setId(30L);
+        existing.setPhone("13900000002");
+        when(sysUserMapper.selectOne(any())).thenReturn(existing);
+
+        customerService.createContactAccount(11L, null, 1L);
+
+        verify(sysUserMapper, never()).insert(any(SysUser.class));
+        ArgumentCaptor<SysUser> userCaptor = ArgumentCaptor.forClass(SysUser.class);
+        verify(sysUserMapper).updateById(userCaptor.capture());
+        assertEquals(11L, userCaptor.getValue().getContactId());
+        assertEquals(5L, userCaptor.getValue().getCustomerId());
+        ArgumentCaptor<CustomerContact> contactCaptor = ArgumentCaptor.forClass(CustomerContact.class);
+        verify(contactMapper).updateById(contactCaptor.capture());
+        assertEquals(30L, contactCaptor.getValue().getUserId());
     }
 
     /** 客户初始密码不足 6 位返回 20002 */

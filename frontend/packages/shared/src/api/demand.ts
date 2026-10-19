@@ -23,6 +23,8 @@ export interface DemandOrder {
   cargoWeight: number | null
   /** 预计使用时长（天），客户自估仅备注提示 */
   estimatedDays: number | null
+  /** 结算主体：ENTERPRISE 企业主体 / PERSONAL 个人主体 */
+  settlementType: string
   expectedStartAt: string | null
   /** PENDING / REVIEWING / CONVERTED / REJECTED / CLOSED */
   status: string
@@ -50,6 +52,8 @@ export interface DemandConvertRequest {
   cargoWeightTon: number
   /** 预计使用时长（天），选填，缺省带入需求单客户自估值 */
   estimatedDays?: number
+  /** 结算主体：ENTERPRISE 企业客户主体（可改选企业客户名）/ PERSONAL 个人结算 */
+  settlementType?: string
   remark: string
 }
 

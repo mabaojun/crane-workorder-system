@@ -318,6 +318,46 @@ class StatServiceTest {
         assertEquals("鲁B99999", list.get(5).getPlateNo());
     }
 
+    /** 车辆证照临期：车险临期 MEDIUM、审车过期 HIGH，按类型优先级排序且置顶 */
+    @Test
+    void alarmsIncludeVehicleCertificateExpiring() {
+        when(systemConfigService.getInt(anyString(), anyInt())).thenAnswer(inv -> inv.getArgument(1));
+        when(conflictAlertMapper.selectList(any())).thenReturn(new ArrayList<>());
+        when(workOrderMapper.selectList(any()))
+                .thenReturn(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
+
+        // 车险：购买日 1 年前 + 10 天 → 10 天后到期（临期）
+        Vehicle insurance = new Vehicle();
+        insurance.setId(11L);
+        insurance.setPlateNo("鲁C11111");
+        insurance.setInsurancePurchaseDate(LocalDate.now().minusYears(1).plusDays(10));
+        // 审车：半年周期，最近审车 6 个月 5 天前 → 已过期 5 天
+        Vehicle inspection = new Vehicle();
+        inspection.setId(12L);
+        inspection.setPlateNo("鲁D22222");
+        inspection.setInspectionDate(LocalDate.now().minusMonths(6).minusDays(5));
+        inspection.setInspectionCycle("HALF_YEAR");
+
+        // 第一次为车辆占用查询（无占用车辆提前返回），第二次为证照查询
+        when(vehicleMapper.selectList(any())).thenReturn(new ArrayList<>(), List.of(insurance, inspection));
+
+        AlarmListVO vo = statService.alarms();
+
+        assertEquals(2, vo.getCount());
+        List<AlarmItem> list = vo.getList();
+        // 排序优先级：车险临期(5) 先于 审车临期(6)
+        assertEquals("VEHICLE_INSURANCE_EXPIRING", list.get(0).getType());
+        assertEquals("MEDIUM", list.get(0).getLevel());
+        assertTrue(list.get(0).isPinned());
+        assertEquals("鲁C11111", list.get(0).getPlateNo());
+        assertTrue(list.get(0).getSummary().startsWith("车险将在 10 天后到期"));
+        assertEquals("VEHICLE_INSPECTION_EXPIRING", list.get(1).getType());
+        assertEquals("HIGH", list.get(1).getLevel());
+        assertTrue(list.get(1).isPinned());
+        assertEquals("鲁D22222", list.get(1).getPlateNo());
+        assertTrue(list.get(1).getSummary().startsWith("审车已过期 5 天"));
+    }
+
     /** 车辆地图：缺坐标工单不产出点位，命中未到场 / 未签到规则时打报警标记 */
     @Test
     void vehicleMapSkipsMissingCoordinatesAndMarksAlarm() {

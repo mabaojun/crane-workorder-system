@@ -81,7 +81,8 @@ export interface StatDashboard {
   staffRank: DashboardStaffRank[]
 }
 
-export type StatAlarmType = 'CONFLICT' | 'NOT_ACCEPTED' | 'NOT_ARRIVED' | 'NOT_CHECKED_IN' | 'VEHICLE_OCCUPIED'
+export type StatAlarmType = 'CONFLICT' | 'NOT_ACCEPTED' | 'NOT_ARRIVED' | 'NOT_CHECKED_IN'
+  | 'VEHICLE_OCCUPIED' | 'VEHICLE_INSURANCE_EXPIRING' | 'VEHICLE_INSPECTION_EXPIRING'
 export type StatAlarmLevel = 'HIGH' | 'MEDIUM'
 
 export interface StatAlarmItem {

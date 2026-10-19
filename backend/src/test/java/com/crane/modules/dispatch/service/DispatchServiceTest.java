@@ -84,7 +84,7 @@ class DispatchServiceTest {
     @BeforeEach
     void setUp() {
         // 默认以司机身份（staffId=8）登录
-        AuthContext.set(new AuthContext(1L, "DRIVER", "SELF", 8L, null, null));
+        AuthContext.set(new AuthContext(1L, "DRIVER", "SELF", 8L, null, null, null));
     }
 
     @AfterEach

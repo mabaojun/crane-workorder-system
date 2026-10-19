@@ -60,6 +60,9 @@ public class DemandCreateRequest {
     /** 预计使用时长（天），选填，快捷 0.5/1/1.5/2 天或自定义，仅备注提示 */
     private BigDecimal estimatedDays;
 
+    /** 结算主体：ENTERPRISE 企业主体（企业联系人提报默认自动带出所属企业，可切个人）/PERSONAL 个人主体；个人客户强制 PERSONAL */
+    private String settlementType;
+
     /** 期望施工时间 */
     private LocalDateTime expectedStartAt;
 

@@ -87,6 +87,9 @@ public class DemandService {
             }
         }
 
+        // 结算主体规则：企业客户联系人默认企业主体（可切个人），个人客户强制个人主体；管理员代录缺省企业
+        String settlementType = resolveSettlementType(req.getSettlementType(), customerId);
+
         // 驳回后重提链路：原需求单必须存在且处于 REJECTED
         if (req.getParentDemandId() != null) {
             DemandOrder parent = demandOrderMapper.selectById(req.getParentDemandId());
@@ -114,6 +117,7 @@ public class DemandService {
         demand.setCraneTonnage(req.getCraneTonnage());
         demand.setCargoWeight(req.getCargoWeight());
         demand.setEstimatedDays(req.getEstimatedDays());
+        demand.setSettlementType(settlementType);
         demand.setExpectedStartAt(req.getExpectedStartAt());
         demand.setStatus("PENDING");
         demand.setRejectCount(0);
@@ -215,6 +219,8 @@ public class DemandService {
         cmd.setCraneTonnage(req.getCraneTonnage());
         // 预计使用时长：转单未填时回落需求单客户自估值
         cmd.setEstimatedDays(req.getEstimatedDays() != null ? req.getEstimatedDays() : demand.getEstimatedDays());
+        // 结算主体：转单未选时回落需求单提报值（企业带出/个人）
+        cmd.setSettlementType(req.getSettlementType() != null ? req.getSettlementType() : demand.getSettlementType());
         cmd.setPlanStartAt(req.getPlanStartAt());
         cmd.setRemark(req.getRemark());
         WorkOrder order = workOrderService.create(cmd, operatorId);
@@ -241,6 +247,25 @@ public class DemandService {
             return prefix + String.format("%04d", seq);
         }
         return prefix + String.format("%04d", (int) (System.currentTimeMillis() % 10000));
+    }
+
+    /**
+     * 结算主体解析（提报侧）：
+     * 企业客户（COMPANY）联系人提报默认 ENTERPRISE（自动带出所属企业），可显式切换 PERSONAL；
+     * 个人客户（PERSON）强制 PERSONAL（自身即结算主体）；管理员代录缺省 ENTERPRISE；非法取值 20008。
+     */
+    private String resolveSettlementType(String requested, Long customerId) {
+        String type = requested == null || requested.isBlank() ? "ENTERPRISE" : requested;
+        if (!"ENTERPRISE".equals(type) && !"PERSONAL".equals(type)) {
+            throw new BizException(ErrorCode.ENUM_INVALID, "结算主体类型取值非法");
+        }
+        if (customerId != null) {
+            Customer customer = customerMapper.selectById(customerId);
+            if (customer != null && "PERSON".equals(customer.getType()) && "ENTERPRISE".equals(type)) {
+                type = "PERSONAL";
+            }
+        }
+        return type;
     }
 
     /** 来源解析：客户强制 CUSTOMER_MP；管理员缺省 ADMIN（可显式代录 PHONE） */

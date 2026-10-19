@@ -33,6 +33,23 @@
         <el-table-column label="规格" width="110" align="right">
           <template #default="{ row }">{{ vehicleSpecLabel(row) }}</template>
         </el-table-column>
+        <el-table-column label="车架号" min-width="170" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.vin || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="车险到期" width="115">
+          <template #default="{ row }">
+            <span :class="{ 'cert-expiring': isCertExpiring(insuranceExpireDate(row)) }">
+              {{ insuranceExpireDate(row) || '-' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="下次审车" width="115">
+          <template #default="{ row }">
+            <span :class="{ 'cert-expiring': isCertExpiring(inspectionNextDate(row)) }">
+              {{ inspectionNextDate(row) || '-' }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column label="默认司机" width="120">
           <template #default="{ row }">{{ staffName(row.defaultStaffId) }}</template>
         </el-table-column>
@@ -119,6 +136,42 @@
             >{{ h }}米</el-check-tag>
           </div>
         </el-form-item>
+        <el-form-item label="车架号">
+          <el-input
+            v-model="form.vin"
+            maxlength="32"
+            placeholder="17 位 VIN，可按年款码自动推算审车周期"
+          />
+        </el-form-item>
+        <el-form-item label="保险购买日期">
+          <el-date-picker
+            v-model="form.insurancePurchaseDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="选择日期"
+            style="width: 200px"
+          />
+          <span class="unit">到期后 1 年内提醒续保</span>
+        </el-form-item>
+        <el-form-item label="审车日期">
+          <el-date-picker
+            v-model="form.inspectionDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="最近一次审车日期"
+            style="width: 200px"
+          />
+        </el-form-item>
+        <el-form-item label="审车周期">
+          <el-radio-group v-model="form.inspectionCycle">
+            <el-radio-button value="">自动</el-radio-button>
+            <el-radio-button value="HALF_YEAR">半年</el-radio-button>
+            <el-radio-button value="YEAR">一年</el-radio-button>
+          </el-radio-group>
+          <div class="quick-heights">
+            <span class="quick-label">{{ cycleHint }}</span>
+          </div>
+        </el-form-item>
         <el-form-item label="默认司机">
           <el-select v-model="form.defaultStaffId" clearable filterable placeholder="选择司机（可空）" style="width: 100%">
             <el-option v-for="s in drivers" :key="s.id" :value="s.id" :label="`${s.name}（${s.phone}）`" />
@@ -137,7 +190,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { VEHICLE_STATUS_LABEL } from '@crane/shared'
 import {
@@ -180,9 +233,62 @@ const form = reactive({
   type: 'CRANE',
   tonnage: undefined as number | undefined,
   liftHeight: undefined as number | undefined,
+  vin: '',
+  insurancePurchaseDate: '' as string,
+  inspectionDate: '' as string,
+  inspectionCycle: '' as '' | 'HALF_YEAR' | 'YEAR',
   defaultStaffId: undefined as number | undefined,
   remark: ''
 })
+
+/** 按 VIN 第 10 位年款码推算车龄，车龄 >15 年提示半年一检 */
+const cycleHint = computed(() => {
+  if (form.inspectionCycle === 'HALF_YEAR') return '当前按半年一审执行'
+  if (form.inspectionCycle === 'YEAR') return '当前按一年一审执行'
+  const year = parseModelYear(form.vin)
+  if (!year) return '留空自动：按车架号年款码推算（15 年以上半年，其余一年）'
+  const age = new Date().getFullYear() - year
+  return `按车架号推算车龄 ${age} 年，建议${age > 15 ? '半年' : '一年'}一审`
+})
+
+/** VIN 年款码：数字 1-9 → 2001-2009，字母 → 2010 起 */
+function parseModelYear(vin: string): number | null {
+  const code = vin.trim().charAt(9).toUpperCase()
+  if (!code) return null
+  if (code >= '1' && code <= '9') return 2000 + Number(code)
+  const letters = 'ABCDEFGHJKLMNPRSTVWXY'
+  const idx = letters.indexOf(code)
+  return idx >= 0 ? 2010 + idx : null
+}
+
+/** 车险到期日 = 保险购买日期 + 1 年 */
+function insuranceExpireDate(row: Vehicle): string {
+  return row.insurancePurchaseDate ? addMonths(row.insurancePurchaseDate, 12) : ''
+}
+
+/** 下次审车日 = 审车日期 + 审车周期（留空按 VIN 推算，默认一年） */
+function inspectionNextDate(row: Vehicle): string {
+  if (!row.inspectionDate) return ''
+  const cycle = row.inspectionCycle || (() => {
+    const year = parseModelYear(row.vin || '')
+    return year && new Date().getFullYear() - year > 15 ? 'HALF_YEAR' : 'YEAR'
+  })()
+  return addMonths(row.inspectionDate, cycle === 'HALF_YEAR' ? 6 : 12)
+}
+
+function addMonths(date: string, months: number): string {
+  const d = new Date(`${date}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return ''
+  d.setMonth(d.getMonth() + months)
+  return d.toISOString().slice(0, 10)
+}
+
+/** 到期前 30 天内或已过期高亮 */
+function isCertExpiring(date: string): boolean {
+  if (!date) return false
+  const diff = (new Date(`${date}T00:00:00`).getTime() - Date.now()) / 86400000
+  return diff <= 30
+}
 
 const rules: FormRules = {
   plateNo: [{ required: true, message: '请填写车牌号', trigger: 'blur' }],
@@ -258,6 +364,12 @@ function openForm(row?: Vehicle) {
   form.type = row?.type === 'LIFT' ? 'LIFT' : 'CRANE'
   form.tonnage = row?.tonnage ?? undefined
   form.liftHeight = row?.liftHeight ?? undefined
+  form.vin = row?.vin ?? ''
+  form.insurancePurchaseDate = row?.insurancePurchaseDate ?? ''
+  form.inspectionDate = row?.inspectionDate ?? ''
+  form.inspectionCycle = row?.inspectionCycle === 'HALF_YEAR' || row?.inspectionCycle === 'YEAR'
+    ? row.inspectionCycle
+    : ''
   form.defaultStaffId = row?.defaultStaffId ?? undefined
   form.remark = row?.remark ?? ''
   formVisible.value = true
@@ -273,6 +385,10 @@ async function submit() {
     type: form.type,
     tonnage: form.type === 'CRANE' ? form.tonnage : undefined,
     liftHeight: form.type === 'LIFT' ? form.liftHeight : undefined,
+    vin: form.vin.trim() || undefined,
+    insurancePurchaseDate: form.insurancePurchaseDate || undefined,
+    inspectionDate: form.inspectionDate || undefined,
+    inspectionCycle: form.inspectionCycle || undefined,
     defaultStaffId: form.defaultStaffId,
     remark: form.remark.trim() || undefined
   }
@@ -338,4 +454,5 @@ async function onDelete(row: Vehicle) {
 .unit { margin-left: 8px; color: var(--sub); }
 .quick-heights { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .quick-label { color: var(--sub); font-size: 12px; }
+.cert-expiring { color: var(--el-color-danger); font-weight: 600; }
 </style>

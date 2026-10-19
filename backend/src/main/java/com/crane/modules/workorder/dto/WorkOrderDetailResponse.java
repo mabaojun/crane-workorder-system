@@ -58,6 +58,15 @@ public class WorkOrderDetailResponse {
     /** 预计使用时长（天），仅备注提示 */
     private BigDecimal estimatedDays;
 
+    /** 结算主体：ENTERPRISE 企业客户主体 / PERSONAL 个人结算 */
+    private String settlementType;
+
+    /** 结算主体客户 id，ENTERPRISE 时为归属企业客户；PERSONAL 时为空 */
+    private Long settlementCustomerId;
+
+    /** 结算主体客户名称（ENTERPRISE 时回填，供列表/详情展示） */
+    private String settlementCustomerName;
+
     private LocalDateTime expectedStartAt;
 
     private LocalDateTime acceptedAt;

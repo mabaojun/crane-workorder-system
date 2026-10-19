@@ -82,6 +82,19 @@
         </div>
       </el-form-item>
       <template v-if="mode === 'convert'">
+        <el-form-item label="结算主体" required>
+          <el-radio-group v-model="form.settlementType">
+            <el-radio value="ENTERPRISE" :disabled="!!prefill?.settlementCustomerIsPerson">
+              企业主体{{ prefill?.settlementCustomerName ? `（${prefill.settlementCustomerName}）` : '' }}
+            </el-radio>
+            <el-radio value="PERSONAL">个人结算</el-radio>
+          </el-radio-group>
+          <div class="tip">
+            {{ prefill?.settlementCustomerIsPerson
+              ? '该客户为个人客户，仅支持个人结算'
+              : '企业主体：订单统一归属该企业结算；个人结算：以个人名义结算' }}
+          </div>
+        </el-form-item>
         <el-form-item label="吊车吨位" required>
           <el-input-number v-model="form.craneTonnage" :min="1" :precision="1" controls-position="right" style="width: 200px" />
           <span class="unit">吨</span>
@@ -171,6 +184,11 @@ const props = defineProps<{
     address?: string
     longitude?: number
     latitude?: number
+    /** 结算主体：ENTERPRISE 企业主体 / PERSONAL 个人结算（转工单带入需求单值） */
+    settlementType?: string
+    /** 需求单所属客户名称与类型（企业主体展示客户名；个人客户仅个人结算） */
+    settlementCustomerName?: string
+    settlementCustomerIsPerson?: boolean
   }
   submit: (payload: {
     staffId: number
@@ -180,6 +198,8 @@ const props = defineProps<{
     cargoWeightTon?: number
     /** 预计使用时长（天），选填，仅备注提示 */
     estimatedDays?: number
+    /** 结算主体，仅转工单场景提交 */
+    settlementType?: string
     remark: string
     confirmPast: boolean
   }) => Promise<void>
@@ -195,6 +215,7 @@ const form = reactive({
   craneTonnage: undefined as number | undefined,
   cargoWeightTon: undefined as number | undefined,
   estimatedDays: undefined as number | undefined,
+  settlementType: 'ENTERPRISE' as string,
   remark: '',
   confirmPast: false
 })
@@ -261,6 +282,9 @@ async function loadOptions() {
   form.craneTonnage = props.prefill?.craneTonnage
   form.cargoWeightTon = props.prefill?.cargoWeightTon
   form.estimatedDays = props.prefill?.estimatedDays
+  form.settlementType = props.prefill?.settlementCustomerIsPerson
+    ? 'PERSONAL'
+    : props.prefill?.settlementType || 'ENTERPRISE'
   form.remark = props.prefill?.remark ?? ''
   optionsLoading.value = true
   optionsError.value = false
@@ -319,6 +343,7 @@ async function onSubmit() {
       craneTonnage: form.craneTonnage,
       cargoWeightTon: form.cargoWeightTon,
       estimatedDays: form.estimatedDays,
+      settlementType: props.mode === 'convert' ? form.settlementType : undefined,
       remark: form.remark.trim(),
       confirmPast: form.confirmPast
     })

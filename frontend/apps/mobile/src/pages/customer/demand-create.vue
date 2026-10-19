@@ -32,6 +32,10 @@ const expectDate = ref('')
 const expectTime = ref('')
 const photos = ref<string[]>([])
 const parentDemandId = ref<number | undefined>(undefined)
+/** 结算主体：企业联系人默认按所属企业结算，可手动切换为个人用车 */
+const settlementType = ref<'ENTERPRISE' | 'PERSONAL'>('ENTERPRISE')
+/** 仅企业客户展示结算主体切换（个人客户只能个人结算） */
+const isCompanyCustomer = computed(() => auth.me?.customerType === 'COMPANY')
 
 const showPicker = ref(false)
 
@@ -92,6 +96,7 @@ onLoad((opts) => {
     description.value = d.description ?? ''
     cargoWeight.value = d.cargoWeight != null ? String(d.cargoWeight) : ''
     estimatedDays.value = d.estimatedDays != null ? String(d.estimatedDays) : ''
+    settlementType.value = d.settlementType === 'PERSONAL' ? 'PERSONAL' : 'ENTERPRISE'
     uni.removeStorageSync('demand_draft')
   }
 })
@@ -173,6 +178,8 @@ async function submit() {
       craneTonnage: craneTonnage.value ? Number(craneTonnage.value) : undefined,
       // 预计使用时长：点选常用档位或直接输入，仅备注提示不作换算
       estimatedDays: estimatedDays.value ? Number(estimatedDays.value) : undefined,
+      // 企业联系人默认按所属企业结算，可切换个人用车；个人客户由后端强制个人主体
+      settlementType: isCompanyCustomer.value ? settlementType.value : undefined,
       expectedStartAt,
       parentDemandId: parentDemandId.value
     })
@@ -287,6 +294,22 @@ async function submit() {
           </view>
           <text class="field-hint">点击时间框可自选任意时间</text>
         </view>
+      </view>
+      <view v-if="isCompanyCustomer" class="field col">
+        <text class="label">结算主体</text>
+        <view class="desc-chips">
+          <view
+            class="desc-chip"
+            :class="{ active: settlementType === 'ENTERPRISE' }"
+            @tap="settlementType = 'ENTERPRISE'"
+          >企业主体{{ auth.me?.customerName ? `（${auth.me.customerName}）` : '' }}</view>
+          <view
+            class="desc-chip"
+            :class="{ active: settlementType === 'PERSONAL' }"
+            @tap="settlementType = 'PERSONAL'"
+          >个人用车（个人结算）</view>
+        </view>
+        <text class="hint-line">默认归属所属企业结算；切换为个人用车后以您个人名义结算</text>
       </view>
       <view class="field col">
         <text class="label">现场照片</text>

@@ -39,7 +39,7 @@ class CommonPlaceServiceTest {
 
     @BeforeEach
     void setUp() {
-        AuthContext.set(new AuthContext(1L, "ADMIN", "SELF", null, null, null));
+        AuthContext.set(new AuthContext(1L, "ADMIN", "SELF", null, null, null, null));
     }
 
     @AfterEach

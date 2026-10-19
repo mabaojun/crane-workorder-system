@@ -42,6 +42,8 @@ export interface DemandOrder {
   cargoWeight?: number
   /** 预计使用时长（天），客户自估仅备注提示 */
   estimatedDays?: number
+  /** 结算主体：ENTERPRISE 企业主体 / PERSONAL 个人主体 */
+  settlementType?: string
   expectedStartAt?: string
   status: string
   reviewRemark?: string
@@ -67,6 +69,12 @@ export interface MeInfo {
   phone: string
   staffId?: number
   customerId?: number
+  /** 客户联系人账号绑定的联系人 id（企业多联系人提报身份） */
+  contactId?: number
+  /** 所属客户名称（企业主体展示） */
+  customerName?: string
+  /** 所属客户类型：COMPANY / PERSON */
+  customerType?: string
   dataScope?: string
   permissions?: string[]
 }

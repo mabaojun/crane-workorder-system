@@ -68,6 +68,12 @@ public class WorkOrder {
     /** 预计使用时长（天），仅备注提示帮助司机与管理员建立时长预期，不参与时间换算 */
     private BigDecimal estimatedDays;
 
+    /** 结算主体：ENTERPRISE 企业客户主体（对账按客户汇总）/PERSONAL 个人结算（对账按联系人） */
+    private String settlementType;
+
+    /** 结算主体客户 id，ENTERPRISE 时=归属企业客户；PERSONAL 时为空（按联系人结算） */
+    private Long settlementCustomerId;
+
     /** 预计开始时间 */
     private LocalDateTime expectedStartAt;
 

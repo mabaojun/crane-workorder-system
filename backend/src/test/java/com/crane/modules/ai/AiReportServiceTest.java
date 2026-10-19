@@ -95,7 +95,34 @@ class AiReportServiceTest {
                 .contains("新增工单：6").contains("完成 4").contains("进行中 3")
                 .contains("待接单 2").contains("报警：1 条").contains("超时未接单(HIGH,70分钟)")
                 .contains("异常上报：2 条").contains("需求单：3 条")
-                .contains("作业中 2 台").contains("维保 1 台");
+                .contains("作业中 2 台").contains("维保 1 台")
+                .contains("车险临期 0 台").contains("审车临期 0 台")
+                .contains("临期/过期明细：无");
+    }
+
+    @Test
+    void 证照临期计入提示词() {
+        when(systemConfigService.getOrDefault(eq("ai.report_prompt"), any())).thenAnswer(inv -> inv.getArgument(1));
+
+        AlarmItem insurance = new AlarmItem();
+        insurance.setType("VEHICLE_INSURANCE_EXPIRING");
+        insurance.setLevel("MEDIUM");
+        insurance.setPlateNo("鲁C11111");
+        insurance.setSummary("车险将在 10 天后到期（2026-10-29）");
+        insurance.setDurationMinutes(10 * 24 * 60);
+        AlarmItem inspection = new AlarmItem();
+        inspection.setType("VEHICLE_INSPECTION_EXPIRING");
+        inspection.setLevel("HIGH");
+        inspection.setPlateNo("鲁D22222");
+        inspection.setSummary("审车已过期 5 天（到期 2026-10-14）");
+        inspection.setDurationMinutes(0);
+
+        String prompt = service.buildPrompt(LocalDate.of(2026, 10, 19),
+                dash(6, 4, 3, 2), List.of(insurance, inspection));
+
+        assertThat(prompt).contains("车险临期 1 台").contains("审车临期 1 台")
+                .contains("鲁C11111 车险将在 10 天后到期（2026-10-29）")
+                .contains("鲁D22222 审车已过期 5 天（到期 2026-10-14）");
     }
 
     @Test
