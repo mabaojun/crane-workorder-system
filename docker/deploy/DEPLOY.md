@@ -68,10 +68,12 @@ SKIP_TESTS=1 bash docker/deploy/build-images.sh
 
 ## 2. 上传到服务器
 
-在本地执行（把 `<版本>` 替换为实际版本）：
+在本地执行（把 `<版本>` 替换为实际版本，`<私钥文件>` 替换为 SSH 私钥）：
 
 ```bash
-scp docker/deploy/dist-release/crane-release-<版本>.tar.gz root@服务器IP:/tmp/
+scp -i ~/.ssh/<私钥文件> \
+  docker/deploy/dist-release/crane-release-<版本>.tar.gz \
+  ubuntu@82.157.64.189:/tmp/
 ```
 
 同时在本地准备腾讯云证书文件（Nginx 版）：
@@ -83,39 +85,96 @@ jndys.top.key
 
 ---
 
-## 3. 服务器准备
+## 3. 新服务器初始化（Ubuntu 24.04）
 
-登录服务器：
+> 本次服务器：`82.157.64.189`，登录用户 `ubuntu`，SSH 密钥登录，无口令。  
+> 域名 `jndys.top` 已解析到该服务器。  
+> 以下命令在服务器执行，需要管理员权限的已标注 `sudo`。
+
+### 3.1 登录服务器
+
+本地执行（把 `<私钥文件>` 替换为你的 SSH 私钥）：
 
 ```bash
-ssh root@服务器IP
+ssh -i ~/.ssh/<私钥文件> ubuntu@82.157.64.189
 ```
 
-### 3.1 检查 Docker
+### 3.2 切换腾讯软件源（Ubuntu 24.04）
+
+Ubuntu 24.04 使用 `/etc/apt/sources.list.d/ubuntu.sources`：
+
+```bash
+sudo cp /etc/apt/sources.list.d/ubuntu.sources \
+  "/etc/apt/sources.list.d/ubuntu.sources.bak.$(date +%F_%H%M)"
+
+sudo sed -i -E \
+  's#https?://(archive|security)\.ubuntu\.com/ubuntu/?#https://mirrors.cloud.tencent.com/ubuntu/#g; s#https?://ports\.ubuntu\.com/ubuntu-ports/?#https://mirrors.cloud.tencent.com/ubuntu-ports/#g' \
+  /etc/apt/sources.list.d/ubuntu.sources
+
+sudo apt-get update
+```
+
+如果系统仍存在 `/etc/apt/sources.list`，同样替换：
+
+```bash
+sudo sed -i -E \
+  's#https?://(archive|security)\.ubuntu\.com/ubuntu/?#https://mirrors.cloud.tencent.com/ubuntu/#g' \
+  /etc/apt/sources.list
+```
+
+### 3.3 安装 Docker CE + Compose（腾讯源）
+
+```bash
+sudo apt-get install -y ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+
+curl -fsSL https://mirrors.tencent.com/docker-ce/linux/ubuntu/gpg \
+  | sudo gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+https://mirrors.tencent.com/docker-ce/linux/ubuntu \
+$(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+
+sudo apt-get update
+sudo apt-get install -y \
+  docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+sudo systemctl enable --now docker
+sudo usermod -aG docker ubuntu
+```
+
+重新登录 SSH（或执行 `newgrp docker`）后，`ubuntu` 用户可免 sudo 使用 Docker。
+
+配置镜像加速：
+
+```bash
+sudo mkdir -p /etc/docker
+sudo tee /etc/docker/daemon.json >/dev/null <<'EOF'
+{
+  "registry-mirrors": [
+    "https://mirror.ccs.tencentyun.com",
+    "https://docker.1ms.run"
+  ]
+}
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+```
+
+验证：
 
 ```bash
 docker version
 docker compose version
 ```
 
-两者都有输出即可。若未安装（一般已有其他容器则无需执行）：
+> 如果 `/etc/docker/daemon.json` 已存在，不要直接覆盖；可在第 4 步解压后运行
+> `sudo bash /crane/deploy/server-init-ubuntu24-tencent.sh`，脚本会合并 `registry-mirrors`。
 
-```bash
-curl -fsSL https://get.docker.com | sh
-systemctl enable --now docker
-```
-
-> 国内服务器拉取 `eclipse-temurin:17-jre` 缓慢时，可在 `/etc/docker/daemon.json` 配置镜像加速后重启 Docker（会重启同机容器，建议在维护窗口执行）：
->
-> ```json
-> { "registry-mirrors": ["https://mirror.ccs.tencentyun.com", "https://docker.1ms.run"] }
-> ```
->
-> ```bash
-> systemctl restart docker
-> ```
-
-### 3.2 检查端口占用（必须为空闲）
+### 3.4 检查端口与防火墙
 
 ```bash
 ss -lntp | grep -E ':(80|443|7772)\b' || echo "80/443/7772 均空闲"
@@ -124,25 +183,22 @@ ss -lntp | grep -E ':(80|443|7772)\b' || echo "80/443/7772 均空闲"
 - `80/443`：本系统 Nginx 使用；
 - `7772`：仅绑定 `127.0.0.1` 供数据库排查。
 
-### 3.3 放行防火墙与云安全组
-
 ```bash
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw status
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw status
 ```
 
-腾讯云控制台「安全组」同样放行 TCP 80、443。**不要放行 7772。**
+腾讯云控制台「安全组」放行 TCP 22、80、443。**不要放行 7772。**
 
-### 3.4 域名解析
-
-在 DNS 服务商把 `jndys.top` 的 A 记录指向服务器公网 IP：
+### 3.5 域名解析确认
 
 ```bash
 ping -c 1 jndys.top
 ```
 
-确认解析到本机公网 IP 后再继续。
+期望解析到 `82.157.64.189`。
 
 ---
 
@@ -155,6 +211,12 @@ sudo mkdir -p /crane
 sudo chown -R "$USER":"$USER" /crane
 tar -xzf /tmp/crane-release-<版本>.tar.gz -C /crane --strip-components=1
 ls -la /crane
+```
+
+如果第 3 步没有手工安装 Docker，可在这个阶段运行一键初始化脚本（腾讯源 + Docker + 镜像加速）：
+
+```bash
+sudo bash /crane/deploy/server-init-ubuntu24-tencent.sh
 ```
 
 期望目录：
@@ -184,7 +246,7 @@ cd /crane && sha256sum -c SHA256SUMS
 参考腾讯云文档下载 **Nginx 版**证书，上传到服务器：
 
 ```bash
-scp jndys.top_bundle.crt jndys.top.key root@服务器IP:/tmp/
+scp -i ~/.ssh/<私钥文件> jndys.top_bundle.crt jndys.top.key ubuntu@82.157.64.189:/tmp/
 ```
 
 统一重命名并放到证书目录：

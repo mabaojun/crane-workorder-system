@@ -62,6 +62,8 @@ mkdir -p "$STAGE"/{deploy,mysql/init,backend/target,www/admin,www/h5,www/screen,
 cp docker/deploy/docker-compose.yml "$STAGE/deploy/"
 cp docker/deploy/nginx.conf          "$STAGE/deploy/"
 cp docker/deploy/backup-loop.sh      "$STAGE/deploy/"
+cp docker/deploy/server-init-ubuntu24-tencent.sh "$STAGE/deploy/"
+chmod +x "$STAGE/deploy/server-init-ubuntu24-tencent.sh"
 # .env.example 预填本次版本号，避免部署时 APP_VERSION 为空回退到 latest
 sed "s|^APP_VERSION=.*|APP_VERSION=$VERSION|" docker/deploy/.env.example > "$STAGE/deploy/.env.example"
 cp docker/deploy/DEPLOY.md           "$STAGE/DEPLOY.md"
@@ -112,8 +114,20 @@ cat > "$STAGE/version.json" <<EOF
 }
 EOF
 
-# 5. 校验与压缩
-echo "== [4/5] 生成 SHA256 校验清单 =="
+# 5. 升级说明：先追加本次打包记录，再随发布包一起归档
+echo "== [4/5] 更新升级说明并生成 SHA256 校验清单 =="
+UPGRADE_DOC="$ROOT/升级说明.md"
+if [ -f "$UPGRADE_DOC" ]; then
+  # 先打一次预归档包获取大小，最终包会再加 UPGRADE.md 与 SHA256SUMS
+  tar -czf "$TARBALL" -C "$OUT" "$STAGE_NAME_BASE-$VERSION"
+  PKG_SIZE=$(du -h "$TARBALL" | cut -f1)
+  printf '| %s | %s | %s | %s | %s |\n' \
+    "$(date '+%F %T')" "$VERSION" "$GIT_SHA" "$(basename "$TARBALL")" "$PKG_SIZE" \
+    >> "$UPGRADE_DOC"
+  cp "$UPGRADE_DOC" "$STAGE/UPGRADE.md"
+  echo "已更新升级说明：$UPGRADE_DOC"
+fi
+
 cd "$STAGE"
 if command -v shasum >/dev/null; then
   find . -type f ! -name SHA256SUMS -print0 | xargs -0 shasum -a 256 > SHA256SUMS
@@ -125,15 +139,6 @@ cd "$ROOT"
 echo "== [5/5] 生成压缩包 =="
 tar -czf "$TARBALL" -C "$OUT" "$STAGE_NAME_BASE-$VERSION"
 echo "$(date '+%F %T')  $VERSION  linux/amd64  $(du -h "$TARBALL" | cut -f1)  $TARBALL" >> "$OUT/release-history.log"
-
-# 6. 升级说明：自动追加本次打包记录（项目根目录，随代码提交）
-UPGRADE_DOC="$ROOT/升级说明.md"
-if [ -f "$UPGRADE_DOC" ]; then
-  printf '| %s | %s | %s | %s | %s |\n' \
-    "$(date '+%F %T')" "$VERSION" "$GIT_SHA" "$(basename "$TARBALL")" "$(du -h "$TARBALL" | cut -f1)" \
-    >> "$UPGRADE_DOC"
-  echo "已更新升级说明：$UPGRADE_DOC"
-fi
 
 du -sh "$STAGE"/* | sed 's/^/  /'
 echo "DONE"
